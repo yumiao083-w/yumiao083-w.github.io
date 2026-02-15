@@ -29,6 +29,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            padding: 0 24px;
             transition: opacity 1.2s ease;
         }
 
@@ -38,19 +39,22 @@
         }
 
         .typewriter {
-            font-size: 1.6rem;
-            letter-spacing: 5px;
+            font-size: clamp(1rem, 4.2vw, 1.6rem);
+            letter-spacing: clamp(2px, 1vw, 5px);
             color: rgba(255,255,255,0.85);
             font-weight: 300;
             position: relative;
             display: inline;
-            line-height: 2;
+            line-height: 2.2;
+            text-align: center;
+            max-width: 90vw;
+            word-break: keep-all;
         }
 
         .typewriter .cursor {
             display: inline-block;
             width: 2px;
-            height: 1.3em;
+            height: 1.2em;
             background: rgba(255,255,255,0.7);
             margin-left: 2px;
             vertical-align: text-bottom;
@@ -139,9 +143,9 @@
         .nav-link {
             text-decoration: none;
             color: #555;
-            font-size: 1.35rem;
+            font-size: clamp(1.1rem, 3.5vw, 1.35rem);
             font-weight: 300;
-            letter-spacing: 4px;
+            letter-spacing: clamp(2px, 0.8vw, 4px);
             transition: color 0.5s ease, transform 0.4s ease, text-shadow 0.5s ease;
             position: relative;
             padding: 6px 20px;
@@ -169,7 +173,6 @@
             to   { opacity: 1; transform: translateY(0); }
         }
 
-        /* 下划线装饰 */
         .nav-link::after {
             content: '';
             position: absolute;
@@ -192,7 +195,6 @@
             text-shadow: 0 0 12px rgba(255,255,255,0.35);
         }
 
-        /* "未完待续" */
         .nav-link.coming-soon {
             color: #3a3a3a;
             font-style: italic;
@@ -245,7 +247,6 @@
 </head>
 <body>
 
-    <!-- 开场打字机动画 -->
     <div class="intro-overlay" id="introOverlay">
         <div class="typewriter" id="typewriter"><span class="cursor" id="cursor"></span></div>
     </div>
@@ -297,26 +298,21 @@
 
             function type() {
                 if (i < text.length) {
-                    // 在光标前插入文字
                     const span = document.createElement('span');
                     span.textContent = text[i];
                     el.insertBefore(span, cursorEl);
                     i++;
 
-                    // 逗号和句号后稍作停顿
                     const ch = text[i - 1];
                     const delay = (ch === '，' || ch === '。') ? 400 : 140;
                     setTimeout(type, delay);
                 } else {
-                    // 打完后光标再闪几下然后消失
                     setTimeout(() => {
                         cursorEl.classList.add('hidden');
-                        // 整句短暂停留后淡出
                         setTimeout(() => {
                             overlay.classList.add('fade-out');
                             main.classList.add('show');
                             footer.classList.add('show');
-                            // 遮罩过渡结束后移除 DOM
                             overlay.addEventListener('transitionend', () => {
                                 overlay.remove();
                             });
@@ -325,7 +321,6 @@
                 }
             }
 
-            // 页面加载后短暂等待再开始打字
             setTimeout(type, 600);
         })();
 
