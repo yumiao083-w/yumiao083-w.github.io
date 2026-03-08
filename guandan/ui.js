@@ -651,18 +651,23 @@ class GuandanUI {
         // 隐藏配置界面，开始游戏
         document.getElementById('config-screen').style.display = 'none';
 
-        // 移动端自动请求全屏
-        if (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) {
-            var el = document.documentElement;
-            var rfs = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
-            if (rfs && !document.fullscreenElement && !document.webkitFullscreenElement) {
-                rfs.call(el).then(function() {
-                    if (screen.orientation && screen.orientation.lock) {
-                        screen.orientation.lock('landscape').catch(function(){});
+        // 移动端自动请求全屏（不阻塞游戏启动）
+        try {
+            if (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) {
+                var docEl = document.documentElement;
+                var rfs = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.msRequestFullscreen;
+                if (rfs && !document.fullscreenElement && !document.webkitFullscreenElement) {
+                    var p = rfs.call(docEl);
+                    if (p && p.then) {
+                        p.then(function() {
+                            if (screen.orientation && screen.orientation.lock) {
+                                screen.orientation.lock('landscape').catch(function(){});
+                            }
+                        }).catch(function(){});
                     }
-                }).catch(function(){});
+                }
             }
-        }
+        } catch(e) { /* 全屏失败不影响游戏 */ }
 
         this.startGame();
     }
