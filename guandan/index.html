@@ -7,6 +7,13 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <!-- 竖屏旋转提示 -->
+    <div id="rotate-hint">
+        <div class="rotate-icon">📱</div>
+        <div>请横屏游玩</div>
+        <div style="font-size:14px;color:#aaa;">旋转手机以获得最佳体验</div>
+    </div>
+
     <div id="game-container">
         <!-- 顶部信息栏 -->
         <div id="top-bar">
@@ -27,6 +34,7 @@
             </div>
             <div class="player-cards-hidden" id="top-cards"></div>
             <div class="player-action" id="top-action"></div>
+            <div class="played-area" id="played-top"></div>
         </div>
 
         <!-- 玩家1（右方） -->
@@ -38,6 +46,7 @@
             </div>
             <div class="player-cards-hidden" id="right-cards"></div>
             <div class="player-action" id="right-action"></div>
+            <div class="played-area" id="played-right"></div>
         </div>
 
         <!-- 玩家3（左方） -->
@@ -49,16 +58,11 @@
             </div>
             <div class="player-cards-hidden" id="left-cards"></div>
             <div class="player-action" id="left-action"></div>
+            <div class="played-area" id="played-left"></div>
         </div>
 
-        <!-- 中央出牌区 -->
+        <!-- 中央信息区（仅文字提示） -->
         <div id="center-area">
-            <div id="played-cards-area">
-                <div class="played-slot" id="played-top"></div>
-                <div class="played-slot" id="played-right"></div>
-                <div class="played-slot" id="played-left"></div>
-                <div class="played-slot" id="played-bottom"></div>
-            </div>
             <div id="game-info"></div>
         </div>
 
@@ -69,6 +73,7 @@
                 <span class="player-tag team-a">A</span>
             </div>
             <div class="player-action" id="bottom-action"></div>
+            <div class="played-area" id="played-bottom"></div>
             <div class="player-cards" id="bottom-cards"></div>
             <div id="controls">
                 <button id="btn-play" onclick="gameUI.playCards()" disabled>出牌</button>

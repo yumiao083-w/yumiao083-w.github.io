@@ -506,14 +506,16 @@ class GuandanUI {
                 el.appendChild(renderCard(id, this.game.currentRank, { selectable: true }));
             });
         } else {
-            // AI手牌：显示背面
-            for (let i = 0; i < this.game.hands[p].length; i++) {
-                el.appendChild(renderCardBack());
-            }
-            // 更新张数
+            // AI手牌：显示为单个牌图标+数字
+            const count = this.game.hands[p].length;
+            const icon = document.createElement('div');
+            icon.className = 'card-count-icon';
+            icon.innerHTML = '<span class="count-number">' + count + '</span><span class="count-label">张</span>';
+            el.appendChild(icon);
+            // 同步更新 info 栏的张数
             const area = ['player-bottom', 'player-right', 'player-top', 'player-left'][p];
             const countEl = document.querySelector(`#${area} .card-count`);
-            if (countEl) countEl.textContent = `(${this.game.hands[p].length}张)`;
+            if (countEl) countEl.textContent = `(${count}张)`;
         }
     }
 
