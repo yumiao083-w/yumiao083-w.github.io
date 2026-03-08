@@ -5,9 +5,11 @@ body {
     background-image: radial-gradient(ellipse at center, #2d7a3e 0%, #14472a 100%);
     color: #fff;
     font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
-    min-height: 100vh; overflow: hidden; user-select: none;
+    min-height: 100vh; min-height: 100dvh; overflow: hidden; user-select: none;
+    /* iOS safe area */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
-#game-container { width: 100vw; height: 100vh; position: relative; }
+#game-container { width: 100vw; height: 100vh; height: 100dvh; position: relative; }
 
 /* ===== 强制横屏提示 ===== */
 #rotate-hint {
@@ -29,6 +31,19 @@ body {
 @media screen and (max-width: 640px) and (orientation: portrait) {
     #rotate-hint { display: flex !important; }
     #game-container { display: none !important; }
+}
+
+/* ===== 全屏按钮 ===== */
+#btn-fullscreen {
+    position: fixed; top: 6px; right: 8px; z-index: 10;
+    background: rgba(0,0,0,0.5); color: #fff; border: 1px solid rgba(255,255,255,0.3);
+    padding: 3px 8px; border-radius: 8px; font-size: 11px; cursor: pointer;
+    backdrop-filter: blur(4px);
+}
+#btn-fullscreen:hover { background: rgba(0,0,0,0.7); }
+/* 已经全屏或 PWA 模式时隐藏 */
+@media (display-mode: fullscreen), (display-mode: standalone) {
+    #btn-fullscreen { display: none; }
 }
 
 /* ===== 顶部 ===== */

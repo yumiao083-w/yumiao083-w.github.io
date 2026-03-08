@@ -2,7 +2,12 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="screen-orientation" content="landscape">
+    <link rel="manifest" href="manifest.json">
     <title>掼蛋 - yuanlang.love</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -15,6 +20,9 @@
     </div>
 
     <div id="game-container">
+        <!-- 全屏按钮 -->
+        <button id="btn-fullscreen" onclick="toggleFullscreen()">⛶ 全屏</button>
+
         <!-- 顶部信息栏 -->
         <div id="top-bar">
             <div id="level-info">
@@ -173,5 +181,34 @@
     <script src="api-ai.js"></script>
     <script src="game.js"></script>
     <script src="ui.js"></script>
+    <script>
+    // 全屏切换
+    function toggleFullscreen() {
+        var el = document.documentElement;
+        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+            var rfs = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+            if (rfs) {
+                rfs.call(el).then(function() {
+                    // 尝试锁定横屏
+                    if (screen.orientation && screen.orientation.lock) {
+                        screen.orientation.lock('landscape').catch(function(){});
+                    }
+                }).catch(function(){});
+            }
+        } else {
+            var efs = document.exitFullscreen || document.webkitExitFullscreen;
+            if (efs) efs.call(document);
+        }
+    }
+    // 更新按钮文字
+    document.addEventListener('fullscreenchange', function() {
+        var btn = document.getElementById('btn-fullscreen');
+        if (btn) btn.textContent = document.fullscreenElement ? '⛶ 退出全屏' : '⛶ 全屏';
+    });
+    document.addEventListener('webkitfullscreenchange', function() {
+        var btn = document.getElementById('btn-fullscreen');
+        if (btn) btn.textContent = document.webkitFullscreenElement ? '⛶ 退出全屏' : '⛶ 全屏';
+    });
+    </script>
 </body>
 </html>

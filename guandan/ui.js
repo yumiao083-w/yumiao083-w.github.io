@@ -637,6 +637,20 @@ class GuandanUI {
 
         // 隐藏配置界面，开始游戏
         document.getElementById('config-screen').style.display = 'none';
+
+        // 移动端自动请求全屏
+        if (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) {
+            var el = document.documentElement;
+            var rfs = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+            if (rfs && !document.fullscreenElement && !document.webkitFullscreenElement) {
+                rfs.call(el).then(function() {
+                    if (screen.orientation && screen.orientation.lock) {
+                        screen.orientation.lock('landscape').catch(function(){});
+                    }
+                }).catch(function(){});
+            }
+        }
+
         this.startGame();
     }
 
