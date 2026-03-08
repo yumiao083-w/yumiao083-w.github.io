@@ -14,47 +14,55 @@ GuandanAPIAI.prototype.buildUserPrompt = function(playerIdx) {
     // 手牌转可读名
     var handNames = hand.map(function(id) { return cardIdToName(id, currentRank); });
 
-    // 基本信息
-    var lines = [];
-    lines.push('## 当前局面');
-    lines.push('- 你是: ' + game.playerNames[playerIdx] + ' (座位' + playerIdx + ')');
-    lines.push('- 你的队友: ' + game.playerNames[(playerIdx + 2) % 4] + ' (座位' + ((playerIdx + 2) % 4) + ')');
-    lines.push('- 对手: ' + game.playerNames[(playerIdx + 1) % 4] + ', ' + game.playerNames[(playerIdx + 3) % 4]);
-    lines.push('- 当前打: ' + RANK_NAMES[currentRank]);
-    lines.push('- 逢人配: 红桃' + RANK_NAMES[currentRank]);
-    lines.push('- 第' + game.roundNumber + '局');
-    lines.push('- ' + game.teamNames[0] + '打' + RANK_NAMES[game.teamLevels[0]] + ', ' + game.teamNames[1] + '打' + RANK_NAMES[game.teamLevels[1]]);
-    lines.push('');
+    // 手牌按牌型分组分析，帮助AI理解手牌结构
+    var pg = getPointGroups(hand, currentRank);
+    var groups = pg.groups;
+    var weights = Object.keys(groups).map(Number).sort(function(a,b){return a-b;});
+    var handAnalysis = [];
+    weights.forEach(function(w) {
+        var cards = groups[w].map(function(id) { return cardIdToName(id, currentRank); });
+        var label = cards.length >= 4 ? '炸弹' : cards.length === 3 ? '三条' : cards.length === 2 ? '对子' : '单张';
+        handAnalysis.push(label + ': ' + cards.join('+'));
+    });
+    if (pg.wilds.length > 0) {
+        handAnalysis.push('逢人配: ' + pg.wilds.map(function(id) { return cardIdToName(id, currentRank); }).join('+'));
+    }
 
-    // 手牌
-    lines.push('## 你的手牌 (' + hand.length + '张)');
-    lines.push(handNames.join(', '));
+    var lines = [];
+    lines.push('当前打: ' + RANK_NAMES[currentRank] + ' | 逢人配: 红桃' + RANK_NAMES[currentRank]);
+    lines.push('你是: ' + game.playerNames[playerIdx] + ' | 队友: ' + game.playerNames[(playerIdx + 2) % 4]);
     lines.push('');
 
     // 各家剩余牌数
-    lines.push('## 各家剩余');
+    lines.push('各家牌数:');
     for (var i = 0; i < 4; i++) {
+        var rel = '';
+        if (i === playerIdx) rel = '(你)';
+        else if (i === (playerIdx + 2) % 4) rel = '(队友)';
+        else rel = '(对手)';
         var finished = game.finishOrder.indexOf(i) !== -1;
-        lines.push('- ' + game.playerNames[i] + ': ' + (finished ? '已出完' : game.hands[i].length + '张'));
+        lines.push('  ' + game.playerNames[i] + rel + ': ' + (finished ? '已出完' : game.hands[i].length + '张'));
     }
     lines.push('');
 
-    // 当前要求
-    if (game.lastPlayedBy === -1 || game.lastPlayedBy === playerIdx) {
-        lines.push('## 你的任务');
-        lines.push('你是首出，必须出牌（不能pass），自由选择牌型，选择最有利的牌。');
+    // 手牌
+    lines.push('你的手牌(' + hand.length + '张): ' + handNames.join(', '));
+    lines.push('牌型分析: ' + handAnalysis.join(' | '));
+    lines.push('');
+
+    // 出牌要求
+    var mustPlay = (game.lastPlayedBy === -1 || game.lastPlayedBy === playerIdx);
+    if (mustPlay) {
+        lines.push('【首出】你必须出牌，action必须是play，自由选择牌型。');
     } else {
         var lastTypeName = TYPE_NAMES[game.lastPlayedType.type] || '未知';
         var lastCardNames = game.lastPlayedCards.map(function(id) { return cardIdToName(id, currentRank); });
-        lines.push('## 上家出牌');
-        lines.push('- 出牌人: ' + game.playerNames[game.lastPlayedBy] + (game.teams[game.lastPlayedBy] === game.teams[playerIdx] ? ' (你的队友)' : ' (对手)'));
-        lines.push('- 牌型: ' + lastTypeName);
-        lines.push('- 牌: ' + lastCardNames.join(', '));
-        lines.push('');
-        lines.push('## 你的任务');
-        lines.push('你需要出比上家更大的同类型牌，或用炸弹压，或选择不出(pass)。');
-        if (game.teams[game.lastPlayedBy] === game.teams[playerIdx]) {
-            lines.push('注意：上家是你的队友，除非必要否则不建议压队友的牌。');
+        var isTeammate = game.teams[game.lastPlayedBy] === game.teams[playerIdx];
+        lines.push('上家: ' + game.playerNames[game.lastPlayedBy] + (isTeammate ? '(队友)' : '(对手)') +
+                   ' 出了' + lastTypeName + ': ' + lastCardNames.join(', '));
+        lines.push('你可以出更大的同类型牌/炸弹压过，或pass不出。');
+        if (isTeammate) {
+            lines.push('（上家是队友，建议不压，选pass）');
         }
     }
 

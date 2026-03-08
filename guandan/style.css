@@ -112,6 +112,14 @@ body {
     position: absolute; bottom: 2px; font-size: 9px; color: #90caf9;
 }
 
+/* 开发者模式 AI 手牌（缩小展示） */
+#top-cards .card, #left-cards .card, #right-cards .card {
+    width: 30px; height: 42px; margin-left: -18px; cursor: default;
+}
+#top-cards .card:first-child, #left-cards .card:first-child, #right-cards .card:first-child { margin-left: 0; }
+#top-cards .card .card-rank, #left-cards .card .card-rank, #right-cards .card .card-rank { font-size: 10px; }
+#top-cards .card .card-suit, #left-cards .card .card-suit, #right-cards .card .card-suit { font-size: 8px; }
+
 /* ===== 手牌（用户） ===== */
 .player-cards-hidden { display: flex; gap: 0; justify-content: center; }
 .card-back {
@@ -124,7 +132,7 @@ body {
 
 #bottom-cards {
     display: flex; justify-content: center; flex-wrap: nowrap;
-    margin: 3px 0; min-height: 78px; overflow-x: auto;
+    margin: 3px 0; min-height: 78px; padding-top: 16px; overflow: visible;
 }
 
 /* ===== 扑克牌 ===== */

@@ -6,6 +6,7 @@ class GuandanUI {
         this.animDelay = 5000;
         this.timerInterval = null;
         this.timerSeconds = 0;
+        this.devMode = false;
     }
 
     startGame() {
@@ -505,8 +506,17 @@ class GuandanUI {
             this.game.hands[0].forEach(id => {
                 el.appendChild(renderCard(id, this.game.currentRank, { selectable: true }));
             });
+        } else if (this.devMode) {
+            // 开发者模式：AI手牌也显示正面（不可选）
+            this.game.hands[p].forEach(id => {
+                el.appendChild(renderCard(id, this.game.currentRank));
+            });
+            // 更新张数
+            const area = ['player-bottom', 'player-right', 'player-top', 'player-left'][p];
+            const countEl = document.querySelector(`#${area} .card-count`);
+            if (countEl) countEl.textContent = `(${this.game.hands[p].length}张)`;
         } else {
-            // AI手牌：显示为单个牌图标+数字
+            // 正常模式：显示为单个牌图标+数字
             const count = this.game.hands[p].length;
             const icon = document.createElement('div');
             icon.className = 'card-count-icon';
@@ -592,6 +602,9 @@ class GuandanUI {
         var teamB = document.getElementById('cfg-team-b').value.trim() || 'B队';
         var aiDelay = parseInt(document.getElementById('cfg-ai-delay').value) || 5;
         var playerTimeout = parseInt(document.getElementById('cfg-player-timeout').value) || 30;
+
+        // 开发者模式
+        this.devMode = document.getElementById('cfg-dev-mode').checked;
 
         // 限制范围
         if (aiDelay < 1) aiDelay = 1;
@@ -713,30 +726,26 @@ class GuandanUI {
     }
 
     _getDefaultPrompt() {
-        return '你是一个掼蛋游戏AI玩家。\n\n' +
-            '## 掼蛋规则\n' +
-            '- 4人游戏，2v2，座位对面是队友\n' +
-            '- 2副牌共108张，每人27张\n' +
-            '- 牌型：单张、对子、三条、三带二、顺子(5-12张)、连对(3连起)、钢板(2连三条起)、炸弹(4-8同点)、同花顺(仅5张)、天王炸(4王)\n' +
-            '- 炸弹大小：天王炸 > 八炸 > 七炸 > 六炸 > 同花顺 > 五炸 > 四炸\n' +
-            '- 逢人配：当前级牌的红桃为万能牌，可替代任意牌\n' +
-            '- 2最小，A最大，级牌权重高于A\n' +
-            '- 同队两人都先出完则大胜(升3级)，头游+三游升2级，头游+末游升1级\n\n' +
-            '## 输出格式（严格遵守）\n' +
-            '先输出一句角色台词（简短，符合角色性格），然后换行输出分隔符和JSON：\n\n' +
-            '你的台词...\n' +
+        return '你是掼蛋AI。根据手牌和局面选择最优出牌。\n\n' +
+            '## 牌型\n' +
+            '单张|对子|三条|三带二(3+2)|顺子(5-12张连续)|连对(3+连续对子)|钢板(2+连续三条)|炸弹(4-8张同点)|同花顺(5张同花色连续)|天王炸(4王)\n\n' +
+            '## 大小\n' +
+            '点数: 2<3<4<...<K<A<级牌<逢人配<小王<大王\n' +
+            '炸弹等级: 四炸<五炸<同花顺<六炸<七炸<八炸<天王炸\n' +
+            '炸弹可压任何非炸牌型，高级炸压低级炸\n\n' +
+            '## 输出格式（严格遵守，不要输出其他内容）\n' +
+            '台词(一句话)\n' +
             '===PLAY===\n' +
             '{"action":"play","cards":["红桃3","方块5"]}\n\n' +
-            '或者不出：\n' +
-            '你的台词...\n' +
+            '不出时:\n' +
+            '台词\n' +
             '===PLAY===\n' +
             '{"action":"pass"}\n\n' +
-            '## 注意\n' +
-            '- cards 中每张牌格式为 "花色+点数"，如 "红桃A" "方块10" "小王" "大王"\n' +
-            '- 逢人配写原始牌名如 "红桃5"（当打5时），不要写"配"\n' +
-            '- 必须从你的手牌中选择，不能出没有的牌\n' +
-            '- 出牌必须合法（符合牌型要求，跟牌必须压过上家）\n' +
-            '- 考虑策略：保护队友、合理拆牌、适时炸弹';
+            '## 关键规则\n' +
+            '- cards里每张牌必须在你的手牌中，格式"花色+点数"如"红桃A""方块10""小王""大王"\n' +
+            '- 首出时action必须是play，不能pass\n' +
+            '- 跟牌必须同牌型且更大，或用炸弹\n' +
+            '- 队友出的牌一般不压（pass），除非你快出完了';
     }
 }
 
