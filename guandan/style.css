@@ -1,0 +1,202 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    background: #1a5c2a;
+    background-image: radial-gradient(ellipse at center, #2d7a3e 0%, #14472a 100%);
+    color: #fff;
+    font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+    min-height: 100vh; overflow: hidden; user-select: none;
+}
+#game-container { width: 100vw; height: 100vh; position: relative; }
+
+/* ===== 顶部 ===== */
+#top-bar {
+    position: absolute; top: 0; left: 0; right: 0;
+    display: flex; justify-content: center; align-items: center; gap: 24px;
+    padding: 5px 15px; background: rgba(0,0,0,0.5); font-size: 13px; z-index: 5;
+}
+#level-info { display: flex; gap: 16px; }
+#level-info b { font-size: 14px; }
+.team-a-rank, .team-a-name { color: #ff8a80; }
+.team-b-rank, .team-b-name { color: #82b1ff; }
+#wild-info { color: #ffe082; }
+#wild-card-display { color: #ff5252; font-weight: bold; }
+#timer-display {
+    background: rgba(0,0,0,0.4); padding: 2px 10px; border-radius: 10px;
+    font-size: 14px; font-weight: bold; color: #fff; min-width: 36px; text-align: center;
+    visibility: hidden;
+}
+#timer-display.warn { color: #ff5252; animation: pulse 0.5s infinite alternate; }
+@keyframes pulse { from { opacity: 1; } to { opacity: 0.5; } }
+
+/* ===== 玩家区域 ===== */
+.player-area { position: absolute; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.player-info {
+    background: rgba(0,0,0,0.45); padding: 3px 10px; border-radius: 12px;
+    font-size: 13px; display: flex; gap: 5px; align-items: center; white-space: nowrap;
+}
+.player-name { font-weight: bold; }
+.player-tag {
+    font-size: 10px; padding: 1px 5px; border-radius: 8px;
+    font-weight: bold; letter-spacing: 1px;
+}
+.team-a { background: #c62828; color: #fff; }
+.team-b { background: #1565c0; color: #fff; }
+.card-count { color: #aaa; font-size: 12px; }
+.player-action { min-height: 24px; font-size: 14px; color: #ffd700; text-align: center; }
+.player-action.finished { color: #69f0ae; font-weight: bold; }
+.player-action.speech {
+    color: #e0e0e0; font-style: italic; font-size: 12px;
+    background: rgba(0,0,0,0.5); padding: 3px 10px; border-radius: 10px;
+    max-width: 200px; word-break: break-all;
+    animation: fadeInSpeech 0.3s ease;
+}
+@keyframes fadeInSpeech { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+
+#player-top    { top: 28px; left: 50%; transform: translateX(-50%); }
+#player-right  { right: 10px; top: 50%; transform: translateY(-50%); }
+#player-left   { left: 10px; top: 50%; transform: translateY(-50%); }
+#player-bottom { bottom: 6px; left: 50%; transform: translateX(-50%); width: 92%; max-width: 900px; }
+
+/* ===== 手牌 ===== */
+.player-cards-hidden { display: flex; gap: 0; justify-content: center; }
+.card-back {
+    width: 28px; height: 40px;
+    background: linear-gradient(135deg, #1565c0, #0d47a1);
+    border: 1px solid #0a3a7a; border-radius: 3px;
+    margin-left: -16px; box-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+}
+.card-back:first-child { margin-left: 0; }
+
+#bottom-cards {
+    display: flex; justify-content: center; flex-wrap: nowrap;
+    margin: 3px 0; min-height: 78px; overflow-x: auto;
+}
+
+/* ===== 扑克牌 ===== */
+.card {
+    width: 42px; height: 60px;
+    background: #fff; border: 1px solid #aaa; border-radius: 4px;
+    display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+    font-weight: bold; cursor: default;
+    margin-left: -13px; position: relative;
+    transition: transform 0.12s, box-shadow 0.12s;
+    box-shadow: 1px 1px 3px rgba(0,0,0,0.25); flex-shrink: 0;
+}
+.card:first-child { margin-left: 0; }
+.card .card-rank { font-size: 14px; line-height: 1; }
+.card .card-suit { font-size: 11px; line-height: 1; }
+.card.red { color: #c00; }
+.card.black { color: #222; }
+.card.joker-red { color: #c00; background: linear-gradient(135deg, #fff8e1, #ffe0b2); }
+.card.joker-black { color: #333; background: linear-gradient(135deg, #e8e8e8, #c0c0c0); }
+.card.wild { border: 2px solid #ffd700; box-shadow: 0 0 6px rgba(255,215,0,0.5); }
+
+#bottom-cards .card { cursor: pointer; }
+#bottom-cards .card:hover { transform: translateY(-4px); box-shadow: 2px 3px 6px rgba(0,0,0,0.35); }
+#bottom-cards .card.selected {
+    transform: translateY(-14px);
+    box-shadow: 0 4px 12px rgba(255,215,0,0.45); border-color: #ffd700;
+}
+
+/* ===== 中央出牌区 ===== */
+#center-area {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    text-align: center; pointer-events: none;
+}
+#played-cards-area {
+    display: grid;
+    grid-template-areas: ". top ." "left . right" ". bottom .";
+    grid-template-columns: 160px 20px 160px;
+    grid-template-rows: 65px 10px 65px;
+    gap: 4px; align-items: center; justify-items: center;
+}
+#played-top    { grid-area: top; }
+#played-right  { grid-area: right; }
+#played-left   { grid-area: left; }
+#played-bottom { grid-area: bottom; }
+.played-slot { display: flex; gap: 0; min-height: 45px; justify-content: center; }
+.played-slot .card { margin-left: -7px; cursor: default; width: 36px; height: 50px; font-size: 10px; }
+.played-slot .card:first-child { margin-left: 0; }
+.played-slot .card .card-rank { font-size: 11px; }
+.played-slot .card .card-suit { font-size: 9px; }
+
+#game-info { margin-top: 6px; font-size: 13px; color: #ffd700; pointer-events: auto; }
+
+/* ===== 按钮 ===== */
+button {
+    background: linear-gradient(to bottom, #ffd54f, #ffb300);
+    color: #333; border: none; padding: 6px 16px; border-radius: 16px;
+    font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.15s;
+}
+button:hover { background: linear-gradient(to bottom, #ffe082, #ffc107); transform: scale(1.05); }
+button:disabled { background: #555; color: #888; cursor: not-allowed; transform: none; }
+button:active { transform: scale(0.95); }
+#controls { display: flex; justify-content: center; gap: 8px; margin-top: 3px; }
+
+/* ===== 覆盖层 ===== */
+#config-screen, #result-screen {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.75); z-index: 50;
+}
+#config-box {
+    background: #2a2a2a; border-radius: 12px; padding: 24px 32px;
+    min-width: 340px; max-width: 400px;
+    max-height: 90vh; overflow-y: auto;
+}
+#config-box h2 { text-align: center; font-size: 28px; margin-bottom: 2px; }
+.config-sub { text-align: center; color: #888; font-size: 12px; margin-bottom: 16px; }
+.config-section { margin-bottom: 10px; }
+.config-section label { display: block; font-size: 12px; color: #aaa; margin-bottom: 3px; }
+.config-section input {
+    width: 100%; padding: 6px 10px; border-radius: 6px; border: 1px solid #555;
+    background: #1a1a1a; color: #fff; font-size: 13px;
+}
+.config-section input:focus { border-color: #ffd700; outline: none; }
+.config-row { display: flex; gap: 10px; }
+.config-row .config-section { flex: 1; }
+.config-divider { border-top: 1px solid #444; margin: 14px 0; }
+#config-box button { width: 100%; padding: 10px; font-size: 15px; margin-top: 8px; }
+.btn-small {
+    width: auto !important; padding: 2px 8px !important; font-size: 11px !important;
+    margin: 0 0 0 6px !important; border-radius: 8px !important; display: inline !important;
+    vertical-align: middle;
+}
+#config-box select {
+    width: 100%; padding: 6px 10px; border-radius: 6px; border: 1px solid #555;
+    background: #1a1a1a; color: #fff; font-size: 13px;
+}
+#config-box select:focus { border-color: #ffd700; outline: none; }
+#config-box textarea {
+    width: 100%; padding: 6px 10px; border-radius: 6px; border: 1px solid #555;
+    background: #1a1a1a; color: #fff; font-size: 12px; resize: vertical;
+    font-family: inherit; line-height: 1.4;
+}
+#config-box textarea:focus { border-color: #ffd700; outline: none; }
+#config-box input[type="range"] {
+    width: 100%; accent-color: #ffd700; background: transparent;
+}
+#model-list-area { display: flex; gap: 6px; align-items: center; }
+#model-list-area select { flex: 1; }
+#model-list-area .btn-small { flex-shrink: 0; }
+
+#result-screen button { font-size: 16px; padding: 10px 30px; }
+#result-text { font-size: 26px; margin-bottom: 8px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+#result-detail { font-size: 13px; color: #ccc; margin-bottom: 14px; white-space: pre-line; text-align: center; }
+
+#tribute-overlay {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.6); z-index: 40;
+}
+#tribute-box {
+    background: #2a2a2a; border-radius: 12px; padding: 18px 28px;
+    text-align: center; min-width: 300px;
+}
+#tribute-box h3 { margin-bottom: 6px; color: #ffd700; }
+#tribute-box p { font-size: 12px; color: #ccc; margin-bottom: 10px; }
+#tribute-cards { display: flex; justify-content: center; gap: 4px; margin-bottom: 10px; flex-wrap: wrap; }
+#tribute-cards .card { margin-left: 0; cursor: pointer; }
+#tribute-cards .card.selected { border-color: #ffd700; box-shadow: 0 0 10px rgba(255,215,0,0.6); transform: translateY(-8px); }
+#tribute-cards .card.disabled { opacity: 0.4; pointer-events: none; }

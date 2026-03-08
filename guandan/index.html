@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>掼蛋 - yuanlang.love</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <!-- 顶部信息栏 -->
+        <div id="top-bar">
+            <div id="level-info">
+                <span id="team-a-level"><b class="team-a-name">A队</b> 打<b class="team-a-rank">2</b></span>
+                <span id="team-b-level"><b class="team-b-name">B队</b> 打<b class="team-b-rank">2</b></span>
+            </div>
+            <div id="wild-info">逢人配: <span id="wild-card-display">红桃2</span></div>
+            <div id="timer-display">--</div>
+        </div>
+
+        <!-- 玩家2（对家） -->
+        <div id="player-top" class="player-area">
+            <div class="player-info">
+                <span class="player-name" id="name-top">对家</span>
+                <span class="player-tag team-a">A</span>
+                <span class="card-count">(27)</span>
+            </div>
+            <div class="player-cards-hidden" id="top-cards"></div>
+            <div class="player-action" id="top-action"></div>
+        </div>
+
+        <!-- 玩家1（右方） -->
+        <div id="player-right" class="player-area">
+            <div class="player-info">
+                <span class="player-name" id="name-right">电脑B</span>
+                <span class="player-tag team-b">B</span>
+                <span class="card-count">(27)</span>
+            </div>
+            <div class="player-cards-hidden" id="right-cards"></div>
+            <div class="player-action" id="right-action"></div>
+        </div>
+
+        <!-- 玩家3（左方） -->
+        <div id="player-left" class="player-area">
+            <div class="player-info">
+                <span class="player-name" id="name-left">电脑A</span>
+                <span class="player-tag team-b">B</span>
+                <span class="card-count">(27)</span>
+            </div>
+            <div class="player-cards-hidden" id="left-cards"></div>
+            <div class="player-action" id="left-action"></div>
+        </div>
+
+        <!-- 中央出牌区 -->
+        <div id="center-area">
+            <div id="played-cards-area">
+                <div class="played-slot" id="played-top"></div>
+                <div class="played-slot" id="played-right"></div>
+                <div class="played-slot" id="played-left"></div>
+                <div class="played-slot" id="played-bottom"></div>
+            </div>
+            <div id="game-info"></div>
+        </div>
+
+        <!-- 玩家0（用户） -->
+        <div id="player-bottom" class="player-area">
+            <div class="player-info">
+                <span class="player-name" id="name-bottom">我</span>
+                <span class="player-tag team-a">A</span>
+            </div>
+            <div class="player-action" id="bottom-action"></div>
+            <div class="player-cards" id="bottom-cards"></div>
+            <div id="controls">
+                <button id="btn-play" onclick="gameUI.playCards()" disabled>出牌</button>
+                <button id="btn-pass" onclick="gameUI.pass()" disabled>不出</button>
+                <button id="btn-hint" onclick="gameUI.hint()" disabled>提示</button>
+            </div>
+        </div>
+
+        <!-- 进贡/还贡选择界面 -->
+        <div id="tribute-overlay" style="display:none;">
+            <div id="tribute-box">
+                <h3 id="tribute-title">进贡</h3>
+                <p id="tribute-desc">请选择一张牌</p>
+                <div id="tribute-cards"></div>
+                <button id="btn-tribute" onclick="gameUI.submitTribute()" disabled>确认</button>
+            </div>
+        </div>
+
+        <!-- 配置界面 -->
+        <div id="config-screen">
+            <div id="config-box">
+                <h2>掼蛋</h2>
+                <p class="config-sub">yuanlang.love</p>
+                <div class="config-section">
+                    <label>你的名字</label>
+                    <input type="text" id="cfg-player-name" value="我" maxlength="8">
+                </div>
+                <div class="config-section">
+                    <label>对家名字</label>
+                    <input type="text" id="cfg-partner-name" value="对家" maxlength="8">
+                </div>
+                <div class="config-row">
+                    <div class="config-section">
+                        <label>A队名称</label>
+                        <input type="text" id="cfg-team-a" value="A队" maxlength="6">
+                    </div>
+                    <div class="config-section">
+                        <label>B队名称</label>
+                        <input type="text" id="cfg-team-b" value="B队" maxlength="6">
+                    </div>
+                </div>
+                <div class="config-section">
+                    <label>AI 出牌延迟(秒)</label>
+                    <input type="number" id="cfg-ai-delay" value="5" min="1" max="30">
+                </div>
+                <div class="config-section">
+                    <label>玩家出牌限时(秒)</label>
+                    <input type="number" id="cfg-player-timeout" value="30" min="10" max="120">
+                </div>
+                <div class="config-divider"></div>
+                <div class="config-section">
+                    <label>AI API 地址 (可选，留空用本地AI)</label>
+                    <input type="text" id="cfg-api-url" placeholder="https://api.openai.com/v1">
+                </div>
+                <div class="config-section">
+                    <label>API Key</label>
+                    <input type="password" id="cfg-api-key" placeholder="sk-...">
+                </div>
+                <div class="config-section">
+                    <label>模型 <button type="button" class="btn-small" id="btn-fetch-models" onclick="gameUI.fetchModels()">获取模型列表</button></label>
+                    <div id="model-select-area">
+                        <input type="text" id="cfg-api-model" placeholder="手动输入模型名 或 点击获取列表">
+                    </div>
+                    <div id="model-list-area" style="display:none;">
+                        <select id="cfg-model-select"><option value="">-- 选择模型 --</option></select>
+                        <button type="button" class="btn-small" onclick="gameUI.switchToManualModel()">手动输入</button>
+                    </div>
+                </div>
+                <div class="config-section">
+                    <label>温度 (Temperature): <span id="temp-value">0.7</span></label>
+                    <input type="range" id="cfg-temperature" min="0" max="2" step="0.1" value="0.7" oninput="document.getElementById('temp-value').textContent=this.value">
+                </div>
+                <div class="config-divider"></div>
+                <div class="config-section">
+                    <label>角色设定 (选填，影响AI说话风格)</label>
+                    <textarea id="cfg-role-prompt" rows="2" placeholder="例: 袁朗 — 冷静沉稳、善于布局，偶尔嘲讽对手"></textarea>
+                </div>
+                <div class="config-section">
+                    <label>AI 系统提示词 <button type="button" class="btn-small" onclick="gameUI.resetPrompt()">恢复默认</button></label>
+                    <textarea id="cfg-system-prompt" rows="5"></textarea>
+                </div>
+                <button onclick="gameUI.applyConfig()">开始游戏</button>
+            </div>
+        </div>
+
+        <!-- 结果界面 -->
+        <div id="result-screen" style="display:none;">
+            <div id="result-text"></div>
+            <div id="result-detail"></div>
+            <button onclick="gameUI.startGame()">继续下一局</button>
+        </div>
+    </div>
+
+    <script src="cards.js"></script>
+    <script src="rules.js"></script>
+    <script src="ai.js"></script>
+    <script src="api-ai.js"></script>
+    <script src="game.js"></script>
+    <script src="ui.js"></script>
+</body>
+</html>
