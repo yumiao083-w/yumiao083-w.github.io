@@ -931,7 +931,7 @@ def async_generate_memory_entry(user_id, tag_description, user_message, ai_reply
     try:
         logger.info(f"🧠 开始异步生成记忆条目: {tag_description}")
         
-        # 获取最近几轮对话作为上下文
+        # 获取尽可能完整的对话上下文（不限制轮数，但限制总字符数防止过长）
         recent_context = ""
         try:
             prompt_name = prompt_mapping.get(user_id, user_id)
@@ -939,19 +939,28 @@ def async_generate_memory_entry(user_id, tag_description, user_message, ai_reply
                 user_data = chat_contexts.get(user_id, {})
                 if isinstance(user_data, dict):
                     context_list = user_data.get(prompt_name, [])
-                    # 取最近 6 条（3轮对话）
-                    recent = context_list[-6:] if len(context_list) > 6 else context_list
-                    for msg in recent:
+                    # 从最新往前取，直到总字符数超过限制
+                    MAX_CONTEXT_CHARS = 8000  # 约2000-3000 token
+                    collected = []
+                    total_chars = 0
+                    for msg in reversed(context_list):
+                        content = msg.get('content', '')[:500]  # 单条最多500字
+                        total_chars += len(content)
+                        if total_chars > MAX_CONTEXT_CHARS:
+                            break
+                        collected.append(msg)
+                    collected.reverse()
+                    for msg in collected:
                         role = "用户" if msg.get("role") == "user" else "角色"
-                        recent_context += f"{role}: {msg.get('content', '')[:200]}\n"
+                        recent_context += f"{role}: {msg.get('content', '')[:500]}\n"
         except Exception as e:
             logger.warning(f"获取对话上下文失败: {e}")
-            recent_context = f"用户: {user_message[:200]}\n角色: {ai_reply[:200]}\n"
+            recent_context = f"用户: {user_message[:300]}\n角色: {ai_reply[:300]}\n"
 
         # 构建提示词让便宜模型生成 event + summary + content
-        gen_prompt = f"""你是一位记忆档案师。以下是一段角色扮演中"袁朗"与"郁邈"的对话片段，以及袁朗认为值得记住的事情。
+        gen_prompt = f"""你是一位记忆档案师。以下是一段角色扮演中"袁朗"与"郁邈"的对话记录，以及袁朗认为值得记住的事情。
 
-请基于对话内容，生成三个字段：
+请基于对话内容，找到与标记描述相关的完整事件脉络，生成三个字段：
 
 ### event
 3-8个客观事实关键词，逗号分隔，用日常口语词汇。
@@ -961,11 +970,12 @@ def async_generate_memory_entry(user_id, tag_description, user_message, ai_reply
 
 ### content
 100-300字，以袁朗第一人称视角的详细记忆，保留具体细节和情感色彩。
+注意：只记录与标记相关的事件，忽略对话中不相关的闲聊部分。
 
 ## 袁朗标记的要点
 {tag_description}
 
-## 最近对话
+## 对话记录
 {recent_context}
 
 ## 输出格式（严格遵守）
@@ -1082,7 +1092,7 @@ def async_update_core_memory(user_id, tag_description, user_message, ai_reply):
                 except:
                     pass
         
-        # 获取最近对话上下文
+        # 获取尽可能完整的对话上下文
         recent_context = ""
         try:
             prompt_name = prompt_mapping.get(user_id, user_id)
@@ -1090,10 +1100,20 @@ def async_update_core_memory(user_id, tag_description, user_message, ai_reply):
                 user_data = chat_contexts.get(user_id, {})
                 if isinstance(user_data, dict):
                     context_list = user_data.get(prompt_name, [])
-                    recent = context_list[-10:] if len(context_list) > 10 else context_list
-                    for msg in recent:
+                    # 从最新往前取，直到总字符数超过限制
+                    MAX_CONTEXT_CHARS = 10000  # 核心记忆给更多上下文
+                    collected = []
+                    total_chars = 0
+                    for msg in reversed(context_list):
+                        content = msg.get('content', '')[:500]
+                        total_chars += len(content)
+                        if total_chars > MAX_CONTEXT_CHARS:
+                            break
+                        collected.append(msg)
+                    collected.reverse()
+                    for msg in collected:
                         role = "用户" if msg.get("role") == "user" else "角色"
-                        recent_context += f"{role}: {msg.get('content', '')[:300]}\n"
+                        recent_context += f"{role}: {msg.get('content', '')[:500]}\n"
         except Exception as e:
             logger.warning(f"获取对话上下文失败: {e}")
             recent_context = f"用户: {user_message[:300]}\n角色: {ai_reply[:300]}\n"
