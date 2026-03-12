@@ -877,6 +877,24 @@ def strip_before_thought_tags(text):
         return text
 
 
+def load_memory_prompt(prompt_type, default_prompt):
+    """
+    从 User_Memory_Prompts 加载自定义提示词，没有则返回默认值。
+    prompt_type: 'save_memory' 或 'update_core'
+    """
+    prompt_file = os.path.join(root_dir, 'User_Memory_Prompts', f'global_{prompt_type}_prompt.txt')
+    if os.path.exists(prompt_file):
+        try:
+            with open(prompt_file, 'r', encoding='utf-8') as f:
+                custom = f.read().strip()
+            if custom:
+                logger.info(f"🧠 使用自定义{prompt_type}提示词（{len(custom)}字符）")
+                return custom
+        except Exception as e:
+            logger.warning(f"读取自定义提示词失败: {e}")
+    return default_prompt
+
+
 def extract_memory_tags(text):
     """
     从 AI 回复中提取并剥离 [SAVE_MEMORY: ...] 或 [UPDATE_CORE: ...] 标记
@@ -958,7 +976,7 @@ def async_generate_memory_entry(user_id, tag_description, user_message, ai_reply
             recent_context = f"用户: {user_message[:300]}\n角色: {ai_reply[:300]}\n"
 
         # 构建提示词让便宜模型生成 event + summary + content
-        gen_prompt = f"""你是一位记忆档案师。以下是一段角色扮演中"袁朗"与"郁邈"的对话记录，以及袁朗认为值得记住的事情。
+        default_save_prompt = """你是一位记忆档案师。以下是一段角色扮演中"袁朗"与"郁邈"的对话记录，以及袁朗认为值得记住的事情。
 
 请基于对话内容，找到与标记描述相关的完整事件脉络，生成三个字段：
 
@@ -982,6 +1000,9 @@ def async_generate_memory_entry(user_id, tag_description, user_message, ai_reply
 event: 关键词1, 关键词2, 关键词3
 summary: 一段概要文字
 content: 一段详细记忆"""
+        
+        prompt_template = load_memory_prompt('save_memory', default_save_prompt)
+        gen_prompt = prompt_template.replace('{tag_description}', tag_description).replace('{recent_context}', recent_context)
 
         # 调用 AI 生成
         result = call_ai_for_summary(gen_prompt, user_id)
@@ -1119,7 +1140,7 @@ def async_update_core_memory(user_id, tag_description, user_message, ai_reply):
             recent_context = f"用户: {user_message[:300]}\n角色: {ai_reply[:300]}\n"
         
         # 构建核心记忆更新提示词
-        update_prompt = f"""你是一位关系心理学专家，正在帮助"袁朗"整理他对"郁邈"的核心认知。
+        default_core_prompt = """你是一位关系心理学专家，正在帮助"袁朗"整理他对"郁邈"的核心认知。
 
 ## 你的任务
 
@@ -1144,7 +1165,7 @@ def async_update_core_memory(user_id, tag_description, user_message, ai_reply):
 ❌ 不重复碎片记忆已经记录的具体事件
 
 ## 现有核心记忆
-{existing_content if existing_content else "（暂无）"}
+{existing_content}
 
 ## 最近对话
 {recent_context}
@@ -1156,7 +1177,11 @@ def async_update_core_memory(user_id, tag_description, user_message, ai_reply):
 如果现有核心记忆中某些内容仍然准确，保留并可适当精炼。
 重点体现这次触发带来的认知变化。
 
-请直接输出核心记忆内容，不要包含任何标题、标记或解释："""
+请直接输出核心记忆内容，不要包含任何标题、标记或解释。"""
+
+        prompt_template = load_memory_prompt('update_core', default_core_prompt)
+        existing = existing_content if existing_content else "（暂无）"
+        update_prompt = prompt_template.replace('{tag_description}', tag_description).replace('{recent_context}', recent_context).replace('{existing_content}', existing)
 
         # 调用 AI 生成
         new_content = call_ai_for_summary(update_prompt, user_id)
