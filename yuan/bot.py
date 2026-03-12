@@ -627,30 +627,20 @@ def get_user_prompt(user_id, retrieved_memories=None):
     if UPLOAD_CORE_MEMORY_TO_AI:
         memory_key = get_user_memory_key(user_id)
         try:
-            # 新系统核心记忆
-            core_memory_file = os.path.join(root_dir, MEMORY_CORE_DIR, f'{memory_key}_core_memory.json')
-            if os.path.exists(core_memory_file):
-                with open(core_memory_file, 'r', encoding='utf-8') as f:
+            # 统一读取 Memory_Core 的 unified_memory 文件
+            unified_memory_file = os.path.join(root_dir, MEMORY_CORE_DIR, f'{memory_key}_unified_memory.json')
+            if os.path.exists(unified_memory_file):
+                with open(unified_memory_file, 'r', encoding='utf-8') as f:
                     memory_data = json.load(f)
                     core_memory_content = memory_data.get("content", "").strip()
             
-            # 兼容旧版
+            # 兼容旧版: core_memory.json
             if not core_memory_content:
-                for legacy_path in [
-                    os.path.join(root_dir, MEMORY_SUMMARIES_DIR, f'{user_id}_{prompt_file_name}.json'),
-                    os.path.join(root_dir, MEMORY_SUMMARIES_DIR, f'{user_id}.json'),
-                ]:
-                    if os.path.exists(legacy_path):
-                        with open(legacy_path, 'r', encoding='utf-8') as f:
-                            data = json.load(f)
-                        if isinstance(data, dict):
-                            core_memory_content = data.get("content", "").strip()
-                        elif isinstance(data, list):
-                            core_memory_content = "\n".join(
-                                item.get("summary", "") for item in data if item.get("summary")
-                            ).strip()
-                        if core_memory_content:
-                            break
+                old_core_file = os.path.join(root_dir, MEMORY_CORE_DIR, f'{memory_key}_core_memory.json')
+                if os.path.exists(old_core_file):
+                    with open(old_core_file, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        core_memory_content = data.get("content", "").strip()
         except Exception as e:
             logger.error(f"为用户 {user_id} 加载核心记忆失败: {e}")
 
@@ -1068,11 +1058,8 @@ def async_update_core_memory(user_id, tag_description, user_message, ai_reply):
         memory_key = get_user_memory_key(user_id)
         core_dir = os.path.join(root_dir, MEMORY_CORE_DIR)
         os.makedirs(core_dir, exist_ok=True)
-        summaries_dir = os.path.join(root_dir, MEMORY_SUMMARIES_DIR)
-        os.makedirs(summaries_dir, exist_ok=True)
         
         unified_memory_file = os.path.join(core_dir, f'{memory_key}_unified_memory.json')
-        summaries_file = os.path.join(summaries_dir, f'{memory_key}.json')
         
         # 读取现有核心记忆
         existing_content = ""
@@ -1169,10 +1156,6 @@ def async_update_core_memory(user_id, tag_description, user_message, ai_reply):
         }
         
         with open(unified_memory_file, 'w', encoding='utf-8') as f:
-            json.dump(unified_data, f, ensure_ascii=False, indent=2)
-        
-        # 同步到 Memory_Summaries
-        with open(summaries_file, 'w', encoding='utf-8') as f:
             json.dump(unified_data, f, ensure_ascii=False, indent=2)
         
         logger.info(f"🧠💎 ✅ 核心记忆已更新: {tag_description[:50]}，长度: {len(cleaned_content)}")
