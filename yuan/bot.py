@@ -88,6 +88,11 @@ from types import SimpleNamespace # 也需要在 bot.py 中导入
 # 生成用户昵称列表和prompt映射字典
 user_names = [entry[0] for entry in LISTEN_LIST]
 prompt_mapping = {entry[0]: entry[1] for entry in LISTEN_LIST}
+# 生成预设映射（新版四元素格式 [nick, character, auto, preset]）
+preset_mapping = {}
+for entry in LISTEN_LIST:
+    if len(entry) >= 4 and entry[3]:
+        preset_mapping[entry[0]] = entry[3]
 # 生成用户自动消息开关映射 (兼容旧版本格式)
 auto_message_mapping = {}
 for entry in LISTEN_LIST:
@@ -601,26 +606,43 @@ def get_user_prompt(user_id, retrieved_memories=None):
     from memory_retrieval import build_memory_index, format_retrieved_memories
     
     prompt_file_name = prompt_mapping.get(user_id, user_id)
+    preset_file_name = preset_mapping.get(user_id, '')
     
     # ========== 板块1: 人设卡 ==========
-    character_path = os.path.join(root_dir, 'prompts', 'character.md')
-    if not os.path.exists(character_path):
-        # 兼容：如果没有拆分过，回退到原始的完整 prompt 文件
-        character_path = os.path.join(root_dir, 'prompts', f'{prompt_file_name}.md')
+    # 查找优先级: characters/ 子目录 → prompts/ 根目录 → 回退到 character.md
+    character_path = None
+    search_paths = [
+        os.path.join(root_dir, 'prompts', 'characters', f'{prompt_file_name}.md'),
+        os.path.join(root_dir, 'prompts', f'{prompt_file_name}.md'),
+        os.path.join(root_dir, 'prompts', 'characters', 'character.md'),
+        os.path.join(root_dir, 'prompts', 'character.md'),
+    ]
+    for p in search_paths:
+        if os.path.exists(p):
+            character_path = p
+            break
     
-    if not os.path.exists(character_path):
-        logger.error(f"人设卡文件不存在: {character_path}")
-        raise FileNotFoundError(f"人设卡文件未找到: {character_path}")
+    if not character_path:
+        logger.error(f"人设卡文件不存在，已搜索: {search_paths}")
+        raise FileNotFoundError(f"人设卡文件未找到: {prompt_file_name}.md")
 
     with open(character_path, 'r', encoding='utf-8') as file:
         character_content = file.read()
 
     # ========== 板块2: 预设 ==========
     preset_content = ""
-    preset_path = os.path.join(root_dir, 'prompts', 'preset.md')
-    if os.path.exists(preset_path):
-        with open(preset_path, 'r', encoding='utf-8') as file:
-            preset_content = file.read()
+    preset_search = []
+    if preset_file_name:
+        preset_search.append(os.path.join(root_dir, 'prompts', 'presets', f'{preset_file_name}.md'))
+        preset_search.append(os.path.join(root_dir, 'prompts', f'{preset_file_name}.md'))
+    preset_search.append(os.path.join(root_dir, 'prompts', 'presets', 'preset.md'))
+    preset_search.append(os.path.join(root_dir, 'prompts', 'preset.md'))
+    
+    for p in preset_search:
+        if os.path.exists(p):
+            with open(p, 'r', encoding='utf-8') as file:
+                preset_content = file.read()
+            break
     
     # ========== 板块3: 核心记忆 ==========
     core_memory_content = ""
@@ -4147,13 +4169,19 @@ def generate_daily_summary(user_id, target_date=None):
         role_personality_content = ""
         try:
             prompt_file_name = prompt_mapping.get(user_id, user_id)
-            prompt_path = os.path.join(root_dir, 'prompts', f'{prompt_file_name}.md')
-            if os.path.exists(prompt_path):
+            # 兼容新旧目录
+            prompt_path = None
+            for check_dir in ['prompts/characters', 'prompts']:
+                p = os.path.join(root_dir, check_dir, f'{prompt_file_name}.md')
+                if os.path.exists(p):
+                    prompt_path = p
+                    break
+            if prompt_path:
                 with open(prompt_path, 'r', encoding='utf-8') as f:
                     role_personality_content = f.read().strip()
                 logger.info(f"日记生成-成功加载角色人设文件：{prompt_path}")
             else:
-                logger.warning(f"日记生成-角色人设文件不存在：{prompt_path}")
+                logger.warning(f"日记生成-角色人设文件不存在：{prompt_file_name}.md")
         except Exception as e:
             logger.error(f"日记生成-加载角色人设文件失败，用户：{user_id}，错误：{e}")
         
@@ -4802,13 +4830,18 @@ def generate_core_memory_update(user_id, force_update=False):
         role_personality_content = ""
         try:
             prompt_file_name = prompt_mapping.get(user_id, user_id)
-            prompt_path = os.path.join(root_dir, 'prompts', f'{prompt_file_name}.md')
-            if os.path.exists(prompt_path):
+            prompt_path = None
+            for check_dir in ['prompts/characters', 'prompts']:
+                p = os.path.join(root_dir, check_dir, f'{prompt_file_name}.md')
+                if os.path.exists(p):
+                    prompt_path = p
+                    break
+            if prompt_path:
                 with open(prompt_path, 'r', encoding='utf-8') as f:
                     role_personality_content = f.read().strip()
                 logger.info(f"成功加载角色人设文件：{prompt_path}")
             else:
-                logger.warning(f"角色人设文件不存在：{prompt_path}")
+                logger.warning(f"角色人设文件不存在：{prompt_file_name}.md")
         except Exception as e:
             logger.error(f"加载角色人设文件失败，用户：{user_id}，错误：{e}")
         
@@ -6599,12 +6632,17 @@ def main():
         # --- 启动前检查 ---
         logger.info("\033[32m进行启动前检查...\033[0m")
 
-        # 预检查所有用户prompt文件
+        # 预检查所有用户prompt文件（兼容新旧目录结构）
         for user in user_names:
             prompt_file = prompt_mapping.get(user, user)
-            prompt_path = os.path.join(root_dir, 'prompts', f'{prompt_file}.md')
-            if not os.path.exists(prompt_path):
-                raise FileNotFoundError(f"用户 {user} 的prompt文件 {prompt_file}.md 不存在")
+            found = False
+            for check_dir in ['prompts/characters', 'prompts']:
+                check_path = os.path.join(root_dir, check_dir, f'{prompt_file}.md')
+                if os.path.exists(check_path):
+                    found = True
+                    break
+            if not found:
+                raise FileNotFoundError(f"用户 {user} 的prompt文件 {prompt_file}.md 不存在（已搜索 prompts/characters/ 和 prompts/）")
 
         # 确保临时目录存在
         memory_temp_dir = os.path.join(root_dir, MEMORY_TEMP_DIR)
