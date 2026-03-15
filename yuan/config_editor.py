@@ -260,6 +260,17 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+
+# =========================================================================
+# 新版桌面入口
+# =========================================================================
+
+@app.route('/home')
+@login_required
+def home():
+    return render_template('home.html')
+
+
 @app.route('/start_bot', methods=['POST'])
 def start_bot():
     global bot_process
