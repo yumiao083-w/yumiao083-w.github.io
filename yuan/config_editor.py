@@ -3288,6 +3288,41 @@ def reset_memory_retrieval_prompt():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/memory_entries', methods=['GET'])
+@login_required
+def get_memory_entries():
+    """获取 memory_entries.json"""
+    try:
+        entries_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'memory_entries.json')
+        if not os.path.exists(entries_path):
+            return jsonify([])
+        with open(entries_path, 'r', encoding='utf-8') as f:
+            entries = json.load(f)
+        return jsonify(entries)
+    except Exception as e:
+        app.logger.error(f"读取 memory_entries.json 失败: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/memory_entries', methods=['POST'])
+@login_required
+def save_memory_entries():
+    """保存 memory_entries.json"""
+    try:
+        entries = request.get_json()
+        if not isinstance(entries, list):
+            return jsonify({'error': '数据格式错误，应为数组'}), 400
+        entries_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'memory_entries.json')
+        with tempfile.NamedTemporaryFile('w', delete=False, dir=os.path.dirname(entries_path), encoding='utf-8', suffix='.tmp') as f:
+            json.dump(entries, f, ensure_ascii=False, indent=2)
+            temp_path = f.name
+        shutil.move(temp_path, entries_path)
+        return jsonify({'status': 'success', 'message': f'已保存 {len(entries)} 条记忆'})
+    except Exception as e:
+        app.logger.error(f"保存 memory_entries.json 失败: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/memory_retrieval_fetch_models', methods=['POST'])
 @login_required
 def memory_retrieval_fetch_models():

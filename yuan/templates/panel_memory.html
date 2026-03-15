@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>记忆</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f7; color: #1d1d1f; padding-bottom: 40px; }
+        .top-bar { position: sticky; top: 0; z-index: 100; background: rgba(245,245,247,0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); padding: 12px 16px; display: flex; align-items: center; border-bottom: 1px solid rgba(0,0,0,0.1); }
+        .back-btn { text-decoration: none; color: #007aff; font-size: 16px; }
+        .top-bar h1 { flex: 1; text-align: center; font-size: 17px; font-weight: 600; margin-right: 40px; }
+        .section-card { background: white; margin: 16px; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .section-card h2 { font-size: 18px; font-weight: 600; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid #f0f0f0; }
+        .field { margin-bottom: 14px; }
+        .field label { display: block; font-size: 13px; font-weight: 500; color: #666; margin-bottom: 4px; }
+        .field input[type="text"], .field input[type="number"], .field select, .field textarea { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; background: #fafafa; }
+        .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: #007aff; background: white; }
+        .field small { display: block; font-size: 12px; color: #999; margin-top: 4px; }
+        .save-bar { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding-top: 12px; border-top: 1px solid #f0f0f0; }
+        .save-btn { padding: 10px 24px; background: #007aff; color: white; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; }
+        .save-btn:active { opacity: 0.7; }
+        .save-status { font-size: 13px; color: #999; }
+        .switch-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; }
+        .switch-row label { font-size: 15px; color: #333; }
+        .toggle { position: relative; width: 44px; height: 26px; background: #e0e0e0; border-radius: 13px; cursor: pointer; transition: background 0.2s; border: none; }
+        .toggle.on { background: #34c759; }
+        .toggle .knob { position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; background: white; border-radius: 50%; transition: left 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+        .toggle.on .knob { left: 20px; }
+        /* 用户条目 */
+        .user-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8f8fa; border-radius: 8px; margin-bottom: 6px; }
+        .user-item .name { font-size: 15px; font-weight: 500; }
+        .user-item .actions { display: flex; gap: 6px; }
+        .user-item .actions button { border: none; padding: 5px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+        .btn-edit { background: #007aff; color: white; }
+        .btn-clear { background: #ff9500; color: white; }
+        .btn-del { background: #ff3b30; color: white; }
+        /* 编辑器 modal */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal-overlay.show { display: flex; }
+        .modal-box { background: white; border-radius: 14px; padding: 20px; width: 90vw; max-width: 600px; max-height: 80vh; overflow-y: auto; }
+        .modal-box h3 { margin-bottom: 14px; font-size: 17px; }
+        .modal-box textarea { width: 100%; height: 300px; font-family: monospace; font-size: 13px; padding: 10px; border: 1px solid #ddd; border-radius: 8px; resize: vertical; }
+        .modal-bar { display: flex; gap: 8px; margin-top: 10px; }
+        .modal-bar button { padding: 8px 16px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; }
+        /* 记忆条目浏览 */
+        .entry-card { background: #f8f8fa; border: 1px solid #e8e8ea; border-radius: 10px; padding: 14px; margin-bottom: 8px; }
+        .entry-card .entry-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .entry-card .entry-id { font-size: 12px; color: #aaa; }
+        .entry-card .entry-date { font-size: 12px; color: #007aff; }
+        .entry-card .entry-summary { font-size: 14px; color: #333; line-height: 1.5; }
+        .entry-card .entry-event { font-size: 12px; color: #888; margin-top: 4px; }
+        .entry-card .entry-actions { margin-top: 8px; display: flex; gap: 6px; }
+        .entry-card .entry-actions button { border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+        .load-more { text-align: center; padding: 12px; color: #007aff; font-size: 14px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div class="top-bar">
+    <a href="/home" class="back-btn">← 返回</a>
+    <h1>🧠 记忆</h1>
+</div>
+
+<!-- ===== 1. 记忆设置 ===== -->
+<div class="section-card">
+    <h2>记忆设置</h2>
+
+    <div class="switch-row">
+        <label>启用记忆系统</label>
+        <button class="toggle {% if config.ENABLE_MEMORY %}on{% endif %}" id="mem-enable" onclick="this.classList.toggle('on')"><div class="knob"></div></button>
+    </div>
+    <div class="switch-row">
+        <label>允许 AI 读取记忆</label>
+        <button class="toggle {% if config.UPLOAD_MEMORY_TO_AI %}on{% endif %}" id="mem-upload" onclick="this.classList.toggle('on')"><div class="knob"></div></button>
+    </div>
+    <div class="switch-row">
+        <label>启用敏感词清除</label>
+        <button class="toggle {% if config.ENABLE_SENSITIVE_CONTENT_CLEARING %}on{% endif %}" id="mem-sensitive" onclick="this.classList.toggle('on')"><div class="knob"></div></button>
+    </div>
+
+    <div class="field">
+        <label>短期记忆轮数</label>
+        <input type="number" id="mem-groups" step="1" value="{{ config.MAX_GROUPS }}">
+        <small>AI 能记住的短期对话轮数（一问一答为一轮），建议 5-15</small>
+    </div>
+
+    <div class="save-bar">
+        <button class="save-btn" onclick="saveMemSettings()">保存</button>
+        <span class="save-status" id="mem-settings-status"></span>
+    </div>
+</div>
+
+<!-- ===== 2. 聊天上下文管理 ===== -->
+<div class="section-card">
+    <h2>聊天上下文</h2>
+    <small style="color: #999; display: block; margin-bottom: 12px;">短期对话历史（chat_contexts.json），清除后不影响长期记忆</small>
+
+    <div id="context-user-list">
+        <p style="color: #bbb; text-align: center; padding: 10px;">加载中...</p>
+    </div>
+</div>
+
+<!-- ===== 3. 核心记忆 ===== -->
+<div class="section-card">
+    <h2>核心记忆</h2>
+    <small style="color: #999; display: block; margin-bottom: 12px;">长期提炼的关系认知（Memory_Core），每次对话都会注入给 AI</small>
+
+    <div id="core-memory-list">
+        <p style="color: #bbb; text-align: center; padding: 10px;">加载中...</p>
+    </div>
+</div>
+
+<!-- ===== 4. 碎片记忆浏览 ===== -->
+<div class="section-card">
+    <h2>碎片记忆</h2>
+    <small style="color: #999; display: block; margin-bottom: 12px;">memory_entries.json 中的所有记忆条目，按时间倒序</small>
+
+    <div class="field">
+        <label>搜索</label>
+        <input type="text" id="entry-search" placeholder="输入关键词搜索记忆..." oninput="filterEntries()">
+    </div>
+
+    <div id="entries-list">
+        <p style="color: #bbb; text-align: center; padding: 10px;">加载中...</p>
+    </div>
+    <div class="load-more" id="load-more-btn" style="display:none;" onclick="showMore()">加载更多...</div>
+
+    <div style="margin-top: 10px; font-size: 13px; color: #aaa;" id="entry-count"></div>
+</div>
+
+<!-- 编辑弹窗 -->
+<div class="modal-overlay" id="edit-modal">
+    <div class="modal-box">
+        <h3 id="modal-title">编辑</h3>
+        <textarea id="modal-content"></textarea>
+        <div class="modal-bar">
+            <button style="background: #007aff; color: white;" onclick="modalSave()">保存</button>
+            <button style="background: #8e8e93; color: white;" onclick="modalClose()">取消</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ===== 通用 =====
+function saveFields(fields, statusId) {
+    const s = document.getElementById(statusId);
+    s.textContent = '保存中...'; s.style.color = '#999';
+    fetch('/api/save_section', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ fields }) })
+    .then(r => { if (!r.ok) return r.text().then(t => { throw new Error(t.substring(0,80)); }); return r.json(); })
+    .then(d => {
+        if (d.error) { s.textContent = '❌ ' + d.error; s.style.color = '#ff3b30'; }
+        else { s.textContent = '✅ 已保存'; s.style.color = '#34c759'; setTimeout(() => s.textContent = '', 3000); }
+    })
+    .catch(e => { s.textContent = '❌ ' + e.message; s.style.color = '#ff3b30'; });
+}
+
+// ===== 1. 记忆设置 =====
+function saveMemSettings() {
+    saveFields({
+        ENABLE_MEMORY: document.getElementById('mem-enable').classList.contains('on'),
+        UPLOAD_MEMORY_TO_AI: document.getElementById('mem-upload').classList.contains('on'),
+        ENABLE_SENSITIVE_CONTENT_CLEARING: document.getElementById('mem-sensitive').classList.contains('on'),
+        MAX_GROUPS: document.getElementById('mem-groups').value,
+    }, 'mem-settings-status');
+}
+
+// ===== 2. 聊天上下文 =====
+function loadContextUsers() {
+    fetch('/api/get_chat_context_users')
+        .then(r => r.json())
+        .then(users => {
+            const list = document.getElementById('context-user-list');
+            if (!users || users.length === 0) {
+                list.innerHTML = '<p style="color:#bbb; text-align:center; padding:10px; font-size:13px;">暂无聊天记录</p>';
+                return;
+            }
+            list.innerHTML = '';
+            users.forEach(u => {
+                const div = document.createElement('div');
+                div.className = 'user-item';
+                div.innerHTML = `
+                    <span class="name">${esc(u)}</span>
+                    <div class="actions">
+                        <button class="btn-edit" onclick="editContext('${esc(u)}')">查看</button>
+                        <button class="btn-clear" onclick="clearContext('${esc(u)}')">清除</button>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        })
+        .catch(() => {});
+}
+
+function editContext(user) {
+    fetch(`/api/get_chat_context/${encodeURIComponent(user)}`)
+        .then(r => r.json())
+        .then(d => {
+            openModal('聊天上下文: ' + user, JSON.stringify(d, null, 2), function(content) {
+                fetch(`/api/save_chat_context/${encodeURIComponent(user)}`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: content
+                })
+                .then(r => r.json())
+                .then(res => { if (res.error) alert('保存失败: ' + res.error); else { alert('✅ 已保存'); modalClose(); } })
+                .catch(e => alert('保存失败: ' + e.message));
+            });
+        })
+        .catch(e => alert('加载失败: ' + e.message));
+}
+
+function clearContext(user) {
+    if (!confirm(`确定清除 "${user}" 的聊天上下文？`)) return;
+    fetch(`/clear_chat_context/${encodeURIComponent(user)}`, { method: 'POST' })
+        .then(r => r.json())
+        .then(() => { loadContextUsers(); })
+        .catch(e => alert('清除失败: ' + e.message));
+}
+
+// ===== 3. 核心记忆 =====
+function loadCoreMemory() {
+    fetch('/api/get_chat_context_users')
+        .then(r => r.json())
+        .then(users => {
+            // 用 memory_summary_users 接口
+            return fetch('/api/get_chat_context_users');
+        })
+        .catch(() => {});
+
+    // 直接获取 memory summary users
+    const list = document.getElementById('core-memory-list');
+    fetch('/api/get_chat_context_users')
+        .then(r => r.json())
+        .then(() => {
+            // 尝试获取已知用户列表
+            list.innerHTML = '';
+            // 从 config 读已知用户
+            const users = [];
+            document.querySelectorAll('#context-user-list .user-item .name').forEach(el => users.push(el.textContent));
+            if (users.length === 0) {
+                // 如果上下文还没加载，用 config 里的 LISTEN_LIST
+                {% for item in config.LISTEN_LIST %}
+                users.push('{{ item[0] }}');
+                {% endfor %}
+            }
+            if (users.length === 0) {
+                list.innerHTML = '<p style="color:#bbb; text-align:center; padding:10px; font-size:13px;">暂无用户</p>';
+                return;
+            }
+            users.forEach(u => {
+                const div = document.createElement('div');
+                div.className = 'user-item';
+                div.innerHTML = `
+                    <span class="name">${esc(u)}</span>
+                    <div class="actions">
+                        <button class="btn-edit" onclick="editCoreMemory('${esc(u)}')">编辑</button>
+                        <button class="btn-del" onclick="deleteCoreMemory('${esc(u)}')">清除</button>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        })
+        .catch(() => {});
+}
+
+function editCoreMemory(user) {
+    fetch(`/api/get_memory_summary/${encodeURIComponent(user)}`)
+        .then(r => r.json())
+        .then(d => {
+            const content = d.content || '';
+            openModal('核心记忆: ' + user, content, function(newContent) {
+                fetch(`/api/save_memory_summary/${encodeURIComponent(user)}`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ content: newContent })
+                })
+                .then(r => r.json())
+                .then(res => { if (res.error) alert('保存失败: ' + res.error); else { alert('✅ 已保存'); modalClose(); } })
+                .catch(e => alert('保存失败: ' + e.message));
+            });
+        })
+        .catch(e => alert('加载失败: ' + e.message));
+}
+
+function deleteCoreMemory(user) {
+    if (!confirm(`确定清除 "${user}" 的核心记忆？`)) return;
+    fetch(`/api/delete_memory_summary/${encodeURIComponent(user)}`, { method: 'POST' })
+        .then(r => r.json())
+        .then(() => alert('✅ 已清除'))
+        .catch(e => alert('清除失败: ' + e.message));
+}
+
+// ===== 4. 碎片记忆 =====
+let allEntries = [];
+let displayCount = 20;
+let filtered = [];
+
+function loadEntries() {
+    // 从后端读 memory_entries.json
+    fetch('/api/memory_entries')
+        .then(r => r.json())
+        .then(d => {
+            allEntries = Array.isArray(d) ? d : [];
+            // 按 id 倒序
+            allEntries.sort((a, b) => (b.id || 0) - (a.id || 0));
+            filtered = allEntries;
+            displayCount = 20;
+            renderEntries();
+            document.getElementById('entry-count').textContent = `共 ${allEntries.length} 条记忆`;
+        })
+        .catch(() => {
+            document.getElementById('entries-list').innerHTML = '<p style="color:#bbb; text-align:center; padding:10px;">加载失败</p>';
+        });
+}
+
+function filterEntries() {
+    const q = document.getElementById('entry-search').value.trim().toLowerCase();
+    if (!q) { filtered = allEntries; }
+    else {
+        filtered = allEntries.filter(e =>
+            (e.summary || '').toLowerCase().includes(q) ||
+            (e.event || '').toLowerCase().includes(q) ||
+            (e.content || '').toLowerCase().includes(q) ||
+            (e.date || '').includes(q)
+        );
+    }
+    displayCount = 20;
+    renderEntries();
+}
+
+function renderEntries() {
+    const list = document.getElementById('entries-list');
+    const show = filtered.slice(0, displayCount);
+    if (show.length === 0) {
+        list.innerHTML = '<p style="color:#bbb; text-align:center; padding:10px; font-size:13px;">无匹配记忆</p>';
+        document.getElementById('load-more-btn').style.display = 'none';
+        return;
+    }
+    list.innerHTML = '';
+    show.forEach(e => {
+        const card = document.createElement('div');
+        card.className = 'entry-card';
+        card.innerHTML = `
+            <div class="entry-header">
+                <span class="entry-id">#${e.id}</span>
+                <span class="entry-date">${e.date || '?'}</span>
+            </div>
+            <div class="entry-summary">${esc(e.summary || '(无概要)')}</div>
+            <div class="entry-event">${esc(e.event || '')}</div>
+            <div class="entry-actions">
+                <button class="btn-edit" onclick="viewEntry(${e.id})">查看详情</button>
+                <button class="btn-del" onclick="deleteEntry(${e.id})">删除</button>
+            </div>
+        `;
+        list.appendChild(card);
+    });
+    document.getElementById('load-more-btn').style.display = displayCount < filtered.length ? 'block' : 'none';
+}
+
+function showMore() {
+    displayCount += 20;
+    renderEntries();
+}
+
+function viewEntry(id) {
+    const entry = allEntries.find(e => e.id === id);
+    if (!entry) return;
+    const text = `ID: ${entry.id}\n日期: ${entry.date}\n事件: ${entry.event}\n概要: ${entry.summary}\n\n--- 详细内容 ---\n${entry.content || '(无)'}\n\n--- 备忘录 ---\n${entry.memo || '(无)'}`;
+    openModal('记忆 #' + id, text, null);  // 只读
+}
+
+function deleteEntry(id) {
+    if (!confirm(`确定删除记忆 #${id}？`)) return;
+    // 从数组中删除并保存
+    allEntries = allEntries.filter(e => e.id !== id);
+    filtered = filtered.filter(e => e.id !== id);
+    renderEntries();
+    document.getElementById('entry-count').textContent = `共 ${allEntries.length} 条记忆`;
+    // 保存到后端
+    fetch('/api/memory_entries', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(allEntries)
+    }).catch(e => alert('保存失败: ' + e.message));
+}
+
+// ===== 弹窗 =====
+let modalCallback = null;
+
+function openModal(title, content, onSave) {
+    document.getElementById('modal-title').textContent = title;
+    document.getElementById('modal-content').value = content;
+    document.getElementById('modal-content').readOnly = !onSave;
+    modalCallback = onSave;
+    document.getElementById('edit-modal').classList.add('show');
+}
+
+function modalSave() {
+    if (modalCallback) modalCallback(document.getElementById('modal-content').value);
+}
+
+function modalClose() {
+    document.getElementById('edit-modal').classList.remove('show');
+    modalCallback = null;
+}
+
+document.getElementById('edit-modal').addEventListener('click', function(e) {
+    if (e.target === this) modalClose();
+});
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// ===== 初始化 =====
+loadContextUsers();
+loadCoreMemory();
+loadEntries();
+</script>
+
+</body>
+</html>
