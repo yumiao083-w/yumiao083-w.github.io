@@ -14,7 +14,8 @@
         .section-card h2 { font-size: 18px; font-weight: 600; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid #f0f0f0; }
         .field { margin-bottom: 14px; }
         .field label { display: block; font-size: 13px; font-weight: 500; color: #666; margin-bottom: 4px; }
-        .field input[type="text"], .field input[type="number"], .field select { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; background: #fafafa; }
+        .field input[type="text"], .field input[type="number"], .field input[type="time"], .field input[type="datetime-local"], .field select {
+            width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; background: #fafafa; }
         .field input:focus, .field select:focus { outline: none; border-color: #007aff; background: white; }
         .field small { display: block; font-size: 12px; color: #999; margin-top: 4px; }
         .range-row { display: flex; gap: 10px; align-items: center; }
@@ -30,6 +31,20 @@
         .save-btn { padding: 10px 24px; background: #007aff; color: white; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; }
         .save-btn:active { opacity: 0.7; }
         .save-status { font-size: 13px; color: #999; }
+        /* 时间选择器 */
+        .time-picker { display: flex; align-items: center; gap: 6px; }
+        .time-picker input[type="time"] { width: auto; flex: 1; }
+        /* 条件显示 */
+        .cond-section { display: none; }
+        .cond-section.show { display: block; }
+        /* 提醒条目 */
+        .reminder-card { background: #f8f8fa; border: 1px solid #e8e8ea; border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+        .reminder-card .card-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
+        .reminder-card .card-row:last-child { margin-bottom: 0; }
+        .reminder-card select, .reminder-card input { padding: 7px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
+        .reminder-card .del-btn { background: #ff3b30; color: white; border: none; padding: 5px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+        .add-btn { width: 100%; padding: 10px; background: #f0f0f2; border: 2px dashed #ccc; border-radius: 10px; font-size: 14px; color: #666; cursor: pointer; text-align: center; margin-top: 8px; }
+        .add-btn:hover { border-color: #007aff; color: #007aff; }
     </style>
 </head>
 <body>
@@ -43,12 +58,10 @@
 <div class="section-card">
     <h2>回复间隔</h2>
     <small style="color: #999; display: block; margin-bottom: 12px;">消息间隔时间 = 字数 × (平均速度 + 随机速度)</small>
-
     <div class="field">
         <label>平均打字速度（秒/字）</label>
         <input type="number" id="avg-speed" step="0.01" value="{{ config.AVERAGE_TYPING_SPEED }}">
     </div>
-
     <div class="field">
         <label>随机打字速度范围（秒/字）</label>
         <div class="range-row">
@@ -57,25 +70,19 @@
             <input type="number" id="rand-speed-max" step="0.01" value="{{ config.RANDOM_TYPING_SPEED_MAX }}">
         </div>
     </div>
-
     <div class="field">
         <label>消息队列等待时间（秒）</label>
         <input type="number" id="queue-wait" step="1" value="{{ config.QUEUE_WAITING_TIME }}">
         <small>建议 5-10 秒</small>
     </div>
-
     <div class="switch-row">
         <label>以换行符分隔消息</label>
         <button class="toggle {% if config.SEPARATE_ROW_SYMBOLS %}on{% endif %}" id="separate-row" onclick="this.classList.toggle('on')"><div class="knob"></div></button>
     </div>
-    <small style="color: #999;">开启后同时使用换行符和反斜线分隔；关闭时仅使用反斜线</small>
-
     <div class="switch-row">
         <label>强制移除括号及其内容</label>
         <button class="toggle {% if config.REMOVE_PARENTHESES %}on{% endif %}" id="remove-paren" onclick="this.classList.toggle('on')"><div class="knob"></div></button>
     </div>
-    <small style="color: #999;">开启后自动删除 AI 回复中括号内的内容（如心理、动作描述）</small>
-
     <div class="save-bar">
         <button class="save-btn" onclick="saveInterval()">保存</button>
         <span class="save-status" id="interval-status"></span>
@@ -85,22 +92,18 @@
 <!-- ===== 2. 主动表情包 ===== -->
 <div class="section-card">
     <h2>主动表情包</h2>
-
     <div class="switch-row">
         <label>启用主动表情包</label>
         <button class="toggle {% if config.ENABLE_EMOJI_SENDING %}on{% endif %}" id="emoji-send-enable" onclick="this.classList.toggle('on')"><div class="knob"></div></button>
     </div>
-
     <div class="field">
         <label>触发概率（0-100）</label>
         <input type="number" id="emoji-prob" step="1" min="0" max="100" value="{{ config.EMOJI_SENDING_PROBABILITY }}">
     </div>
-
     <div class="field">
         <label>表情包存放目录</label>
         <input type="text" id="emoji-dir" value="{{ config.EMOJI_DIR }}">
     </div>
-
     <div class="save-bar">
         <button class="save-btn" onclick="saveEmoji()">保存</button>
         <span class="save-status" id="emoji-status"></span>
@@ -110,41 +113,42 @@
 <!-- ===== 3. 主动消息 ===== -->
 <div class="section-card">
     <h2>主动消息</h2>
-
     <div class="switch-row">
         <label>启用主动消息</label>
         <button class="toggle {% if config.ENABLE_AUTO_MESSAGE %}on{% endif %}" id="auto-msg-enable" onclick="this.classList.toggle('on')"><div class="knob"></div></button>
     </div>
-
     <div class="field">
         <label>主动消息内容（发送给 AI 获取回复）</label>
         <input type="text" id="auto-msg-content" value="{{ config.AUTO_MESSAGE }}">
     </div>
-
     <div class="field">
-        <label>触发时间间隔（小时）</label>
+        <label>触发时间间隔</label>
         <div class="range-row">
-            <input type="number" id="auto-msg-min" step="0.01" value="{{ config.MIN_COUNTDOWN_HOURS }}">
-            <span>至</span>
-            <input type="number" id="auto-msg-max" step="0.01" value="{{ config.MAX_COUNTDOWN_HOURS }}">
+            <div style="flex:1;">
+                <small style="margin-bottom:2px;">最短（小时）</small>
+                <input type="time" id="auto-msg-min-time" value="" step="60">
+            </div>
+            <span style="margin-top:16px;">至</span>
+            <div style="flex:1;">
+                <small style="margin-bottom:2px;">最长（小时）</small>
+                <input type="time" id="auto-msg-max-time" value="" step="60">
+            </div>
         </div>
+        <small>用时间选择器设置间隔，例如 00:30 = 半小时，01:30 = 一个半小时</small>
     </div>
-
     <div class="field">
         <label>安静时间段</label>
-        <div class="range-row">
-            <input type="text" id="quiet-start" value="{{ config.QUIET_TIME_START }}" placeholder="HH:MM">
+        <div class="time-picker">
+            <input type="time" id="quiet-start" value="{{ config.QUIET_TIME_START }}" step="60">
             <span>至</span>
-            <input type="text" id="quiet-end" value="{{ config.QUIET_TIME_END }}" placeholder="HH:MM">
+            <input type="time" id="quiet-end" value="{{ config.QUIET_TIME_END }}" step="60">
         </div>
         <small>此时间段内不发送主动消息</small>
     </div>
-
     <div class="switch-row">
         <label>忽略群聊主动消息</label>
         <button class="toggle {% if config.IGNORE_GROUP_CHAT_FOR_AUTO_MESSAGE %}on{% endif %}" id="ignore-group" onclick="this.classList.toggle('on')"><div class="knob"></div></button>
     </div>
-
     <div class="save-bar">
         <button class="save-btn" onclick="saveAutoMsg()">保存</button>
         <span class="save-status" id="auto-msg-status"></span>
@@ -154,40 +158,56 @@
 <!-- ===== 4. 定时器与提醒 ===== -->
 <div class="section-card">
     <h2>定时器与提醒</h2>
-
     <div class="switch-row">
         <label>启用定时提醒</label>
         <button class="toggle {% if config.ENABLE_REMINDERS %}on{% endif %}" id="reminder-enable" onclick="this.classList.toggle('on')"><div class="knob"></div></button>
     </div>
-
     <div class="switch-row">
         <label>允许在安静时间内发送提醒</label>
         <button class="toggle {% if config.ALLOW_REMINDERS_IN_QUIET_TIME %}on{% endif %}" id="reminder-quiet" onclick="this.classList.toggle('on')"><div class="knob"></div></button>
     </div>
-
     <div class="switch-row">
         <label>使用语音通话提醒（仅私聊）</label>
         <button class="toggle {% if config.USE_VOICE_CALL_FOR_REMINDERS %}on{% endif %}" id="reminder-voice" onclick="this.classList.toggle('on')"><div class="knob"></div></button>
     </div>
 
+    <!-- 已读不回 -->
     <div class="switch-row">
         <label>启用已读不回检测</label>
-        <button class="toggle {% if config.ENABLE_IGNORE_DETECTION %}on{% endif %}" id="ignore-detect" onclick="this.classList.toggle('on')"><div class="knob"></div></button>
+        <button class="toggle {% if config.ENABLE_IGNORE_DETECTION %}on{% endif %}" id="ignore-detect" onclick="this.classList.toggle('on'); toggleIgnoreSection()"><div class="knob"></div></button>
     </div>
-
-    <div class="field">
-        <label>已读不回触发拍一拍次数</label>
-        <input type="number" id="ignore-threshold" min="1" value="{{ config.IGNORE_PAT_THRESHOLD }}">
-        <small>连续多少次已读不回后触发拍一拍</small>
+    <div class="cond-section" id="ignore-section">
+        <div class="field">
+            <label>已读不回触发拍一拍次数</label>
+            <input type="number" id="ignore-threshold" min="1" value="{{ config.IGNORE_PAT_THRESHOLD }}" style="width: 100px;">
+            <small>连续多少次已读不回后自动拍一拍提醒对方</small>
+        </div>
     </div>
 
     <div class="save-bar">
         <button class="save-btn" onclick="saveReminder()">保存</button>
         <span class="save-status" id="reminder-status"></span>
     </div>
+
+    <!-- 提醒管理 -->
+    <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid #f0f0f0;">
+        <h3 style="font-size: 16px; margin-bottom: 12px;">提醒管理</h3>
+        <small style="color: #999; display: block; margin-bottom: 12px;">管理已配置的定时提醒（修改后需重启 Bot 生效）</small>
+
+        <div id="reminder-list">
+            <p style="color: #bbb; text-align: center; padding: 10px;">加载中...</p>
+        </div>
+        <div class="add-btn" onclick="addReminder()">+ 添加提醒</div>
+
+        <div class="save-bar">
+            <button class="save-btn" onclick="saveReminders()">保存提醒列表</button>
+            <span class="save-status" id="reminder-list-status"></span>
+        </div>
+    </div>
 </div>
 
 <script>
+// ===== 通用 =====
 function saveFields(fields, statusId) {
     const s = document.getElementById(statusId);
     s.textContent = '保存中...'; s.style.color = '#999';
@@ -200,6 +220,25 @@ function saveFields(fields, statusId) {
     .catch(e => { s.textContent = '❌ ' + e.message; s.style.color = '#ff3b30'; });
 }
 
+// ===== 已读不回条件显示 =====
+function toggleIgnoreSection() {
+    const on = document.getElementById('ignore-detect').classList.contains('on');
+    document.getElementById('ignore-section').classList.toggle('show', on);
+}
+
+// ===== 时间转换工具 =====
+function hoursToTime(h) {
+    const hours = Math.floor(h);
+    const mins = Math.round((h - hours) * 60);
+    return String(hours).padStart(2,'0') + ':' + String(mins).padStart(2,'0');
+}
+function timeToHours(t) {
+    if (!t) return 0;
+    const parts = t.split(':');
+    return parseInt(parts[0]) + parseInt(parts[1]) / 60;
+}
+
+// ===== 保存函数 =====
 function saveInterval() {
     saveFields({
         AVERAGE_TYPING_SPEED: document.getElementById('avg-speed').value,
@@ -220,11 +259,13 @@ function saveEmoji() {
 }
 
 function saveAutoMsg() {
+    const minH = timeToHours(document.getElementById('auto-msg-min-time').value);
+    const maxH = timeToHours(document.getElementById('auto-msg-max-time').value);
     saveFields({
         ENABLE_AUTO_MESSAGE: document.getElementById('auto-msg-enable').classList.contains('on'),
         AUTO_MESSAGE: document.getElementById('auto-msg-content').value,
-        MIN_COUNTDOWN_HOURS: document.getElementById('auto-msg-min').value,
-        MAX_COUNTDOWN_HOURS: document.getElementById('auto-msg-max').value,
+        MIN_COUNTDOWN_HOURS: minH,
+        MAX_COUNTDOWN_HOURS: maxH,
         QUIET_TIME_START: document.getElementById('quiet-start').value.trim(),
         QUIET_TIME_END: document.getElementById('quiet-end').value.trim(),
         IGNORE_GROUP_CHAT_FOR_AUTO_MESSAGE: document.getElementById('ignore-group').classList.contains('on'),
@@ -240,6 +281,89 @@ function saveReminder() {
         IGNORE_PAT_THRESHOLD: document.getElementById('ignore-threshold').value,
     }, 'reminder-status');
 }
+
+// ===== 提醒管理 =====
+let reminders = [];
+
+function loadReminders() {
+    fetch('/get_all_reminders')
+        .then(r => r.json())
+        .then(d => {
+            reminders = Array.isArray(d) ? d : [];
+            renderReminders();
+        })
+        .catch(() => { reminders = []; renderReminders(); });
+}
+
+function renderReminders() {
+    const list = document.getElementById('reminder-list');
+    if (reminders.length === 0) {
+        list.innerHTML = '<p style="color:#bbb; text-align:center; padding:10px; font-size:13px;">暂无提醒</p>';
+        return;
+    }
+    list.innerHTML = '';
+    reminders.forEach((r, idx) => {
+        const card = document.createElement('div');
+        card.className = 'reminder-card';
+        const isRecurring = r.reminder_type === 'recurring';
+        card.innerHTML = `
+            <div class="card-row">
+                <select onchange="reminders[${idx}].reminder_type=this.value; renderReminders();" style="width:100px;">
+                    <option value="recurring" ${isRecurring?'selected':''}>每日重复</option>
+                    <option value="one-off" ${!isRecurring?'selected':''}>一次性</option>
+                </select>
+                <input type="text" value="${esc(r.user_id||'')}" placeholder="用户昵称" onchange="reminders[${idx}].user_id=this.value" style="flex:1;">
+                <button class="del-btn" onclick="reminders.splice(${idx},1); renderReminders();">删除</button>
+            </div>
+            <div class="card-row">
+                ${isRecurring
+                    ? `<label style="font-size:12px; color:#888;">每日时间</label><input type="time" value="${r.time_str||''}" onchange="reminders[${idx}].time_str=this.value" style="width:120px;">`
+                    : `<label style="font-size:12px; color:#888;">触发时间</label><input type="datetime-local" value="${(r.target_datetime_str||'').replace(' ','T')}" onchange="reminders[${idx}].target_datetime_str=this.value.replace('T',' ')" style="flex:1;">`
+                }
+            </div>
+            <div class="card-row">
+                <input type="text" value="${esc(r.content||'')}" placeholder="提醒内容" onchange="reminders[${idx}].content=this.value" style="flex:1;">
+            </div>
+        `;
+        list.appendChild(card);
+    });
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function addReminder() {
+    reminders.push({ reminder_type: 'recurring', user_id: '', time_str: '08:00', content: '' });
+    renderReminders();
+    setTimeout(() => { const list = document.getElementById('reminder-list'); list.lastElementChild?.scrollIntoView({behavior:'smooth'}); }, 100);
+}
+
+function saveReminders() {
+    const s = document.getElementById('reminder-list-status');
+    s.textContent = '保存中...'; s.style.color = '#999';
+
+    fetch('/save_all_reminders', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(reminders)
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.error) { s.textContent = '❌ ' + d.error; s.style.color = '#ff3b30'; }
+        else { s.textContent = '✅ 已保存（重启Bot后生效）'; s.style.color = '#34c759'; setTimeout(() => s.textContent = '', 5000); }
+    })
+    .catch(e => { s.textContent = '❌ ' + e.message; s.style.color = '#ff3b30'; });
+}
+
+// ===== 初始化 =====
+function init() {
+    // 已读不回条件显示
+    toggleIgnoreSection();
+    // 主动消息时间初始化
+    document.getElementById('auto-msg-min-time').value = hoursToTime({{ config.MIN_COUNTDOWN_HOURS }});
+    document.getElementById('auto-msg-max-time').value = hoursToTime({{ config.MAX_COUNTDOWN_HOURS }});
+    // 加载提醒
+    loadReminders();
+}
+init();
 </script>
 
 </body>
