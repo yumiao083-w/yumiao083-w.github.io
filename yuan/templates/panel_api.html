@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>API 配置</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f7;
+            color: #1d1d1f;
+            padding-bottom: 40px;
+        }
+
+        /* 顶部导航栏 */
+        .top-bar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(245,245,247,0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+        .back-btn {
+            text-decoration: none;
+            color: #007aff;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .top-bar h1 {
+            flex: 1;
+            text-align: center;
+            font-size: 17px;
+            font-weight: 600;
+            margin-right: 40px; /* 平衡左边返回按钮 */
+        }
+
+        /* 区块卡片 */
+        .section-card {
+            background: white;
+            margin: 16px;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .section-card h2 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        /* 表单元素 */
+        .field {
+            margin-bottom: 14px;
+        }
+        .field label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: #666;
+            margin-bottom: 4px;
+        }
+        .field input[type="text"],
+        .field input[type="number"],
+        .field input[type="password"],
+        .field select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 15px;
+            background: #fafafa;
+            transition: border-color 0.2s;
+        }
+        .field input:focus, .field select:focus {
+            outline: none;
+            border-color: #007aff;
+            background: white;
+        }
+        .field small {
+            display: block;
+            font-size: 12px;
+            color: #999;
+            margin-top: 4px;
+        }
+
+        /* 模型选择行 */
+        .model-row {
+            display: flex;
+            gap: 8px;
+        }
+        .model-row select { flex: 1; }
+        .model-row .fetch-btn {
+            padding: 10px 14px;
+            background: #007aff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .model-row .fetch-btn:disabled { opacity: 0.5; }
+
+        /* 开关 */
+        .switch-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+        }
+        .switch-row label { font-size: 15px; color: #333; }
+        .toggle {
+            position: relative;
+            width: 44px;
+            height: 26px;
+            background: #e0e0e0;
+            border-radius: 13px;
+            cursor: pointer;
+            transition: background 0.2s;
+            border: none;
+        }
+        .toggle.on { background: #34c759; }
+        .toggle .knob {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 22px;
+            height: 22px;
+            background: white;
+            border-radius: 50%;
+            transition: left 0.2s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .toggle.on .knob { left: 20px; }
+
+        /* 保存按钮 */
+        .save-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px solid #f0f0f0;
+        }
+        .save-btn {
+            padding: 10px 24px;
+            background: #007aff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .save-btn:active { opacity: 0.7; }
+        .save-status {
+            font-size: 13px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+
+<div class="top-bar">
+    <a href="/home" class="back-btn">← 返回</a>
+    <h1>🔌 API 配置</h1>
+</div>
+
+<!-- ===== 1. 聊天模型 ===== -->
+<div class="section-card" id="card-chat">
+    <h2>聊天模型</h2>
+
+    <div class="field">
+        <label>Base URL</label>
+        <input type="text" id="chat-url" value="{{ config.DEEPSEEK_BASE_URL }}">
+    </div>
+
+    <div class="field">
+        <label>API Key</label>
+        <input type="password" id="chat-key" value="{{ config.DEEPSEEK_API_KEY }}">
+    </div>
+
+    <div class="field">
+        <label>模型</label>
+        <div class="model-row">
+            <select id="chat-model-select"><option value="">-- 获取模型列表 --</option>
+                {% if config.MODEL %}<option value="{{ config.MODEL }}" selected>{{ config.MODEL }}</option>{% endif %}
+            </select>
+            <button class="fetch-btn" onclick="fetchModels('chat')">获取</button>
+        </div>
+        <input type="text" id="chat-model-manual" value="{{ config.MODEL }}" placeholder="或手动输入模型名" style="margin-top: 6px;">
+    </div>
+
+    <div class="field">
+        <label>温度 (0-2)</label>
+        <input type="number" id="chat-temp" step="0.1" min="0" max="2" value="{{ config.TEMPERATURE }}">
+    </div>
+
+    <div class="field">
+        <label>最大 Token</label>
+        <input type="number" id="chat-max-token" step="100" value="{{ config.MAX_TOKEN }}">
+    </div>
+
+    <div class="save-bar">
+        <button class="save-btn" onclick="saveChat()">保存</button>
+        <span class="save-status" id="chat-status"></span>
+    </div>
+</div>
+
+<!-- ===== 2. 记忆筛选模型 ===== -->
+<div class="section-card" id="card-memory-retrieval">
+    <h2>记忆筛选模型</h2>
+    <small style="color: #999; display: block; margin-bottom: 12px;">用于从记忆库中智能检索相关记忆的模型（推荐快速便宜的模型如 Flash）</small>
+
+    <div class="field">
+        <label>检索模式</label>
+        <select id="mr-mode-panel">
+            <option value="llm" {% if config.MEMORY_RETRIEVAL_MODE == 'llm' %}selected{% endif %}>LLM 精筛（推荐）</option>
+            <option value="keyword" {% if config.MEMORY_RETRIEVAL_MODE == 'keyword' %}selected{% endif %}>仅关键词匹配</option>
+            <option value="off" {% if config.MEMORY_RETRIEVAL_MODE == 'off' %}selected{% endif %}>关闭检索</option>
+        </select>
+    </div>
+
+    <div id="mr-providers-panel">
+        <!-- JS 动态渲染中转站列表 -->
+    </div>
+
+    <div style="margin-top: 8px;">
+        <button class="save-btn" style="background: #34c759; font-size: 13px; padding: 8px 14px;" onclick="mrAddProviderPanel()">+ 添加中转站</button>
+    </div>
+
+    <div class="field" style="margin-top: 12px;">
+        <label>最大输出 Token</label>
+        <input type="number" id="mr-max-tokens-panel" step="500" value="{{ config.MEMORY_RETRIEVAL_MAX_TOKENS or 4000 }}">
+        <small>LLM 精筛输出上限，建议 2000-8000</small>
+    </div>
+
+    <div class="field">
+        <label>关键词降级条数</label>
+        <input type="number" id="mr-topk-panel" min="1" max="15" value="{{ config.MEMORY_RETRIEVAL_TOP_K or 5 }}">
+        <small>LLM 失败降级到关键词时返回的条数</small>
+    </div>
+
+    <div class="switch-row">
+        <label>LLM 失败时降级到关键词</label>
+        <button class="toggle {% if config.MEMORY_FALLBACK_TO_KEYWORD %}on{% endif %}" id="mr-fallback-panel" onclick="this.classList.toggle('on')">
+            <div class="knob"></div>
+        </button>
+    </div>
+
+    <div class="save-bar">
+        <button class="save-btn" onclick="saveMrConfig()">保存</button>
+        <span class="save-status" id="mr-status"></span>
+    </div>
+</div>
+
+<!-- ===== 3. 识图模型 ===== -->
+<div class="section-card" id="card-image">
+    <h2>识图模型</h2>
+
+    <div class="switch-row">
+        <label>启用图片识别</label>
+        <button class="toggle {% if config.ENABLE_IMAGE_RECOGNITION %}on{% endif %}" id="img-enable" onclick="this.classList.toggle('on')">
+            <div class="knob"></div>
+        </button>
+    </div>
+
+    <div class="switch-row">
+        <label>启用表情包识别</label>
+        <button class="toggle {% if config.ENABLE_EMOJI_RECOGNITION %}on{% endif %}" id="emoji-enable" onclick="this.classList.toggle('on')">
+            <div class="knob"></div>
+        </button>
+    </div>
+
+    <div class="field">
+        <label>Base URL</label>
+        <input type="text" id="img-url" value="{{ config.MOONSHOT_BASE_URL }}">
+    </div>
+
+    <div class="field">
+        <label>API Key</label>
+        <input type="password" id="img-key" value="{{ config.MOONSHOT_API_KEY }}">
+    </div>
+
+    <div class="field">
+        <label>模型</label>
+        <div class="model-row">
+            <select id="img-model-select"><option value="">-- 获取模型列表 --</option>
+                {% if config.MOONSHOT_MODEL %}<option value="{{ config.MOONSHOT_MODEL }}" selected>{{ config.MOONSHOT_MODEL }}</option>{% endif %}
+            </select>
+            <button class="fetch-btn" onclick="fetchModels('image')">获取</button>
+        </div>
+        <input type="text" id="img-model-manual" value="{{ config.MOONSHOT_MODEL }}" placeholder="或手动输入" style="margin-top: 6px;">
+    </div>
+
+    <div class="field">
+        <label>温度</label>
+        <input type="number" id="img-temp" step="0.1" min="0" max="2" value="{{ config.MOONSHOT_TEMPERATURE }}">
+    </div>
+
+    <div class="save-bar">
+        <button class="save-btn" onclick="saveImage()">保存</button>
+        <span class="save-status" id="img-status"></span>
+    </div>
+</div>
+
+<!-- ===== 4. 联网搜索 ===== -->
+<div class="section-card" id="card-online">
+    <h2>联网搜索</h2>
+
+    <div class="switch-row">
+        <label>启用联网搜索</label>
+        <button class="toggle {% if config.ENABLE_ONLINE_API %}on{% endif %}" id="online-enable" onclick="this.classList.toggle('on')">
+            <div class="knob"></div>
+        </button>
+    </div>
+
+    <div class="field">
+        <label>Base URL</label>
+        <input type="text" id="online-url" value="{{ config.ONLINE_BASE_URL }}">
+    </div>
+
+    <div class="field">
+        <label>API Key</label>
+        <input type="password" id="online-key" value="{{ config.ONLINE_API_KEY }}">
+    </div>
+
+    <div class="field">
+        <label>模型</label>
+        <div class="model-row">
+            <select id="online-model-select"><option value="">-- 获取模型列表 --</option>
+                {% if config.ONLINE_MODEL %}<option value="{{ config.ONLINE_MODEL }}" selected>{{ config.ONLINE_MODEL }}</option>{% endif %}
+            </select>
+            <button class="fetch-btn" onclick="fetchModels('online')">获取</button>
+        </div>
+        <input type="text" id="online-model-manual" value="{{ config.ONLINE_MODEL }}" placeholder="或手动输入" style="margin-top: 6px;">
+    </div>
+
+    <div class="field">
+        <label>温度</label>
+        <input type="number" id="online-temp" step="0.1" min="0" max="2" value="{{ config.ONLINE_API_TEMPERATURE }}">
+    </div>
+
+    <div class="field">
+        <label>最大 Token</label>
+        <input type="number" id="online-max-token" step="100" value="{{ config.ONLINE_API_MAX_TOKEN }}">
+    </div>
+
+    <div class="field">
+        <label>触发联网的提示词</label>
+        <input type="text" id="online-trigger" value="{{ config.SEARCH_DETECTION_PROMPT }}">
+        <small>AI 根据此提示词判断是否需要联网搜索</small>
+    </div>
+
+    <div class="field">
+        <label>固定附加提示词（可选）</label>
+        <input type="text" id="online-fixed" value="{{ config.ONLINE_FIXED_PROMPT }}">
+        <small>每次联网搜索自动附加，如所在地信息</small>
+    </div>
+
+    <div class="save-bar">
+        <button class="save-btn" onclick="saveOnline()">保存</button>
+        <span class="save-status" id="online-status"></span>
+    </div>
+</div>
+
+<script>
+// ===== 通用保存函数 =====
+function saveFields(fields, statusId) {
+    const statusEl = document.getElementById(statusId);
+    statusEl.textContent = '保存中...';
+    statusEl.style.color = '#999';
+
+    fetch('/api/save_section', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ fields: fields })
+    })
+    .then(r => { if (!r.ok) return r.text().then(t => { throw new Error(t.substring(0, 100)); }); return r.json(); })
+    .then(data => {
+        if (data.error) {
+            statusEl.textContent = '❌ ' + data.error;
+            statusEl.style.color = '#ff3b30';
+        } else {
+            statusEl.textContent = '✅ 已保存';
+            statusEl.style.color = '#34c759';
+            setTimeout(() => { statusEl.textContent = ''; }, 3000);
+        }
+    })
+    .catch(err => {
+        statusEl.textContent = '❌ ' + err.message;
+        statusEl.style.color = '#ff3b30';
+    });
+}
+
+// ===== 获取模型列表 =====
+function fetchModels(area) {
+    const urlMap = { chat: 'chat-url', image: 'img-url', online: 'online-url' };
+    const keyMap = { chat: 'chat-key', image: 'img-key', online: 'online-key' };
+    const selectMap = { chat: 'chat-model-select', image: 'img-model-select', online: 'online-model-select' };
+    const manualMap = { chat: 'chat-model-manual', image: 'img-model-manual', online: 'online-model-manual' };
+
+    const url = document.getElementById(urlMap[area]).value.trim();
+    const key = document.getElementById(keyMap[area]).value.trim();
+    const select = document.getElementById(selectMap[area]);
+    const manual = document.getElementById(manualMap[area]);
+
+    if (!url) { alert('请先填写 Base URL'); return; }
+
+    select.innerHTML = '<option value="">获取中...</option>';
+
+    fetch('/api/fetch_models', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ url: url, key: key })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) { select.innerHTML = `<option value="">❌ ${data.error}</option>`; return; }
+        const models = data.models || [];
+        const current = manual.value.trim();
+        select.innerHTML = '<option value="">-- 选择模型 --</option>';
+        models.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m; opt.textContent = m;
+            if (m === current) opt.selected = true;
+            select.appendChild(opt);
+        });
+        select.onchange = () => { if (select.value) manual.value = select.value; };
+    })
+    .catch(err => { select.innerHTML = `<option value="">❌ ${err.message}</option>`; });
+}
+
+// ===== 各区块保存 =====
+function saveChat() {
+    const model = document.getElementById('chat-model-manual').value.trim() || document.getElementById('chat-model-select').value;
+    saveFields({
+        DEEPSEEK_BASE_URL: document.getElementById('chat-url').value.trim(),
+        DEEPSEEK_API_KEY: document.getElementById('chat-key').value.trim(),
+        MODEL: model,
+        TEMPERATURE: document.getElementById('chat-temp').value,
+        MAX_TOKEN: document.getElementById('chat-max-token').value,
+    }, 'chat-status');
+}
+
+function saveImage() {
+    const model = document.getElementById('img-model-manual').value.trim() || document.getElementById('img-model-select').value;
+    saveFields({
+        MOONSHOT_BASE_URL: document.getElementById('img-url').value.trim(),
+        MOONSHOT_API_KEY: document.getElementById('img-key').value.trim(),
+        MOONSHOT_MODEL: model,
+        MOONSHOT_TEMPERATURE: document.getElementById('img-temp').value,
+        ENABLE_IMAGE_RECOGNITION: document.getElementById('img-enable').classList.contains('on'),
+        ENABLE_EMOJI_RECOGNITION: document.getElementById('emoji-enable').classList.contains('on'),
+    }, 'img-status');
+}
+
+function saveOnline() {
+    const model = document.getElementById('online-model-manual').value.trim() || document.getElementById('online-model-select').value;
+    saveFields({
+        ONLINE_BASE_URL: document.getElementById('online-url').value.trim(),
+        ONLINE_API_KEY: document.getElementById('online-key').value.trim(),
+        ONLINE_MODEL: model,
+        ONLINE_API_TEMPERATURE: document.getElementById('online-temp').value,
+        ONLINE_API_MAX_TOKEN: document.getElementById('online-max-token').value,
+        ENABLE_ONLINE_API: document.getElementById('online-enable').classList.contains('on'),
+        SEARCH_DETECTION_PROMPT: document.getElementById('online-trigger').value.trim(),
+        ONLINE_FIXED_PROMPT: document.getElementById('online-fixed').value.trim(),
+    }, 'online-status');
+}
+
+// ===== 记忆筛选模型（复用已有 API） =====
+function saveMrConfig() {
+    const statusEl = document.getElementById('mr-status');
+    statusEl.textContent = '保存中...';
+
+    // 先保存 mode/top_k/max_tokens/fallback 到 config.py
+    saveFields({
+        MEMORY_RETRIEVAL_MODE: document.getElementById('mr-mode-panel').value,
+        MEMORY_RETRIEVAL_TOP_K: document.getElementById('mr-topk-panel').value,
+        MEMORY_RETRIEVAL_MAX_TOKENS: document.getElementById('mr-max-tokens-panel').value,
+        MEMORY_FALLBACK_TO_KEYWORD: document.getElementById('mr-fallback-panel').classList.contains('on'),
+    }, 'mr-status');
+
+    // providers 通过专用 API 保存
+    fetch('/api/memory_retrieval_config', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            mode: document.getElementById('mr-mode-panel').value,
+            top_k: parseInt(document.getElementById('mr-topk-panel').value) || 5,
+            max_tokens: parseInt(document.getElementById('mr-max-tokens-panel').value) || 4000,
+            fallback: document.getElementById('mr-fallback-panel').classList.contains('on'),
+            providers: mrProviders
+        })
+    }).then(r => r.json()).catch(() => {});
+}
+
+// ===== 记忆筛选中转站管理 =====
+let mrProviders = [];
+
+function mrLoadProviders() {
+    fetch('/api/memory_retrieval_config')
+        .then(r => r.json())
+        .then(data => {
+            mrProviders = data.providers || [];
+            mrRenderProvidersPanel();
+        })
+        .catch(() => {});
+}
+
+function mrRenderProvidersPanel() {
+    const container = document.getElementById('mr-providers-panel');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (mrProviders.length === 0) {
+        container.innerHTML = '<p style="color: #999; font-size: 13px; padding: 10px 0;">未添加中转站</p>';
+        return;
+    }
+
+    mrProviders.forEach((p, idx) => {
+        const div = document.createElement('div');
+        div.style.cssText = 'background: #f8f8f8; border-radius: 8px; padding: 10px 12px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;';
+        div.innerHTML = `
+            <div style="font-size: 13px;">
+                <strong>${p.name || '未命名'}</strong><br>
+                <span style="color: #999;">${p.model || '?'} · T=${p.temperature !== undefined ? p.temperature : 0.3} · ${p.timeout || 8}s</span>
+            </div>
+            <div style="display: flex; gap: 6px;">
+                <button onclick="mrEditProviderPanel(${idx})" style="background: #007aff; color: white; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;">编辑</button>
+                <button onclick="mrRemoveProviderPanel(${idx})" style="background: #ff3b30; color: white; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;">删除</button>
+            </div>
+        `;
+        container.appendChild(div);
+    });
+}
+
+function mrAddProviderPanel() {
+    const name = prompt('中转站名称:', '');
+    if (name === null) return;
+    const url = prompt('Base URL:', '');
+    if (!url) return;
+    const key = prompt('API Key (留空无鉴权):', '');
+    const model = prompt('模型名:', 'gemini-2.0-flash');
+    if (!model) return;
+    const temp = prompt('温度 (0-2):', '0.3');
+    const timeout = prompt('超时秒数:', '30');
+
+    mrProviders.push({
+        name: name || url,
+        base_url: url,
+        api_key: key || '',
+        model: model,
+        temperature: parseFloat(temp) || 0.3,
+        timeout: parseInt(timeout) || 30
+    });
+    mrRenderProvidersPanel();
+}
+
+function mrEditProviderPanel(idx) {
+    const p = mrProviders[idx];
+    const name = prompt('名称:', p.name);
+    if (name === null) return;
+    p.name = name;
+    p.base_url = prompt('Base URL:', p.base_url) || p.base_url;
+    p.api_key = prompt('API Key:', p.api_key);
+    p.model = prompt('模型:', p.model) || p.model;
+    p.temperature = parseFloat(prompt('温度:', p.temperature)) || 0.3;
+    p.timeout = parseInt(prompt('超时:', p.timeout)) || 30;
+    mrRenderProvidersPanel();
+}
+
+function mrRemoveProviderPanel(idx) {
+    if (confirm('确定删除?')) {
+        mrProviders.splice(idx, 1);
+        mrRenderProvidersPanel();
+    }
+}
+
+// 页面加载
+mrLoadProviders();
+</script>
+
+</body>
+</html>

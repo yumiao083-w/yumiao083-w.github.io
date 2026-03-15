@@ -271,6 +271,59 @@ def home():
     return render_template('home.html')
 
 
+@app.route('/panel/<name>')
+@login_required
+def panel(name):
+    """子页面路由"""
+    valid_panels = ['api', 'reply', 'chat', 'memory', 'prompt', 'settings']
+    if name not in valid_panels:
+        return redirect(url_for('home'))
+    config = parse_config()
+    return render_template(f'panel_{name}.html', config=config)
+
+
+@app.route('/api/save_section', methods=['POST'])
+@login_required
+def save_section():
+    """通用的按区块保存配置 API（各子页面共用）"""
+    try:
+        req = request.get_json()
+        if not req:
+            return jsonify({'error': '请求数据为空'}), 400
+
+        fields = req.get('fields', {})
+        if not fields:
+            return jsonify({'error': '没有要保存的字段'}), 400
+
+        # 类型转换：前端传来的都是字符串/布尔，需要匹配 config.py 原始类型
+        config = parse_config()
+        converted = {}
+        for key, value in fields.items():
+            original = config.get(key)
+            if original is None:
+                converted[key] = value
+            elif isinstance(original, bool):
+                converted[key] = value if isinstance(value, bool) else str(value).lower() in ('true', '1', 'on')
+            elif isinstance(original, int):
+                try:
+                    converted[key] = int(value)
+                except (ValueError, TypeError):
+                    converted[key] = original
+            elif isinstance(original, float):
+                try:
+                    converted[key] = float(value)
+                except (ValueError, TypeError):
+                    converted[key] = original
+            else:
+                converted[key] = str(value)
+
+        update_config(converted)
+        return jsonify({'status': 'success', 'message': f'已保存 {len(converted)} 项配置'})
+    except Exception as e:
+        app.logger.error(f"保存配置区块失败: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/start_bot', methods=['POST'])
 def start_bot():
     global bot_process
