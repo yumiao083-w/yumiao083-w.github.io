@@ -153,22 +153,6 @@
             <span class="save-status" id="save-prompt-status"></span>
         </div>
     </div>
-
-    <!-- 检索管道提示词 -->
-    <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #f0f0f0;">
-        <div class="field">
-            <label>记忆检索提示词 <span style="font-weight: normal; color: #aaa;">LLM 精筛时发给模型的指令</span></label>
-            <textarea id="retrieval-prompt" style="height: 200px; font-family: monospace; font-size: 12px; resize: vertical;" placeholder="加载中..."></textarea>
-            <small>可用变量：{top_k} {memory_index} {recent_context} {user_message}</small>
-            <div style="margin-top: 6px;">
-                <button style="background: #8e8e93; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-size: 12px; cursor: pointer;" onclick="resetRetrievalPrompt()">重置为默认</button>
-            </div>
-        </div>
-        <div class="save-bar">
-            <button class="save-btn" onclick="saveRetrievalPrompt()">保存提示词</button>
-            <span class="save-status" id="retrieval-prompt-status"></span>
-        </div>
-    </div>
 </div>
 
 <!-- 编辑弹窗 -->
@@ -470,11 +454,7 @@ function loadPrompts() {
         .then(d => { if (d.prompt) document.getElementById('save-prompt').value = d.prompt; })
         .catch(() => {});
 
-    // 检索管道提示词
-    fetch('/api/memory_retrieval_prompt')
-        .then(r => r.json())
-        .then(d => { if (d.content) document.getElementById('retrieval-prompt').value = d.content; })
-        .catch(() => {});
+
 }
 
 function saveCorePrompt() {
@@ -507,28 +487,7 @@ function saveSavePrompt() {
     .catch(e => { s.textContent = '❌ ' + e.message; s.style.color = '#ff3b30'; });
 }
 
-function saveRetrievalPrompt() {
-    const s = document.getElementById('retrieval-prompt-status');
-    s.textContent = '保存中...'; s.style.color = '#999';
-    fetch('/api/memory_retrieval_prompt', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ content: document.getElementById('retrieval-prompt').value })
-    })
-    .then(r => r.json())
-    .then(d => {
-        if (d.error) { s.textContent = '❌ ' + d.error; s.style.color = '#ff3b30'; }
-        else { s.textContent = '✅ 已保存'; s.style.color = '#34c759'; setTimeout(() => s.textContent = '', 3000); }
-    })
-    .catch(e => { s.textContent = '❌ ' + e.message; s.style.color = '#ff3b30'; });
-}
 
-function resetRetrievalPrompt() {
-    if (!confirm('确定重置为默认提示词？')) return;
-    fetch('/api/memory_retrieval_prompt/reset', { method: 'POST' })
-        .then(r => r.json())
-        .then(d => { if (d.content) document.getElementById('retrieval-prompt').value = d.content; })
-        .catch(e => alert('重置失败: ' + e.message));
-}
 </script>
 
 </body>
