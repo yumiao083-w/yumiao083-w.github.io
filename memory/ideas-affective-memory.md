@@ -51,10 +51,23 @@
 ### 检索管道
 
 ```
-用户消息
-  ├─ 路径A（当前已实现）：event 关键词匹配 → top 5 展开
-  ├─ 路径B（待实现）：embedding 语义搜索 → 候选池
-  └─ 路径C（待实现）：辅助 LLM 读 summary 列表精筛 → 精选
+用户消息 + 最近 3 轮对话
+    ↓
+路径选择（config: MEMORY_RETRIEVAL_MODE）
+  ├─ 'llm'  → 全量 181 条 summary 丢给便宜模型（如 Flash）精选 top 5
+  │           失败时自动降级 keyword
+  ├─ 'keyword' → event 关键词匹配 top 5
+  └─ 'off'  → 不检索
+
+LLM 精筛故障转移：
+  中转站 A → 超时/报错 → 中转站 B → ... → 全挂 → 降级 keyword
+  连续失败 3 次的站自动冷却 120s
+```
+
+### 未来（记忆 >500 条时）
+```
+embedding 粗筛 top 50 → LLM 精筛 top 5
+（embedding 做缩小候选池，不做最终决策）
 ```
 
 ---
@@ -80,6 +93,12 @@
 15. [x] config_editor.py 网页端适配 Memory_Core 路径和文件名格式
 16. [x] 碎片/核心记忆上下文范围从固定轮数 → 动态字符数上限（8000/10000字符）
 17. [x] 碎片记忆总结 prompt 改进：要求找完整事件脉络，忽略不相关闲聊
+18. [x] **记忆检索管道 v2** — LLM 精筛 + 多中转站故障转移 + 关键词降级
+    - `memory_llm_ranker.py`: LLM精筛模块（故障转移链、冷却机制、JSON解析兼容多格式）
+    - `memory_retrieval.py`: 路由模式（llm/keyword/off），全量 summary 丢给便宜模型精选
+    - `bot.py`: 传入 recent_context（最近3轮对话）给检索管道
+    - `config.py`: MEMORY_RETRIEVAL_MODE/PROVIDERS/TOP_K/FALLBACK
+    - 前端配置界面：模式切换、中转站增删排序、获取模型列表、超时/降级设置
 
 ### 🔲 待实施
 
@@ -94,17 +113,21 @@
 - [ ] 基于人类记忆研究设计格式：情感色调 > 关系认知 > 相处模式 > 极少数印记时刻
 - [ ] 现有核心记忆 ~7k字 → 精简到 800-1500 字
 
-#### 优先级 3：前端网页更新
+#### 优先级 3：前端网页更新（放在最后做）
+- [ ] 整体风格：手机桌面风格，图标入口 → 点击进入各配置/管理页面
+- [ ] 风格选型：iOS / Material / 自定义，用户待选定
 - [ ] config_editor 适配新的文件结构（character.md / preset.md 分开编辑）
 - [ ] 记忆管理界面（查看/编辑/删除 memory_entries.json 中的条目）
 - [ ] 预设切换功能（多套 preset 文件热切换）
-- [ ] UI 美化和不适配的地方修正
+- [ ] 世界书系统（空入口先占位）
+- [ ] 去掉新手引导、商业导流
+- [ ] UI 美化和手机适配
 
-#### 优先级 4：检索管道增强
-- [ ] embedding 语义搜索（用 event/summary 做向量化，匹配用户消息语义）
-- [ ] AI 辅助精筛（便宜模型读 summary 列表 + 对话上下文，选最相关的 3-5 条）
-- [ ] 关键词 + embedding + AI 精筛三路融合
-- [ ] 检索日志记录（为未来情感检索训练积累数据）
+#### 优先级 4：检索管道增强（远期，记忆 >500 条时）
+- [ ] embedding 预筛层（Gemini text-embedding-004，预计算 summary 向量，检索时余弦相似度取 top 50）
+- [ ] embedding top 50 → LLM 精筛 top 5（两级管道）
+- [ ] 新增记忆自动追加 embedding 向量
+- [ ] 检索日志记录（为未来分析积累数据）
 
 #### 优先级 5：远期
 - [ ] 世界书系统（角色次要设定，关键词触发注入）
