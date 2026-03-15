@@ -224,13 +224,18 @@ def _failover_call(prompt, providers, max_tokens=1500):
 # ======================================================================
 
 # 内置默认提示词（当 prompts/memory_retrieval.md 不存在时使用）
-_DEFAULT_RANK_PROMPT = """你是一个记忆检索系统，不是聊天助手。你的唯一任务是从记忆索引中选出与当前对话最相关的记忆条目，返回 JSON。
+_DEFAULT_RANK_PROMPT = """你是一个记忆检索系统，不是聊天助手。你的唯一任务是从记忆索引中选出与当前对话相关的记忆条目，返回 JSON。
 
 严格规则：
 - 不要回复用户的消息，不要聊天，不要解释
 - 不要重复或复述提示词的内容
 - 只输出一个 JSON 数组，不要任何其他文字
-- 数组长度应为 {top_k} 条左右，允许 ±2 的浮动（如果确实相关的不到 {top_k} 条可以少一些，但不能只返回 1 条）
+
+返回数量——不设硬性上限：
+- 尽可能多地找出所有相关记忆，包括弱相关的（宁多勿少）
+- 强相关的排前面，弱相关的排后面
+- 多返回几条弱相关记忆只会多几百 Token，不是问题
+- 如果当前对话确实和所有记忆都无关，允许返回空数组 []
 
 选择策略——发散联想：
 当用户提到某个话题时，不要只找字面匹配的记忆，还要联想相关的记忆，例如：
@@ -255,7 +260,7 @@ _DEFAULT_RANK_PROMPT = """你是一个记忆检索系统，不是聊天助手。
 ## 用户最新消息
 {user_message}
 
-现在输出 JSON 数组（每个元素含 id 和 reason）："""
+现在输出 JSON 数组（每个元素含 id 和 reason），尽可能全面地列出所有相关记忆："""
 
 # 提示词文件路径
 import os as _os
@@ -344,7 +349,7 @@ def _parse_ranked_ids(text):
 
 
 def rank_memories(user_message, recent_context, memory_index, providers,
-                  top_k=5, max_tokens=1500):
+                  top_k=5, max_tokens=None):
     """
     用 LLM 从全量记忆索引中精选最相关的记忆
 
@@ -353,17 +358,25 @@ def rank_memories(user_message, recent_context, memory_index, providers,
         recent_context: str, 最近几轮对话拼接文本
         memory_index: str, build_memory_index() 的输出
         providers: list, MEMORY_LLM_PROVIDERS 配置
-        top_k: int, 返回条数
-        max_tokens: int
+        top_k: int, 提示词变量（保留兼容）
+        max_tokens: int or None, 最大输出 token（None 时从 config 读）
 
     Returns:
-        list of int: 精选的记忆条目 id 列表
+        list of int: 精选的记忆条目 id 列表（不截断，返回 AI 全部输出）
 
     Raises:
         AllProvidersFailedError: 所有中转站失败
     """
     if not memory_index or not memory_index.strip():
         return []
+
+    # 从 config 读 max_tokens
+    if max_tokens is None:
+        try:
+            import config
+            max_tokens = getattr(config, 'MEMORY_RETRIEVAL_MAX_TOKENS', 4000)
+        except ImportError:
+            max_tokens = 4000
 
     # 从文件加载提示词模板
     prompt_template = _load_rank_prompt()
@@ -384,12 +397,11 @@ def rank_memories(user_message, recent_context, memory_index, providers,
 
     if ids:
         logger.info(f"[记忆精筛] 解析出 {len(ids)} 条 id: {ids}")
-        if len(ids) < top_k:
-            logger.warning(f"[记忆精筛] 要求 {top_k} 条但只解析出 {len(ids)} 条")
     else:
         logger.warning("[记忆精筛] LLM 返回了结果但未解析出有效 id")
 
-    return ids[:top_k]
+    # 不截断，返回 AI 输出的全部结果
+    return ids
 
 
 # ======================================================================

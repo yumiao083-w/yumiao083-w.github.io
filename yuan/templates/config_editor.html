@@ -3548,11 +3548,18 @@ if (switchPromptModal) {
                                 <small style="display: block; margin-top: 5px; color: #888;">LLM 精筛：用便宜模型读全量记忆索引，智能选最相关的。关键词：只匹配 event 字段，速度快但可能漏掉情感相关的记忆。</small>
                             </div>
 
-                            <!-- 检索条数 -->
+                            <!-- 检索条数（仅关键词降级时使用） -->
                             <div style="margin-bottom: 15px;">
-                                <label>检索条数:</label>
+                                <label>关键词降级条数:</label>
                                 <input type="number" id="mr-top-k" min="1" max="15" value="5" style="width: 80px;">
-                                <small style="margin-left: 10px; color: #888;">每次对话注入的相关记忆数量（建议 3-7）</small>
+                                <small style="margin-left: 10px; color: #888;">LLM 全部失败降级到关键词匹配时返回的条数（LLM 模式不限制）</small>
+                            </div>
+
+                            <!-- max_tokens -->
+                            <div style="margin-bottom: 15px;">
+                                <label>LLM 最大输出 Token:</label>
+                                <input type="number" id="mr-max-tokens" min="500" max="16000" step="500" value="4000" style="width: 100px;">
+                                <small style="margin-left: 10px; color: #888;">LLM 精筛的输出上限，需要足够大以容纳所有相关记忆的 JSON（建议 2000-8000）</small>
                             </div>
 
                             <!-- 降级开关 -->
@@ -4682,6 +4689,9 @@ content: 一段详细记忆`,
                 // 条数
                 const topKInput = document.getElementById('mr-top-k');
                 if (topKInput) topKInput.value = data.top_k || 5;
+                // max_tokens
+                const maxTokensInput = document.getElementById('mr-max-tokens');
+                if (maxTokensInput) maxTokensInput.value = data.max_tokens || 4000;
                 // 降级
                 const fallbackCb = document.getElementById('mr-fallback');
                 if (fallbackCb) fallbackCb.checked = data.fallback !== false;
@@ -4830,15 +4840,15 @@ content: 一段详细记忆`,
                 </div>
 
                 <div style="margin-bottom: 12px;">
-                    <label style="display: block; font-weight: bold; margin-bottom: 4px;">超时（秒）:</label>
-                    <input type="number" id="mr-dlg-timeout" value="${existing.timeout || 8}" min="3" max="30" style="width: 80px; padding: 6px;">
-                    <small style="color: #888; margin-left: 8px;">单次请求超时，超时后自动切换下一个中转站</small>
-                </div>
-
-                <div style="margin-bottom: 12px;">
                     <label style="display: block; font-weight: bold; margin-bottom: 4px;">温度 (Temperature):</label>
                     <input type="number" id="mr-dlg-temperature" value="${existing.temperature !== undefined ? existing.temperature : 0.3}" min="0" max="2" step="0.1" style="width: 80px; padding: 6px;">
                     <small style="color: #888; margin-left: 8px;">检索任务建议 0.1-0.5，越低越稳定</small>
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 4px;">超时（秒）:</label>
+                    <input type="number" id="mr-dlg-timeout" value="${existing.timeout || 8}" min="3" max="60" style="width: 80px; padding: 6px;">
+                    <small style="color: #888; margin-left: 8px;">单次请求超时，超时后自动切换下一个中转站</small>
                 </div>
 
                 <div id="mr-dlg-status" style="margin: 10px 0; font-size: 13px;"></div>
@@ -4990,6 +5000,7 @@ content: 一段详细记忆`,
     window.mrSaveConfig = function() {
         const mode = document.getElementById('mr-mode').value;
         const topK = parseInt(document.getElementById('mr-top-k').value) || 5;
+        const maxTokens = parseInt(document.getElementById('mr-max-tokens').value) || 4000;
         const fallback = document.getElementById('mr-fallback').checked;
         const statusEl = document.getElementById('mr-save-status');
         const promptContent = document.getElementById('mr-prompt-editor').value;
@@ -5003,6 +5014,7 @@ content: 一段详细记忆`,
             body: JSON.stringify({
                 mode: mode,
                 top_k: topK,
+                max_tokens: maxTokens,
                 fallback: fallback,
                 providers: mrProviders
             })

@@ -210,7 +210,6 @@ def retrieve_memories(user_message, top_k=None, recent_context=""):
                 recent_context=recent_context,
                 memory_index=memory_index,
                 providers=providers,
-                top_k=top_k
             )
 
             if ranked_ids:

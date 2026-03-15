@@ -218,8 +218,11 @@ MEMORY_LLM_PROVIDERS = [
     },
 ]
 
-# LLM 精筛返回的记忆条数
+# LLM 精筛返回的记忆条数（仅关键词降级时使用，LLM 模式不限制）
 MEMORY_RETRIEVAL_TOP_K = 5
+
+# LLM 精筛最大输出 token（需要足够大以容纳所有相关记忆的 JSON）
+MEMORY_RETRIEVAL_MAX_TOKENS = 4000
 
 # LLM 全部失败时是否降级到关键词匹配
 MEMORY_FALLBACK_TO_KEYWORD = True

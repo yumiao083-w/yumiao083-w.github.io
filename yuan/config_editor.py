@@ -2998,6 +2998,7 @@ def _read_memory_retrieval_config():
             'mode': getattr(cfg, 'MEMORY_RETRIEVAL_MODE', 'keyword'),
             'providers': getattr(cfg, 'MEMORY_LLM_PROVIDERS', []),
             'top_k': getattr(cfg, 'MEMORY_RETRIEVAL_TOP_K', 5),
+            'max_tokens': getattr(cfg, 'MEMORY_RETRIEVAL_MAX_TOKENS', 4000),
             'fallback': getattr(cfg, 'MEMORY_FALLBACK_TO_KEYWORD', True),
         }
     except Exception as e:
@@ -3006,6 +3007,7 @@ def _read_memory_retrieval_config():
             'mode': 'keyword',
             'providers': [],
             'top_k': 5,
+            'max_tokens': 4000,
             'fallback': True,
         }
 
@@ -3037,6 +3039,16 @@ def _write_memory_retrieval_config(data):
             content = _re.sub(
                 r"MEMORY_RETRIEVAL_TOP_K\s*=\s*\d+",
                 f"MEMORY_RETRIEVAL_TOP_K = {top_k_val}",
+                content
+            )
+
+    # 更新 MEMORY_RETRIEVAL_MAX_TOKENS
+    if 'max_tokens' in data:
+        max_tokens_val = int(data['max_tokens'])
+        if 'MEMORY_RETRIEVAL_MAX_TOKENS' in content:
+            content = _re.sub(
+                r"MEMORY_RETRIEVAL_MAX_TOKENS\s*=\s*\d+",
+                f"MEMORY_RETRIEVAL_MAX_TOKENS = {max_tokens_val}",
                 content
             )
 
