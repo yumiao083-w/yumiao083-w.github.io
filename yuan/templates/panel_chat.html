@@ -14,8 +14,7 @@
         .section-card h2 { font-size: 18px; font-weight: 600; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid #f0f0f0; }
         .field { margin-bottom: 14px; }
         .field label { display: block; font-size: 13px; font-weight: 500; color: #666; margin-bottom: 4px; }
-        .field input[type="text"], .field select, .field textarea {
-            width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; background: #fafafa; }
+        .field input[type="text"], .field select, .field textarea { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; background: #fafafa; }
         .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: #007aff; background: white; }
         .field small { display: block; font-size: 12px; color: #999; margin-top: 4px; }
         .save-bar { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding-top: 12px; border-top: 1px solid #f0f0f0; }
@@ -27,24 +26,22 @@
         .toggle.on { background: #34c759; }
         .toggle .knob { position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; background: white; border-radius: 50%; transition: left 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
         .toggle.on .knob { left: 20px; }
-
-        /* 用户列表条目 */
-        .user-entry { display: flex; gap: 8px; align-items: center; padding: 10px; background: #f8f8fa; border-radius: 8px; margin-bottom: 6px; flex-wrap: wrap; }
-        .user-entry input { flex: 1; min-width: 100px; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
-        .user-entry select { flex: 1; min-width: 120px; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+        /* 用户列表 */
+        .user-entry { background: #f8f8fa; border: 1px solid #e8e8ea; border-radius: 10px; padding: 14px; margin-bottom: 8px; }
+        .user-entry .entry-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+        .user-entry .entry-row:last-child { margin-bottom: 0; }
+        .user-entry input[type="text"] { flex: 1; min-width: 100px; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; background: white; }
+        .user-entry select { flex: 1; min-width: 120px; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; background: white; }
         .user-entry .del-btn { background: #ff3b30; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
         .add-btn { width: 100%; padding: 10px; background: #f0f0f2; border: 2px dashed #ccc; border-radius: 10px; font-size: 14px; color: #666; cursor: pointer; text-align: center; margin-top: 8px; }
         .add-btn:hover { border-color: #007aff; color: #007aff; }
-
-        /* Prompt 文件列表 */
-        .prompt-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8f8fa; border-radius: 8px; margin-bottom: 6px; }
-        .prompt-item .name { font-size: 15px; font-weight: 500; }
-        .prompt-item .actions { display: flex; gap: 6px; }
-        .prompt-item .actions button { border: none; padding: 5px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+        /* 文件列表 */
+        .file-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8f8fa; border-radius: 8px; margin-bottom: 6px; }
+        .file-item .name { font-size: 15px; font-weight: 500; }
+        .file-item .actions { display: flex; gap: 6px; }
+        .file-item .actions button { border: none; padding: 5px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
         .btn-edit { background: #007aff; color: white; }
         .btn-del { background: #ff3b30; color: white; }
-        .btn-new { background: #34c759; color: white; }
-
         /* 编辑器 */
         .editor-area { display: none; margin-top: 12px; }
         .editor-area.show { display: block; }
@@ -64,22 +61,32 @@
 <!-- ===== 1. 用户列表 ===== -->
 <div class="section-card">
     <h2>用户列表</h2>
-    <small style="color: #999; display: block; margin-bottom: 12px;">微信昵称与对应 Prompt 的绑定关系</small>
+    <small style="color: #999; display: block; margin-bottom: 12px;">每个用户绑定一份人设和一份预设，两者可独立切换</small>
 
     <div id="user-list">
         {% for item in config.LISTEN_LIST %}
         <div class="user-entry">
-            <input type="text" value="{{ item[0] }}" placeholder="微信昵称" data-field="nick">
-            <select data-field="prompt">
-                <option value="">-- 选择Prompt --</option>
-                {% for file in prompt_files %}
-                <option value="{{ file }}" {% if item[1] == file %}selected{% endif %}>{{ file }}</option>
-                {% endfor %}
-            </select>
-            <label style="font-size: 12px; white-space: nowrap; display: flex; align-items: center; gap: 4px;">
-                <input type="checkbox" data-field="auto" {% if item|length >= 3 and item[2] %}checked{% elif item|length < 3 %}checked{% endif %}> 主动消息
-            </label>
-            <button class="del-btn" onclick="this.parentElement.remove()">删除</button>
+            <div class="entry-row">
+                <input type="text" value="{{ item[0] }}" placeholder="微信昵称" data-field="nick">
+                <label style="font-size: 12px; white-space: nowrap; display: flex; align-items: center; gap: 4px;">
+                    <input type="checkbox" data-field="auto" {% if item|length >= 3 and item[2] %}checked{% elif item|length < 3 %}checked{% endif %}> 主动消息
+                </label>
+                <button class="del-btn" onclick="this.closest('.user-entry').remove()">删除</button>
+            </div>
+            <div class="entry-row">
+                <select data-field="character">
+                    <option value="">-- 人设 --</option>
+                    {% for file in prompt_files %}
+                    <option value="{{ file }}" {% if item[1] == file %}selected{% endif %}>{{ file }}</option>
+                    {% endfor %}
+                </select>
+                <select data-field="preset">
+                    <option value="">-- 预设 --</option>
+                    {% for file in prompt_files %}
+                    <option value="{{ file }}" {% if item|length >= 4 and item[3] == file %}selected{% endif %}>{{ file }}</option>
+                    {% endfor %}
+                </select>
+            </div>
         </div>
         {% endfor %}
     </div>
@@ -91,51 +98,52 @@
     </div>
 </div>
 
-<!-- ===== 2. Prompt 管理 ===== -->
+<!-- ===== 2. 人设管理 ===== -->
 <div class="section-card">
-    <h2>Prompt 管理</h2>
+    <h2>人设管理</h2>
+    <small style="color: #999; display: block; margin-bottom: 12px;">角色人设卡（character），定义角色的身份、性格、背景</small>
 
-    <div id="prompt-list">
+    <div id="character-list">
         {% for file in prompt_files %}
-        <div class="prompt-item" data-file="{{ file }}.md">
+        <div class="file-item" data-file="{{ file }}.md">
             <span class="name">{{ file }}</span>
             <div class="actions">
-                <button class="btn-edit" onclick="editPrompt('{{ file }}.md')">编辑</button>
-                <button class="btn-del" onclick="deletePrompt('{{ file }}.md')">删除</button>
+                <button class="btn-edit" onclick="openEditor('character', '{{ file }}.md')">编辑</button>
+                <button class="btn-del" onclick="deleteFile('{{ file }}.md')">删除</button>
             </div>
         </div>
         {% endfor %}
     </div>
 
-    <div style="margin-top: 10px; display: flex; gap: 8px;">
-        <button class="btn-new" style="padding: 8px 16px; border-radius: 6px; font-size: 14px; cursor: pointer;" onclick="showNewPrompt()">+ 新建 Prompt</button>
+    <div style="margin-top: 10px;">
+        <button style="background: #34c759; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 14px; cursor: pointer;" onclick="showNewEditor('character')">+ 新建人设</button>
     </div>
 
-    <!-- 新建区域 -->
-    <div class="editor-area" id="new-prompt-area">
+    <!-- 新建 -->
+    <div class="editor-area" id="character-new-area">
         <div class="field">
             <label>文件名（不含 .md）</label>
-            <input type="text" id="new-prompt-name" placeholder="例：角色名">
+            <input type="text" id="character-new-name" placeholder="例：角色名">
         </div>
-        <textarea id="new-prompt-content" placeholder="在此输入 Prompt 内容..."></textarea>
+        <textarea id="character-new-content" placeholder="在此输入人设内容..." oninput="updateWc('character-new')"></textarea>
         <div class="editor-bar">
-            <button style="background: #34c759; color: white;" onclick="createPrompt()">创建</button>
-            <button style="background: #8e8e93; color: white;" onclick="hideNewPrompt()">取消</button>
-            <span class="word-count" id="new-wc">0 字</span>
+            <button style="background: #34c759; color: white;" onclick="createFile('character')">创建</button>
+            <button style="background: #8e8e93; color: white;" onclick="hideEditor('character-new')">取消</button>
+            <span class="word-count" id="character-new-wc">0 字</span>
         </div>
     </div>
 
-    <!-- 编辑区域 -->
-    <div class="editor-area" id="edit-prompt-area">
+    <!-- 编辑 -->
+    <div class="editor-area" id="character-edit-area">
         <div class="field">
             <label>文件名</label>
-            <input type="text" id="edit-prompt-name">
+            <input type="text" id="character-edit-name">
         </div>
-        <textarea id="edit-prompt-content"></textarea>
+        <textarea id="character-edit-content" oninput="updateWc('character-edit')"></textarea>
         <div class="editor-bar">
-            <button style="background: #007aff; color: white;" onclick="savePrompt()">保存</button>
-            <button style="background: #8e8e93; color: white;" onclick="hideEditPrompt()">取消</button>
-            <span class="word-count" id="edit-wc">0 字</span>
+            <button style="background: #007aff; color: white;" onclick="saveFile('character')">保存</button>
+            <button style="background: #8e8e93; color: white;" onclick="hideEditor('character-edit')">取消</button>
+            <span class="word-count" id="character-edit-wc">0 字</span>
         </div>
     </div>
 </div>
@@ -143,16 +151,55 @@
 <!-- ===== 3. 预设管理 ===== -->
 <div class="section-card">
     <h2>预设管理</h2>
-    <small style="color: #999; display: block; margin-bottom: 12px;">preset.md — 角色行为规则、记忆标记协议等</small>
+    <small style="color: #999; display: block; margin-bottom: 12px;">预设（preset）定义角色行为规则、记忆标记协议等。支持新建多套预设、导入文件</small>
 
-    <textarea id="preset-content" style="width: 100%; height: 300px; font-family: monospace; font-size: 13px; padding: 12px; border: 1px solid #ddd; border-radius: 8px; resize: vertical;" placeholder="加载中..."></textarea>
-    <div class="editor-bar" style="margin-top: 8px;">
-        <span class="word-count" id="preset-wc">0 字</span>
+    <div id="preset-list">
+        {% for file in prompt_files %}
+        <div class="file-item" data-file="{{ file }}.md">
+            <span class="name">{{ file }}</span>
+            <div class="actions">
+                <button class="btn-edit" onclick="openEditor('preset', '{{ file }}.md')">编辑</button>
+                <button class="btn-del" onclick="deleteFile('{{ file }}.md')">删除</button>
+            </div>
+        </div>
+        {% endfor %}
     </div>
 
-    <div class="save-bar">
-        <button class="save-btn" onclick="savePreset()">保存</button>
-        <span class="save-status" id="preset-status"></span>
+    <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
+        <button style="background: #34c759; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 14px; cursor: pointer;" onclick="showNewEditor('preset')">+ 新建预设</button>
+        <label style="background: #007aff; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 14px; cursor: pointer; display: inline-block;">
+            📂 导入文件
+            <input type="file" accept=".md,.txt,.json" style="display: none;" onchange="importPreset(this)">
+        </label>
+    </div>
+    <small style="color: #aaa; margin-top: 6px; display: block;">支持导入 .md / .txt 文件（未来将支持酒馆 JSON 预设格式）</small>
+
+    <!-- 新建 -->
+    <div class="editor-area" id="preset-new-area">
+        <div class="field">
+            <label>文件名（不含 .md）</label>
+            <input type="text" id="preset-new-name" placeholder="例：preset_v2">
+        </div>
+        <textarea id="preset-new-content" placeholder="在此输入预设内容..." oninput="updateWc('preset-new')"></textarea>
+        <div class="editor-bar">
+            <button style="background: #34c759; color: white;" onclick="createFile('preset')">创建</button>
+            <button style="background: #8e8e93; color: white;" onclick="hideEditor('preset-new')">取消</button>
+            <span class="word-count" id="preset-new-wc">0 字</span>
+        </div>
+    </div>
+
+    <!-- 编辑 -->
+    <div class="editor-area" id="preset-edit-area">
+        <div class="field">
+            <label>文件名</label>
+            <input type="text" id="preset-edit-name">
+        </div>
+        <textarea id="preset-edit-content" oninput="updateWc('preset-edit')"></textarea>
+        <div class="editor-bar">
+            <button style="background: #007aff; color: white;" onclick="saveFile('preset')">保存</button>
+            <button style="background: #8e8e93; color: white;" onclick="hideEditor('preset-edit')">取消</button>
+            <span class="word-count" id="preset-edit-wc">0 字</span>
+        </div>
     </div>
 </div>
 
@@ -164,23 +211,52 @@
 </div>
 
 <script>
+// ===== 通用工具 =====
+function saveFields(fields, statusId) {
+    const s = document.getElementById(statusId);
+    s.textContent = '保存中...'; s.style.color = '#999';
+    fetch('/api/save_section', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ fields }) })
+    .then(r => { if (!r.ok) return r.text().then(t => { throw new Error(t.substring(0,80)); }); return r.json(); })
+    .then(d => {
+        if (d.error) { s.textContent = '❌ ' + d.error; s.style.color = '#ff3b30'; }
+        else { s.textContent = '✅ 已保存'; s.style.color = '#34c759'; setTimeout(() => s.textContent = '', 3000); }
+    })
+    .catch(e => { s.textContent = '❌ ' + e.message; s.style.color = '#ff3b30'; });
+}
+
+function updateWc(prefix) {
+    const ta = document.getElementById(prefix + '-content');
+    const wc = document.getElementById(prefix + '-wc');
+    if (ta && wc) wc.textContent = ta.value.length + ' 字';
+}
+
 // ===== 用户列表 =====
 function addUser() {
     const list = document.getElementById('user-list');
     const div = document.createElement('div');
     div.className = 'user-entry';
     div.innerHTML = `
-        <input type="text" placeholder="微信昵称" data-field="nick">
-        <select data-field="prompt">
-            <option value="">-- 选择Prompt --</option>
-            {% for file in prompt_files %}
-            <option value="{{ file }}">{{ file }}</option>
-            {% endfor %}
-        </select>
-        <label style="font-size: 12px; white-space: nowrap; display: flex; align-items: center; gap: 4px;">
-            <input type="checkbox" data-field="auto" checked> 主动消息
-        </label>
-        <button class="del-btn" onclick="this.parentElement.remove()">删除</button>
+        <div class="entry-row">
+            <input type="text" placeholder="微信昵称" data-field="nick">
+            <label style="font-size: 12px; white-space: nowrap; display: flex; align-items: center; gap: 4px;">
+                <input type="checkbox" data-field="auto" checked> 主动消息
+            </label>
+            <button class="del-btn" onclick="this.closest('.user-entry').remove()">删除</button>
+        </div>
+        <div class="entry-row">
+            <select data-field="character">
+                <option value="">-- 人设 --</option>
+                {% for file in prompt_files %}
+                <option value="{{ file }}">{{ file }}</option>
+                {% endfor %}
+            </select>
+            <select data-field="preset">
+                <option value="">-- 预设 --</option>
+                {% for file in prompt_files %}
+                <option value="{{ file }}">{{ file }}</option>
+                {% endfor %}
+            </select>
+        </div>
     `;
     list.appendChild(div);
 }
@@ -190,62 +266,54 @@ function saveUsers() {
     const listenList = [];
     entries.forEach(e => {
         const nick = e.querySelector('[data-field="nick"]').value.trim();
-        const prompt = e.querySelector('[data-field="prompt"]').value;
+        const character = e.querySelector('[data-field="character"]').value;
         const auto = e.querySelector('[data-field="auto"]').checked;
-        if (nick && prompt) listenList.push([nick, prompt, auto]);
+        const preset = e.querySelector('[data-field="preset"]')?.value || '';
+        if (nick && character) listenList.push([nick, character, auto, preset]);
     });
-
-    const s = document.getElementById('user-status');
-    s.textContent = '保存中...'; s.style.color = '#999';
-
-    fetch('/api/save_section', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ fields: { LISTEN_LIST: listenList } })
-    })
-    .then(r => r.json())
-    .then(d => {
-        if (d.error) { s.textContent = '❌ ' + d.error; s.style.color = '#ff3b30'; }
-        else { s.textContent = '✅ 已保存'; s.style.color = '#34c759'; setTimeout(() => s.textContent = '', 3000); }
-    })
-    .catch(e => { s.textContent = '❌ ' + e.message; s.style.color = '#ff3b30'; });
+    saveFields({ LISTEN_LIST: listenList }, 'user-status');
 }
 
-// ===== Prompt 管理 =====
-let editingFile = '';
+// ===== 文件管理（人设 & 预设共用） =====
+let editingFile = {};  // { character: 'xxx.md', preset: 'yyy.md' }
 
-function showNewPrompt() {
-    document.getElementById('new-prompt-area').classList.add('show');
-    document.getElementById('edit-prompt-area').classList.remove('show');
+function showNewEditor(area) {
+    document.getElementById(area + '-new-area').classList.add('show');
+    document.getElementById(area + '-edit-area').classList.remove('show');
+    document.getElementById(area + '-new-name').value = '';
+    document.getElementById(area + '-new-content').value = '';
+    updateWc(area + '-new');
 }
-function hideNewPrompt() { document.getElementById('new-prompt-area').classList.remove('show'); }
 
-function editPrompt(filename) {
-    editingFile = filename;
-    document.getElementById('edit-prompt-area').classList.add('show');
-    document.getElementById('new-prompt-area').classList.remove('show');
+function hideEditor(areaId) {
+    document.getElementById(areaId + '-area').classList.remove('show');
+}
+
+function openEditor(area, filename) {
+    editingFile[area] = filename;
+    document.getElementById(area + '-edit-area').classList.add('show');
+    document.getElementById(area + '-new-area').classList.remove('show');
 
     fetch(`/edit_prompt/${encodeURIComponent(filename)}`)
         .then(r => r.json())
         .then(d => {
-            document.getElementById('edit-prompt-name').value = d.filename || filename;
-            document.getElementById('edit-prompt-content').value = d.content || '';
-            updateWc('edit');
+            document.getElementById(area + '-edit-name').value = d.filename || filename;
+            document.getElementById(area + '-edit-content').value = d.content || '';
+            updateWc(area + '-edit');
         })
         .catch(e => alert('加载失败: ' + e.message));
 }
 
-function hideEditPrompt() { document.getElementById('edit-prompt-area').classList.remove('show'); }
-
-function savePrompt() {
-    const filename = document.getElementById('edit-prompt-name').value.trim();
-    const content = document.getElementById('edit-prompt-content').value;
+function saveFile(area) {
+    const filename = document.getElementById(area + '-edit-name').value.trim();
+    const content = document.getElementById(area + '-edit-content').value;
     if (!filename) { alert('文件名不能为空'); return; }
 
     const formData = new FormData();
     formData.append('filename', filename);
     formData.append('content', content);
 
-    fetch(`/edit_prompt/${encodeURIComponent(editingFile)}`, { method: 'POST', body: formData })
+    fetch(`/edit_prompt/${encodeURIComponent(editingFile[area])}`, { method: 'POST', body: formData })
         .then(r => r.json())
         .then(d => {
             if (d.error) alert('保存失败: ' + d.error);
@@ -254,9 +322,9 @@ function savePrompt() {
         .catch(e => alert('保存失败: ' + e.message));
 }
 
-function createPrompt() {
-    const name = document.getElementById('new-prompt-name').value.trim();
-    const content = document.getElementById('new-prompt-content').value;
+function createFile(area) {
+    const name = document.getElementById(area + '-new-name').value.trim();
+    const content = document.getElementById(area + '-new-content').value;
     if (!name) { alert('请输入文件名'); return; }
 
     const formData = new FormData();
@@ -272,7 +340,7 @@ function createPrompt() {
         .catch(e => alert('创建失败: ' + e.message));
 }
 
-function deletePrompt(filename) {
+function deleteFile(filename) {
     if (!confirm(`确定删除 "${filename}"？`)) return;
     fetch(`/delete_prompt/${encodeURIComponent(filename)}`, { method: 'POST' })
         .then(r => r.json())
@@ -283,55 +351,47 @@ function deletePrompt(filename) {
         .catch(e => alert('删除失败: ' + e.message));
 }
 
-// 字数统计
-function updateWc(area) {
-    const ta = document.getElementById(area + '-prompt-content');
-    const wc = document.getElementById(area + '-wc');
-    if (ta && wc) wc.textContent = ta.value.length + ' 字';
+// ===== 预设导入 =====
+function importPreset(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        let content = e.target.result;
+        let filename = file.name;
+
+        // JSON 格式预设（未来扩展：酒馆格式解析）
+        if (filename.endsWith('.json')) {
+            try {
+                const json = JSON.parse(content);
+                // 简单处理：如果 JSON 有 content/description 字段就提取
+                content = json.content || json.description || JSON.stringify(json, null, 2);
+                filename = filename.replace('.json', '.md');
+            } catch(e) {
+                alert('JSON 解析失败: ' + e.message);
+                return;
+            }
+        }
+
+        // 去掉扩展名作为预设名
+        const name = filename.replace(/\.(md|txt|json)$/, '');
+
+        const formData = new FormData();
+        formData.append('filename', name + '.md');
+        formData.append('content', content);
+
+        fetch('/create_prompt', { method: 'POST', body: formData })
+            .then(r => r.json())
+            .then(d => {
+                if (d.error) alert('导入失败: ' + d.error);
+                else { alert(`✅ 已导入 "${name}"`); location.reload(); }
+            })
+            .catch(e => alert('导入失败: ' + e.message));
+    };
+    reader.readAsText(file);
+    input.value = '';  // 重置 file input
 }
-document.getElementById('new-prompt-content')?.addEventListener('input', () => updateWc('new'));
-document.getElementById('edit-prompt-content')?.addEventListener('input', () => updateWc('edit'));
-
-// ===== 预设管理 =====
-function loadPreset() {
-    fetch(`/edit_prompt/${encodeURIComponent('preset.md')}`)
-        .then(r => r.json())
-        .then(d => {
-            document.getElementById('preset-content').value = d.content || '';
-            updatePresetWc();
-        })
-        .catch(() => {
-            document.getElementById('preset-content').placeholder = '未找到 preset.md';
-        });
-}
-
-function savePreset() {
-    const content = document.getElementById('preset-content').value;
-    const s = document.getElementById('preset-status');
-    s.textContent = '保存中...'; s.style.color = '#999';
-
-    const formData = new FormData();
-    formData.append('filename', 'preset.md');
-    formData.append('content', content);
-
-    fetch(`/edit_prompt/${encodeURIComponent('preset.md')}`, { method: 'POST', body: formData })
-        .then(r => r.json())
-        .then(d => {
-            if (d.error) { s.textContent = '❌ ' + d.error; s.style.color = '#ff3b30'; }
-            else { s.textContent = '✅ 已保存'; s.style.color = '#34c759'; setTimeout(() => s.textContent = '', 3000); }
-        })
-        .catch(e => { s.textContent = '❌ ' + e.message; s.style.color = '#ff3b30'; });
-}
-
-function updatePresetWc() {
-    const ta = document.getElementById('preset-content');
-    const wc = document.getElementById('preset-wc');
-    if (ta && wc) wc.textContent = ta.value.length + ' 字';
-}
-document.getElementById('preset-content')?.addEventListener('input', updatePresetWc);
-
-// 初始化
-loadPreset();
 </script>
 
 </body>
