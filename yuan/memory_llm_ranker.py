@@ -219,7 +219,10 @@ def _failover_call(prompt, providers, max_tokens=500):
 # 核心精筛函数
 # ======================================================================
 
-RANK_PROMPT_TEMPLATE = """你是记忆检索助手。下面是一个人的所有记忆概要索引，请根据当前对话上下文，选出最相关的 {top_k} 条记忆。
+# 内置默认提示词（当 prompts/memory_retrieval.md 不存在时使用）
+_DEFAULT_RANK_PROMPT = """你是记忆检索助手。下面是一个人的所有记忆概要索引，请根据当前对话上下文，选出最相关的 {top_k} 条记忆。
+
+重要：你必须返回恰好 {top_k} 条，不能多也不能少。从整个索引中全面扫描，不要只看前面几条就停下。
 
 "相关"的判断标准（按重要性排序）：
 1. 情感关联 — 类似的情绪状态、关系动态、心理需求
@@ -237,9 +240,48 @@ RANK_PROMPT_TEMPLATE = """你是记忆检索助手。下面是一个人的所有
 ## 最新消息
 {user_message}
 
-请返回一个 JSON 数组，每个元素包含 id（记忆条目编号）和 reason（一句话说明为什么相关）。
-示例：[{{"id": 42, "reason": "她上次也是这种心情低落的状态"}}, {{"id": 7, "reason": "这个话题和她的XX偏好有关"}}]
-只返回 JSON 数组，不要任何其他文字、不要 markdown 代码块。"""
+请返回一个包含恰好 {top_k} 个元素的 JSON 数组。每个元素包含 id（记忆条目编号，整数）和 reason（一句话说明为什么相关）。
+格式要求：只返回 JSON 数组，不要 markdown 代码块，不要任何其他解释文字。
+示例：[{{"id": 42, "reason": "她上次也是这种心情低落的状态"}}, {{"id": 7, "reason": "这个话题和她的XX偏好有关"}}, {{"id": 156, "reason": "最近发生的相关事件"}}, {{"id": 88, "reason": "她的一个重要习惯"}}, {{"id": 23, "reason": "之前类似情境的记忆"}}]"""
+
+# 提示词文件路径
+import os as _os
+_PROMPT_FILE = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 'prompts', 'memory_retrieval.md')
+
+# 提示词文件缓存
+_prompt_cache = None
+_prompt_mtime = 0
+
+
+def _load_rank_prompt():
+    """加载记忆检索提示词，优先从文件读取，文件不存在用内置默认"""
+    global _prompt_cache, _prompt_mtime
+
+    if not _os.path.exists(_PROMPT_FILE):
+        return _DEFAULT_RANK_PROMPT
+
+    try:
+        mtime = _os.path.getmtime(_PROMPT_FILE)
+        if _prompt_cache is not None and mtime == _prompt_mtime:
+            return _prompt_cache
+
+        with open(_PROMPT_FILE, 'r', encoding='utf-8') as f:
+            content = f.read().strip()
+
+        if not content:
+            return _DEFAULT_RANK_PROMPT
+
+        # 文件里用单花括号 {top_k}，转成模板需要的双花括号给非变量部分
+        # 但我们的变量就是 {top_k} {memory_index} {recent_context} {user_message}
+        # 所以文件里直接用 {xxx} 即可，和 .format() 兼容
+        _prompt_cache = content
+        _prompt_mtime = mtime
+        logger.debug(f"已加载记忆检索提示词，长度: {len(content)}")
+        return content
+
+    except Exception as e:
+        logger.error(f"加载记忆检索提示词失败: {e}")
+        return _DEFAULT_RANK_PROMPT
 
 
 def _parse_ranked_ids(text):
@@ -310,7 +352,10 @@ def rank_memories(user_message, recent_context, memory_index, providers,
     if not memory_index or not memory_index.strip():
         return []
 
-    prompt = RANK_PROMPT_TEMPLATE.format(
+    # 从文件加载提示词模板
+    prompt_template = _load_rank_prompt()
+
+    prompt = prompt_template.format(
         top_k=top_k,
         memory_index=memory_index,
         recent_context=recent_context or "(无上下文)",
@@ -318,10 +363,16 @@ def rank_memories(user_message, recent_context, memory_index, providers,
     )
 
     response_text = _failover_call(prompt, providers, max_tokens)
+
+    # 详细日志：记录 LLM 原始输出，方便排查
+    logger.info(f"[记忆精筛] LLM 原始输出 (前500字): {response_text[:500]}")
+
     ids = _parse_ranked_ids(response_text)
 
     if ids:
-        logger.info(f"[记忆精筛] 选中 {len(ids)} 条: {ids}")
+        logger.info(f"[记忆精筛] 解析出 {len(ids)} 条 id: {ids}")
+        if len(ids) < top_k:
+            logger.warning(f"[记忆精筛] 要求 {top_k} 条但只解析出 {len(ids)} 条")
     else:
         logger.warning("[记忆精筛] LLM 返回了结果但未解析出有效 id")
 

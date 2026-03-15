@@ -223,6 +223,10 @@ MEMORY_RETRIEVAL_TOP_K = 5
 # LLM 全部失败时是否降级到关键词匹配
 MEMORY_FALLBACK_TO_KEYWORD = True
 
+# LLM 精筛提示词文件路径（相对于项目根目录），前端可编辑
+# 文件不存在时使用内置默认提示词
+MEMORY_RETRIEVAL_PROMPT_FILE = 'prompts/memory_retrieval.md'
+
 
 
 # 自动补充的配置项

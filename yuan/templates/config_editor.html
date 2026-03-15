@@ -3576,6 +3576,18 @@ if (switchPromptModal) {
                                 </div>
                             </div>
 
+                            <!-- 检索提示词编辑 -->
+                            <div style="margin-bottom: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <label style="margin: 0; font-weight: bold;">检索提示词 <small style="font-weight: normal; color: #888;">（LLM 精筛时发给模型的指令）</small></label>
+                                    <button type="button" onclick="mrResetPrompt()" style="background: #6c757d; color: white; padding: 4px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">重置为默认</button>
+                                </div>
+                                <textarea id="mr-prompt-editor" style="width: 100%; height: 250px; font-family: monospace; font-size: 12px; padding: 10px; border: 1px solid #dee2e6; border-radius: 4px; resize: vertical; box-sizing: border-box;" placeholder="加载中..."></textarea>
+                                <small style="color: #888; display: block; margin-top: 5px;">
+                                    可用变量：{top_k}=检索条数, {memory_index}=全量记忆索引, {recent_context}=最近对话, {user_message}=用户最新消息。修改后点下方"保存检索配置"生效。
+                                </small>
+                            </div>
+
                             <!-- 保存按钮 -->
                             <div style="margin-top: 15px;">
                                 <button type="button" onclick="mrSaveConfig()" style="background: #007bff; color: white; padding: 8px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">💾 保存检索配置</button>
@@ -4677,6 +4689,19 @@ content: 一段详细记忆`,
             .catch(err => {
                 console.error('加载记忆检索配置失败:', err);
             });
+
+        // 加载提示词
+        fetch('/api/memory_retrieval_prompt')
+            .then(r => r.json())
+            .then(data => {
+                const editor = document.getElementById('mr-prompt-editor');
+                if (editor && data.content) {
+                    editor.value = data.content;
+                }
+            })
+            .catch(err => {
+                console.error('加载记忆检索提示词失败:', err);
+            });
     }
 
     // ====== 渲染中转站列表 ======
@@ -4947,10 +4972,12 @@ content: 一段详细记忆`,
         const topK = parseInt(document.getElementById('mr-top-k').value) || 5;
         const fallback = document.getElementById('mr-fallback').checked;
         const statusEl = document.getElementById('mr-save-status');
+        const promptContent = document.getElementById('mr-prompt-editor').value;
 
         statusEl.innerHTML = '<span style="color: #666;">保存中...</span>';
 
-        fetch('/api/memory_retrieval_config', {
+        // 并行保存配置和提示词
+        const saveConfig = fetch('/api/memory_retrieval_config', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
@@ -4959,19 +4986,52 @@ content: 一段详细记忆`,
                 fallback: fallback,
                 providers: mrProviders
             })
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.error) {
-                statusEl.innerHTML = `<span style="color: red;">❌ ${data.error}</span>`;
-            } else {
-                statusEl.innerHTML = '<span style="color: green;">✅ 保存成功</span>';
-                setTimeout(() => { statusEl.innerHTML = ''; }, 3000);
-            }
-        })
-        .catch(err => {
-            statusEl.innerHTML = `<span style="color: red;">❌ 保存失败: ${err.message}</span>`;
-        });
+        }).then(r => r.json());
+
+        const savePrompt = fetch('/api/memory_retrieval_prompt', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ content: promptContent })
+        }).then(r => r.json());
+
+        Promise.all([saveConfig, savePrompt])
+            .then(([configRes, promptRes]) => {
+                if (configRes.error || promptRes.error) {
+                    statusEl.innerHTML = `<span style="color: red;">❌ ${configRes.error || promptRes.error}</span>`;
+                } else {
+                    statusEl.innerHTML = '<span style="color: green;">✅ 配置和提示词已保存</span>';
+                    setTimeout(() => { statusEl.innerHTML = ''; }, 3000);
+                }
+            })
+            .catch(err => {
+                statusEl.innerHTML = `<span style="color: red;">❌ 保存失败: ${err.message}</span>`;
+            });
+    };
+
+    // ====== 重置提示词 ======
+    window.mrResetPrompt = function() {
+        if (!confirm('确定重置提示词为默认？当前修改将丢失。')) return;
+
+        fetch('/api/memory_retrieval_prompt/reset', { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    alert('重置失败: ' + data.error);
+                } else {
+                    const editor = document.getElementById('mr-prompt-editor');
+                    if (editor && data.content) {
+                        editor.value = data.content;
+                    }
+                    const statusEl = document.getElementById('mr-save-status');
+                    if (statusEl) {
+                        statusEl.innerHTML = '<span style="color: green;">✅ 已重置为默认提示词</span>';
+                        setTimeout(() => { statusEl.innerHTML = ''; }, 3000);
+                    }
+                }
+            })
+            .catch(err => {
+                alert('重置失败: ' + err.message);
+            });
     };
 
     // ====== 页面加载时初始化 ======

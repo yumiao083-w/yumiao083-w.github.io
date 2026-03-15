@@ -3124,6 +3124,93 @@ def save_memory_retrieval_config():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/memory_retrieval_prompt', methods=['GET'])
+@login_required
+def get_memory_retrieval_prompt():
+    """获取记忆检索提示词"""
+    try:
+        import config as cfg
+        import importlib
+        importlib.reload(cfg)
+        prompt_file = getattr(cfg, 'MEMORY_RETRIEVAL_PROMPT_FILE', 'prompts/memory_retrieval.md')
+        prompt_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), prompt_file)
+
+        content = ''
+        if os.path.exists(prompt_path):
+            with open(prompt_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+
+        # 如果文件为空或不存在，返回内置默认
+        if not content.strip():
+            try:
+                from memory_llm_ranker import _DEFAULT_RANK_PROMPT
+                content = _DEFAULT_RANK_PROMPT
+            except ImportError:
+                content = ''
+
+        return jsonify({'content': content, 'file': prompt_file})
+    except Exception as e:
+        app.logger.error(f"获取记忆检索提示词失败: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/memory_retrieval_prompt', methods=['POST'])
+@login_required
+def save_memory_retrieval_prompt():
+    """保存记忆检索提示词"""
+    try:
+        req = request.get_json()
+        if not req:
+            return jsonify({'error': '请求数据为空'}), 400
+
+        content = req.get('content', '')
+
+        import config as cfg
+        import importlib
+        importlib.reload(cfg)
+        prompt_file = getattr(cfg, 'MEMORY_RETRIEVAL_PROMPT_FILE', 'prompts/memory_retrieval.md')
+        prompt_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), prompt_file)
+
+        # 确保目录存在
+        prompt_dir = os.path.dirname(prompt_path)
+        if not os.path.exists(prompt_dir):
+            os.makedirs(prompt_dir)
+
+        with open(prompt_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+
+        return jsonify({'status': 'success', 'message': '记忆检索提示词已保存'})
+    except Exception as e:
+        app.logger.error(f"保存记忆检索提示词失败: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/memory_retrieval_prompt/reset', methods=['POST'])
+@login_required
+def reset_memory_retrieval_prompt():
+    """重置记忆检索提示词为内置默认"""
+    try:
+        from memory_llm_ranker import _DEFAULT_RANK_PROMPT
+
+        import config as cfg
+        import importlib
+        importlib.reload(cfg)
+        prompt_file = getattr(cfg, 'MEMORY_RETRIEVAL_PROMPT_FILE', 'prompts/memory_retrieval.md')
+        prompt_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), prompt_file)
+
+        prompt_dir = os.path.dirname(prompt_path)
+        if not os.path.exists(prompt_dir):
+            os.makedirs(prompt_dir)
+
+        with open(prompt_path, 'w', encoding='utf-8') as f:
+            f.write(_DEFAULT_RANK_PROMPT)
+
+        return jsonify({'status': 'success', 'message': '已重置为默认提示词', 'content': _DEFAULT_RANK_PROMPT})
+    except Exception as e:
+        app.logger.error(f"重置记忆检索提示词失败: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/memory_retrieval_fetch_models', methods=['POST'])
 @login_required
 def memory_retrieval_fetch_models():
