@@ -243,6 +243,14 @@ let contextData = [];
 
 function viewContext(user) {
     contextUser = user;
+    // 获取该用户对应的人设名（从 config LISTEN_LIST）
+    const configNames = {};
+    {% for item in config.LISTEN_LIST %}
+    configNames['{{ item[0] }}'] = '{{ item[1] }}';
+    {% endfor %}
+    window._contextAiName = configNames[user] || 'AI';
+    window._contextUserName = user;
+
     fetch(`/api/get_chat_context/${encodeURIComponent(user)}`)
         .then(r => r.json())
         .then(d => {
@@ -263,19 +271,55 @@ function renderContextCards() {
         container.innerHTML = '<p style="color:#bbb;text-align:center;padding:10px;font-size:13px;">暂无对话记录</p>';
         return;
     }
-    contextData.forEach((msg, idx) => {
-        const isUser = msg.role === 'user';
+
+    const userName = window._contextUserName || '用户';
+    const aiName = window._contextAiName || 'AI';
+
+    // 按轮次配对：user+assistant 为一轮
+    let i = 0;
+    let roundNum = 1;
+    while (i < contextData.length) {
         const card = document.createElement('div');
-        card.style.cssText = `padding:10px 12px;margin-bottom:6px;border-radius:10px;background:${isUser?'#e3f2fd':'#f3e5f5'};border-left:4px solid ${isUser?'#2196f3':'#9c27b0'};`;
-        card.innerHTML = `
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                <strong style="font-size:12px;color:${isUser?'#1565c0':'#7b1fa2'};">${isUser?'用户':'AI'}</strong>
-                <button onclick="deleteContextMsg(${idx})" style="background:#ff3b30;color:white;border:none;padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer;">删除</button>
-            </div>
-            <div contenteditable="true" onblur="updateContextMsg(${idx},this.textContent)" style="font-size:14px;line-height:1.5;outline:none;min-height:20px;white-space:pre-wrap;">${esc(msg.content||'')}</div>
-        `;
+        card.style.cssText = 'border: 1px solid #e0e0e0; border-radius: 10px; margin-bottom: 10px; overflow: hidden;';
+
+        let cardHtml = `<div style="background:#f5f5f5;padding:6px 12px;font-size:12px;color:#888;display:flex;justify-content:space-between;align-items:center;">
+            <span>第 ${roundNum} 轮</span>
+            <button onclick="deleteRound(${i})" style="background:#ff3b30;color:white;border:none;padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer;">删除本轮</button>
+        </div>`;
+
+        // 用户消息
+        if (i < contextData.length && contextData[i].role === 'user') {
+            cardHtml += `<div style="padding:10px 12px;background:white;border-bottom:1px solid #f0f0f0;">
+                <strong style="font-size:12px;color:#333;">${esc(userName)}</strong>
+                <div contenteditable="true" data-idx="${i}" onblur="updateContextMsg(${i},this.textContent)" style="font-size:14px;line-height:1.5;outline:none;max-height:80px;overflow-y:auto;white-space:pre-wrap;margin-top:4px;">${esc(contextData[i].content||'')}</div>
+            </div>`;
+            i++;
+        }
+
+        // AI 回复
+        if (i < contextData.length && contextData[i].role === 'assistant') {
+            cardHtml += `<div style="padding:10px 12px;background:#fafafa;">
+                <strong style="font-size:12px;color:#666;">${esc(aiName)}</strong>
+                <div contenteditable="true" data-idx="${i}" onblur="updateContextMsg(${i},this.textContent)" style="font-size:14px;line-height:1.5;outline:none;max-height:80px;overflow-y:auto;white-space:pre-wrap;margin-top:4px;">${esc(contextData[i].content||'')}</div>
+            </div>`;
+            i++;
+        }
+
+        card.innerHTML = cardHtml;
         container.appendChild(card);
-    });
+        roundNum++;
+    }
+}
+
+function deleteRound(startIdx) {
+    // 删除一轮（user + assistant）
+    let count = 0;
+    if (startIdx < contextData.length && contextData[startIdx].role === 'user') count++;
+    if (startIdx + count < contextData.length && contextData[startIdx + count].role === 'assistant') count++;
+    if (count > 0) {
+        contextData.splice(startIdx, count);
+        renderContextCards();
+    }
 }
 
 function deleteContextMsg(idx) {

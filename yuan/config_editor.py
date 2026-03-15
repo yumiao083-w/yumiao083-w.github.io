@@ -231,7 +231,7 @@ def get_memory_summary_users():
 def login():
     config = parse_config()
     if not config.get('ENABLE_LOGIN_PASSWORD', False):
-        return redirect(url_for('index'))
+        return redirect(url_for('home'))
 
     if request.method == 'POST':
         password = request.form.get('password', '')
@@ -239,7 +239,7 @@ def login():
         
         if password == stored_pwd:
             session['logged_in'] = True
-            return redirect(url_for('index'))
+            return redirect(url_for('home'))
         else:
             return render_template('login.html', error="密码错误")
 
