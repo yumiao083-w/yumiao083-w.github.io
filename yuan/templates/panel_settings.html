@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>程序设置</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f7; color: #1d1d1f; padding-bottom: 40px; }
+        .top-bar { position: sticky; top: 0; z-index: 100; background: rgba(245,245,247,0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); padding: 12px 16px; display: flex; align-items: center; border-bottom: 1px solid rgba(0,0,0,0.1); }
+        .back-btn { text-decoration: none; color: #007aff; font-size: 16px; }
+        .top-bar h1 { flex: 1; text-align: center; font-size: 17px; font-weight: 600; margin-right: 40px; }
+        .section-card { background: white; margin: 16px; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .section-card h2 { font-size: 18px; font-weight: 600; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid #f0f0f0; }
+        .field { margin-bottom: 14px; }
+        .field label { display: block; font-size: 13px; font-weight: 500; color: #666; margin-bottom: 4px; }
+        .field input[type="text"], .field input[type="number"], .field input[type="password"] { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; background: #fafafa; }
+        .field input:focus { outline: none; border-color: #007aff; background: white; }
+        .field small { display: block; font-size: 12px; color: #999; margin-top: 4px; }
+        .save-bar { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding-top: 12px; border-top: 1px solid #f0f0f0; }
+        .save-btn { padding: 10px 24px; background: #007aff; color: white; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; }
+        .save-btn:active { opacity: 0.7; }
+        .save-status { font-size: 13px; color: #999; }
+        .switch-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; }
+        .switch-row label { font-size: 15px; color: #333; }
+        .toggle { position: relative; width: 44px; height: 26px; background: #e0e0e0; border-radius: 13px; cursor: pointer; transition: background 0.2s; border: none; }
+        .toggle.on { background: #34c759; }
+        .toggle .knob { position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; background: white; border-radius: 50%; transition: left 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+        .toggle.on .knob { left: 20px; }
+        .cond-section { display: none; }
+        .cond-section.show { display: block; }
+        /* 日志 */
+        .log-container { background: #1e1e1e; border-radius: 10px; padding: 12px; height: 400px; overflow-y: auto; font-family: 'Menlo', 'Monaco', 'Courier New', monospace; font-size: 12px; line-height: 1.6; color: #d4d4d4; }
+        .log-entry { padding: 1px 0; white-space: pre-wrap; word-break: break-all; }
+        .log-entry.error { color: #f44747; }
+        .log-entry.warning { color: #cca700; }
+        .log-entry.info { color: #d4d4d4; }
+        .danger-btn { background: #ff3b30; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-size: 15px; cursor: pointer; }
+        .danger-btn:active { opacity: 0.7; }
+    </style>
+</head>
+<body>
+
+<div class="top-bar">
+    <a href="/home" class="back-btn">← 返回</a>
+    <h1>⚙️ 程序设置</h1>
+</div>
+
+<!-- ===== 1. 定时重启 ===== -->
+<div class="section-card">
+    <h2>定时重启</h2>
+    <small style="color: #999; display: block; margin-bottom: 12px;">启用后程序在满足条件时自动重启，解决长时间运行性能下降问题</small>
+
+    <div class="switch-row">
+        <label>启用定时重启</label>
+        <button class="toggle {% if config.ENABLE_SCHEDULED_RESTART %}on{% endif %}" id="restart-enable" onclick="this.classList.toggle('on'); toggleRestartSection()"><div class="knob"></div></button>
+    </div>
+
+    <div class="cond-section" id="restart-section">
+        <div class="field">
+            <label>运行时长阈值（小时）</label>
+            <input type="number" id="restart-hours" step="0.1" min="0.1" value="{{ config.RESTART_INTERVAL_HOURS }}">
+            <small>程序连续运行达到此时长后开始检查是否满足重启条件</small>
+        </div>
+        <div class="field">
+            <label>不活跃时长阈值（分钟）</label>
+            <input type="number" id="restart-inactive" step="1" min="5" value="{{ config.RESTART_INACTIVITY_MINUTES }}">
+            <small>达到运行时长后，连续无活动达到此分钟数则执行重启</small>
+        </div>
+    </div>
+
+    <div class="save-bar">
+        <button class="save-btn" onclick="saveRestart()">保存</button>
+        <span class="save-status" id="restart-status"></span>
+    </div>
+</div>
+
+<!-- ===== 2. 网页编辑器 ===== -->
+<div class="section-card">
+    <h2>网页编辑器</h2>
+
+    <div class="switch-row">
+        <label>启用密码登录</label>
+        <button class="toggle {% if config.ENABLE_LOGIN_PASSWORD %}on{% endif %}" id="login-enable" onclick="this.classList.toggle('on')"><div class="knob"></div></button>
+    </div>
+    <small style="color: #999; margin-bottom: 10px; display: block;">远程访问时建议启用</small>
+
+    <div class="field">
+        <label>登录密码</label>
+        <input type="password" id="login-pwd" value="{{ config.LOGIN_PASSWORD }}">
+    </div>
+    <div class="field">
+        <label>网页端口</label>
+        <input type="number" id="web-port" step="1" value="{{ config.PORT }}">
+    </div>
+
+    <div class="save-bar">
+        <button class="save-btn" onclick="saveWebEditor()">保存</button>
+        <span class="save-status" id="web-status"></span>
+    </div>
+</div>
+
+<!-- ===== 3. 程序运行日志 ===== -->
+<div class="section-card">
+    <h2>程序运行日志</h2>
+    <div class="log-container" id="log-container">
+        <div id="logs"><div class="log-entry info">连接日志流...</div></div>
+    </div>
+</div>
+
+<script>
+// ===== 通用 =====
+function saveFields(fields, statusId) {
+    const s = document.getElementById(statusId);
+    s.textContent = '保存中...'; s.style.color = '#999';
+    fetch('/api/save_section', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ fields }) })
+    .then(r => { if (!r.ok) return r.text().then(t => { throw new Error(t.substring(0,80)); }); return r.json(); })
+    .then(d => {
+        if (d.error) { s.textContent = '❌ ' + d.error; s.style.color = '#ff3b30'; }
+        else { s.textContent = '✅ 已保存'; s.style.color = '#34c759'; setTimeout(() => s.textContent = '', 3000); }
+    })
+    .catch(e => { s.textContent = '❌ ' + e.message; s.style.color = '#ff3b30'; });
+}
+
+// ===== 定时重启 =====
+function toggleRestartSection() {
+    const on = document.getElementById('restart-enable').classList.contains('on');
+    document.getElementById('restart-section').classList.toggle('show', on);
+}
+
+function saveRestart() {
+    saveFields({
+        ENABLE_SCHEDULED_RESTART: document.getElementById('restart-enable').classList.contains('on'),
+        RESTART_INTERVAL_HOURS: document.getElementById('restart-hours').value,
+        RESTART_INACTIVITY_MINUTES: document.getElementById('restart-inactive').value,
+    }, 'restart-status');
+}
+
+// ===== 网页编辑器 =====
+function saveWebEditor() {
+    saveFields({
+        ENABLE_LOGIN_PASSWORD: document.getElementById('login-enable').classList.contains('on'),
+        LOGIN_PASSWORD: document.getElementById('login-pwd').value,
+        PORT: document.getElementById('web-port').value,
+    }, 'web-status');
+}
+
+// ===== 日志 SSE =====
+const logContainer = document.getElementById('log-container');
+const logElement = document.getElementById('logs');
+const maxLogLines = 300;
+
+function addLogEntry(text, type) {
+    if (!logElement) return;
+    const entry = document.createElement('div');
+    entry.className = 'log-entry ' + type;
+    entry.textContent = text;
+    logElement.appendChild(entry);
+    // 限制行数
+    while (logElement.children.length > maxLogLines) {
+        logElement.removeChild(logElement.firstChild);
+    }
+    // 自动滚动到底部
+    logContainer.scrollTop = logContainer.scrollHeight;
+}
+
+function initEventSource() {
+    const es = new EventSource('/stream');
+    es.addEventListener('message', e => {
+        if (e.data.trim()) {
+            const type = e.data.includes('ERROR') ? 'error' : e.data.includes('WARNING') ? 'warning' : 'info';
+            addLogEntry(e.data, type);
+        }
+    });
+    es.addEventListener('error', () => {
+        es.close();
+        addLogEntry('[系统] 日志连接中断，5秒后重连...', 'error');
+        setTimeout(initEventSource, 5000);
+    });
+}
+
+// ===== 初始化 =====
+toggleRestartSection();
+initEventSource();
+</script>
+
+</body>
+</html>
