@@ -357,12 +357,18 @@ function saveReminders() {
 
 // ===== 初始化 =====
 function init() {
-    // 已读不回条件显示
-    toggleIgnoreSection();
-    // 主动消息时间初始化
-    document.getElementById('auto-msg-min-time').value = hoursToTime({{ config.MIN_COUNTDOWN_HOURS }});
-    document.getElementById('auto-msg-max-time').value = hoursToTime({{ config.MAX_COUNTDOWN_HOURS }});
-    // 加载提醒
+    try {
+        // 已读不回条件显示
+        toggleIgnoreSection();
+        // 主动消息时间初始化
+        var minH = {{ config.MIN_COUNTDOWN_HOURS|default(0.5) }};
+        var maxH = {{ config.MAX_COUNTDOWN_HOURS|default(1.5) }};
+        document.getElementById('auto-msg-min-time').value = hoursToTime(minH);
+        document.getElementById('auto-msg-max-time').value = hoursToTime(maxH);
+    } catch(e) {
+        console.error('init error:', e);
+    }
+    // 加载提醒（放在 try 外面确保一定执行）
     loadReminders();
 }
 init();
