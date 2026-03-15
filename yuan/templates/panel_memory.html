@@ -109,6 +109,8 @@
     <div id="core-memory-list">
         <p style="color: #bbb; text-align: center; padding: 10px;">加载中...</p>
     </div>
+    <!-- 隐藏的用户列表数据源 -->
+    <div id="config-user-names" style="display:none;">{% for item in config.LISTEN_LIST %}<span>{{ item[0] }}</span>{% endfor %}</div>
 
     <!-- 核心记忆提示词 -->
     <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #f0f0f0;">
@@ -195,9 +197,10 @@ function saveMemSettings() {
 function loadContextUsers() {
     fetch('/api/get_chat_context_users')
         .then(r => r.json())
-        .then(users => {
+        .then(data => {
+            const users = data.users || data || [];
             const list = document.getElementById('context-user-list');
-            if (!users || users.length === 0) {
+            if (!Array.isArray(users) || users.length === 0) {
                 list.innerHTML = '<p style="color:#bbb; text-align:center; padding:10px; font-size:13px;">暂无聊天记录</p>';
                 return;
             }
@@ -214,6 +217,8 @@ function loadContextUsers() {
                 `;
                 list.appendChild(div);
             });
+            // 核心记忆也用同一个用户列表
+            loadCoreMemoryList(users);
         })
         .catch(() => {});
 }
@@ -244,50 +249,31 @@ function clearContext(user) {
 }
 
 // ===== 3. 核心记忆 =====
-function loadCoreMemory() {
-    fetch('/api/get_chat_context_users')
-        .then(r => r.json())
-        .then(users => {
-            // 用 memory_summary_users 接口
-            return fetch('/api/get_chat_context_users');
-        })
-        .catch(() => {});
-
-    // 直接获取 memory summary users
+function loadCoreMemoryList(contextUsers) {
     const list = document.getElementById('core-memory-list');
-    fetch('/api/get_chat_context_users')
-        .then(r => r.json())
-        .then(() => {
-            // 尝试获取已知用户列表
-            list.innerHTML = '';
-            // 从 config 读已知用户
-            const users = [];
-            document.querySelectorAll('#context-user-list .user-item .name').forEach(el => users.push(el.textContent));
-            if (users.length === 0) {
-                // 如果上下文还没加载，用 config 里的 LISTEN_LIST
-                {% for item in config.LISTEN_LIST %}
-                users.push('{{ item[0] }}');
-                {% endfor %}
-            }
-            if (users.length === 0) {
-                list.innerHTML = '<p style="color:#bbb; text-align:center; padding:10px; font-size:13px;">暂无用户</p>';
-                return;
-            }
-            users.forEach(u => {
-                const div = document.createElement('div');
-                div.className = 'user-item';
-                div.innerHTML = `
-                    <span class="name">${esc(u)}</span>
-                    <div class="actions">
-                        <button class="btn-edit" onclick="editCoreMemory('${esc(u)}')">编辑</button>
-                        <button class="btn-del" onclick="deleteCoreMemory('${esc(u)}')">清除</button>
-                    </div>
-                `;
-                list.appendChild(div);
-            });
-        })
-        .catch(() => {});
+    const users = new Set(contextUsers || []);
+    // 从 config LISTEN_LIST 补充
+    document.querySelectorAll('#config-user-names span').forEach(el => users.add(el.textContent));
+    const userArr = Array.from(users);
+    if (userArr.length === 0) {
+        list.innerHTML = '<p style="color:#bbb; text-align:center; padding:10px; font-size:13px;">暂无用户</p>';
+        return;
+    }
+    list.innerHTML = '';
+    userArr.forEach(u => {
+        const div = document.createElement('div');
+        div.className = 'user-item';
+        div.innerHTML = `
+            <span class="name">${esc(u)}</span>
+            <div class="actions">
+                <button class="btn-edit" onclick="editCoreMemory('${esc(u)}')">编辑</button>
+                <button class="btn-del" onclick="deleteCoreMemory('${esc(u)}')">清除</button>
+            </div>
+        `;
+        list.appendChild(div);
+    });
 }
+
 
 function editCoreMemory(user) {
     fetch(`/api/get_memory_summary/${encodeURIComponent(user)}`)
@@ -436,7 +422,6 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s; re
 
 // ===== 初始化 =====
 loadContextUsers();
-loadCoreMemory();
 loadEntries();
 loadPrompts();
 
