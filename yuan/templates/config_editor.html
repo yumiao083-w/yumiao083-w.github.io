@@ -3528,6 +3528,62 @@ if (switchPromptModal) {
                         <input type="number" step="1" name="MAX_GROUPS" value="{{ config.MAX_GROUPS }}">
                         <small>这是AI能记住的短期对话轮数（一问一答为一轮）。数值越大，AI对当前话题的记忆越好，但API成本也越高。推荐5-15轮。</small>
                     </div>
+
+                    <!-- ===== 记忆检索管道配置 ===== -->
+                    <div class="form-group" style="margin-top: 30px;">
+                        <h3>🔍 记忆检索管道配置</h3>
+                        <small style="color: #666; margin-bottom: 15px; display: block;">
+                            配置 AI 如何从记忆库中检索与当前对话相关的记忆。LLM 模式会用便宜快速的模型从全量记忆索引中智能精选，能理解情感关联和隐含语境。
+                        </small>
+
+                        <div id="memoryRetrievalConfig">
+                            <!-- 检索模式 -->
+                            <div style="margin-bottom: 15px;">
+                                <label>检索模式:</label>
+                                <select id="mr-mode" style="width: 200px; padding: 5px;">
+                                    <option value="llm">LLM 精筛（推荐）</option>
+                                    <option value="keyword">仅关键词匹配</option>
+                                    <option value="off">关闭检索</option>
+                                </select>
+                                <small style="display: block; margin-top: 5px; color: #888;">LLM 精筛：用便宜模型读全量记忆索引，智能选最相关的。关键词：只匹配 event 字段，速度快但可能漏掉情感相关的记忆。</small>
+                            </div>
+
+                            <!-- 检索条数 -->
+                            <div style="margin-bottom: 15px;">
+                                <label>检索条数:</label>
+                                <input type="number" id="mr-top-k" min="1" max="15" value="5" style="width: 80px;">
+                                <small style="margin-left: 10px; color: #888;">每次对话注入的相关记忆数量（建议 3-7）</small>
+                            </div>
+
+                            <!-- 降级开关 -->
+                            <div style="margin-bottom: 15px;">
+                                <div class="switch-item">
+                                    <label>LLM 全部失败时降级到关键词匹配</label>
+                                    <div class="switch"><label class="switch-label"><input type="checkbox" id="mr-fallback" checked><span class="slider round"></span></label></div>
+                                </div>
+                            </div>
+
+                            <!-- 中转站列表 -->
+                            <div style="margin-bottom: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <label style="margin: 0; font-weight: bold;">中转站列表 <small style="font-weight: normal; color: #888;">（按顺序故障转移，拖拽调整优先级）</small></label>
+                                    <button type="button" onclick="mrAddProvider()" style="background: #28a745; color: white; padding: 6px 14px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">+ 添加中转站</button>
+                                </div>
+
+                                <div id="mr-providers-list">
+                                    <!-- 中转站卡片会由 JS 动态渲染 -->
+                                    <p id="mr-no-providers" style="color: #999; text-align: center; padding: 20px;">尚未添加中转站，请点击"添加中转站"按钮</p>
+                                </div>
+                            </div>
+
+                            <!-- 保存按钮 -->
+                            <div style="margin-top: 15px;">
+                                <button type="button" onclick="mrSaveConfig()" style="background: #007bff; color: white; padding: 8px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">💾 保存检索配置</button>
+                                <span id="mr-save-status" style="margin-left: 15px; font-size: 13px;"></span>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="form-group" style="margin-top: 30px;">
                         <h3>聊天上下文管理 (chat_contexts.json)</h3>
                         <ul class="context-user-list" {% if not chat_context_users %}style="display: none;"{% endif %}>
@@ -4590,6 +4646,341 @@ content: 一段详细记忆`,
             });
         });
     });
+})();
+</script>
+
+<!-- ===== 记忆检索管道配置 JavaScript ===== -->
+<script>
+(function() {
+    // 中转站数据缓存
+    let mrProviders = [];
+    let mrDragSrcIdx = null;
+
+    // ====== 初始化：从后端加载配置 ======
+    function mrLoadConfig() {
+        fetch('/api/memory_retrieval_config')
+            .then(r => r.json())
+            .then(data => {
+                // 模式
+                const modeSelect = document.getElementById('mr-mode');
+                if (modeSelect) modeSelect.value = data.mode || 'keyword';
+                // 条数
+                const topKInput = document.getElementById('mr-top-k');
+                if (topKInput) topKInput.value = data.top_k || 5;
+                // 降级
+                const fallbackCb = document.getElementById('mr-fallback');
+                if (fallbackCb) fallbackCb.checked = data.fallback !== false;
+                // 中转站
+                mrProviders = data.providers || [];
+                mrRenderProviders();
+            })
+            .catch(err => {
+                console.error('加载记忆检索配置失败:', err);
+            });
+    }
+
+    // ====== 渲染中转站列表 ======
+    function mrRenderProviders() {
+        const container = document.getElementById('mr-providers-list');
+        const noData = document.getElementById('mr-no-providers');
+        if (!container) return;
+
+        // 清空
+        container.querySelectorAll('.mr-provider-card').forEach(el => el.remove());
+
+        if (mrProviders.length === 0) {
+            if (noData) noData.style.display = 'block';
+            return;
+        }
+        if (noData) noData.style.display = 'none';
+
+        mrProviders.forEach((p, idx) => {
+            const card = document.createElement('div');
+            card.className = 'mr-provider-card';
+            card.draggable = true;
+            card.dataset.idx = idx;
+            card.style.cssText = 'background: white; border: 1px solid #dee2e6; border-radius: 6px; padding: 12px; margin-bottom: 8px; cursor: grab;';
+
+            card.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-weight: bold; color: #333;">⇅ #${idx + 1} ${_escHtml(p.name || '未命名')}</span>
+                    <div>
+                        <button type="button" onclick="mrEditProvider(${idx})" style="background: #17a2b8; color: white; border: none; padding: 4px 10px; border-radius: 3px; cursor: pointer; font-size: 12px; margin-right: 4px;">编辑</button>
+                        <button type="button" onclick="mrRemoveProvider(${idx})" style="background: #dc3545; color: white; border: none; padding: 4px 10px; border-radius: 3px; cursor: pointer; font-size: 12px;">删除</button>
+                    </div>
+                </div>
+                <div style="font-size: 12px; color: #666;">
+                    <span>URL: ${_escHtml(p.base_url || '—')}</span> · 
+                    <span>模型: <strong>${_escHtml(p.model || '未选择')}</strong></span> · 
+                    <span>超时: ${p.timeout || 8}s</span>
+                </div>
+            `;
+
+            // 拖拽排序
+            card.addEventListener('dragstart', function(e) {
+                mrDragSrcIdx = idx;
+                e.dataTransfer.effectAllowed = 'move';
+                card.style.opacity = '0.5';
+            });
+            card.addEventListener('dragend', function() {
+                card.style.opacity = '1';
+            });
+            card.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                card.style.borderTop = '3px solid #007bff';
+            });
+            card.addEventListener('dragleave', function() {
+                card.style.borderTop = '';
+            });
+            card.addEventListener('drop', function(e) {
+                e.preventDefault();
+                card.style.borderTop = '';
+                if (mrDragSrcIdx !== null && mrDragSrcIdx !== idx) {
+                    const item = mrProviders.splice(mrDragSrcIdx, 1)[0];
+                    mrProviders.splice(idx, 0, item);
+                    mrRenderProviders();
+                }
+                mrDragSrcIdx = null;
+            });
+
+            container.appendChild(card);
+        });
+    }
+
+    function _escHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    // ====== 添加/编辑中转站 ======
+    function mrShowProviderDialog(idx) {
+        const isEdit = idx !== undefined && idx !== null;
+        const existing = isEdit ? mrProviders[idx] : {};
+
+        // 创建模态框
+        const overlay = document.createElement('div');
+        overlay.id = 'mr-provider-overlay';
+        overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center;';
+
+        overlay.innerHTML = `
+            <div style="background: white; border-radius: 10px; padding: 25px; width: 480px; max-width: 90vw; max-height: 80vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+                <h3 style="margin-top: 0; margin-bottom: 20px;">${isEdit ? '编辑' : '添加'}中转站</h3>
+                
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 4px;">名称:</label>
+                    <input type="text" id="mr-dlg-name" value="${_escHtml(existing.name || '')}" placeholder="给这个中转站起个名字" style="width: 100%; padding: 6px; box-sizing: border-box;">
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 4px;">Base URL:</label>
+                    <input type="text" id="mr-dlg-url" value="${_escHtml(existing.base_url || '')}" placeholder="https://api.example.com/v1" style="width: 100%; padding: 6px; box-sizing: border-box;">
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 4px;">API Key:</label>
+                    <input type="password" id="mr-dlg-key" value="${_escHtml(existing.api_key || '')}" placeholder="sk-xxx" style="width: 100%; padding: 6px; box-sizing: border-box;">
+                    <small style="color: #888;">留空表示不需要鉴权</small>
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 4px;">模型:</label>
+                    <div style="display: flex; gap: 8px;">
+                        <select id="mr-dlg-model-select" style="flex: 1; padding: 6px;">
+                            <option value="">-- 请先获取模型列表 --</option>
+                            ${existing.model ? `<option value="${_escHtml(existing.model)}" selected>${_escHtml(existing.model)}</option>` : ''}
+                        </select>
+                        <button type="button" id="mr-dlg-fetch-btn" onclick="mrFetchModels()" style="background: #6c757d; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; white-space: nowrap;">获取模型</button>
+                    </div>
+                    <input type="text" id="mr-dlg-model-manual" value="${_escHtml(existing.model || '')}" placeholder="或手动输入模型名" style="width: 100%; padding: 6px; margin-top: 6px; box-sizing: border-box;">
+                    <small style="color: #888;">可从列表选择，也可手动输入。推荐 gemini-2.0-flash 等快速模型。</small>
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 4px;">超时（秒）:</label>
+                    <input type="number" id="mr-dlg-timeout" value="${existing.timeout || 8}" min="3" max="30" style="width: 80px; padding: 6px;">
+                    <small style="color: #888; margin-left: 8px;">单次请求超时，超时后自动切换下一个中转站</small>
+                </div>
+
+                <div id="mr-dlg-status" style="margin: 10px 0; font-size: 13px;"></div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                    <button type="button" onclick="mrCloseDialog()" style="background: #6c757d; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">取消</button>
+                    <button type="button" onclick="mrConfirmProvider(${isEdit ? idx : 'null'})" style="background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">${isEdit ? '保存修改' : '添加'}</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        // 点击背景关闭
+        overlay.addEventListener('click', function(e) {
+            if (e.target === overlay) mrCloseDialog();
+        });
+    }
+
+    window.mrAddProvider = function() {
+        mrShowProviderDialog(null);
+    };
+
+    window.mrEditProvider = function(idx) {
+        mrShowProviderDialog(idx);
+    };
+
+    window.mrRemoveProvider = function(idx) {
+        if (confirm(`确定删除中转站 "${mrProviders[idx]?.name || '#' + (idx+1)}"？`)) {
+            mrProviders.splice(idx, 1);
+            mrRenderProviders();
+        }
+    };
+
+    window.mrCloseDialog = function() {
+        const overlay = document.getElementById('mr-provider-overlay');
+        if (overlay) overlay.remove();
+    };
+
+    window.mrConfirmProvider = function(editIdx) {
+        const name = document.getElementById('mr-dlg-name').value.trim();
+        const url = document.getElementById('mr-dlg-url').value.trim();
+        const key = document.getElementById('mr-dlg-key').value.trim();
+        const modelSelect = document.getElementById('mr-dlg-model-select').value;
+        const modelManual = document.getElementById('mr-dlg-model-manual').value.trim();
+        const timeout = parseInt(document.getElementById('mr-dlg-timeout').value) || 8;
+
+        const model = modelManual || modelSelect;  // 手动输入优先
+
+        if (!url) {
+            document.getElementById('mr-dlg-status').innerHTML = '<span style="color: red;">Base URL 不能为空</span>';
+            return;
+        }
+        if (!model) {
+            document.getElementById('mr-dlg-status').innerHTML = '<span style="color: red;">请选择或输入模型</span>';
+            return;
+        }
+
+        const provider = {
+            name: name || url,
+            base_url: url,
+            api_key: key,
+            model: model,
+            timeout: Math.max(3, Math.min(30, timeout))
+        };
+
+        if (editIdx !== null && editIdx !== undefined) {
+            mrProviders[editIdx] = provider;
+        } else {
+            mrProviders.push(provider);
+        }
+
+        mrCloseDialog();
+        mrRenderProviders();
+    };
+
+    // ====== 获取模型列表 ======
+    window.mrFetchModels = function() {
+        const url = document.getElementById('mr-dlg-url').value.trim();
+        const key = document.getElementById('mr-dlg-key').value.trim();
+        const btn = document.getElementById('mr-dlg-fetch-btn');
+        const status = document.getElementById('mr-dlg-status');
+
+        if (!url) {
+            status.innerHTML = '<span style="color: red;">请先填写 Base URL</span>';
+            return;
+        }
+
+        btn.textContent = '获取中...';
+        btn.disabled = true;
+        status.innerHTML = '<span style="color: #666;">正在获取模型列表...</span>';
+
+        fetch('/api/memory_retrieval_fetch_models', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({url: url, key: key})
+        })
+        .then(r => r.json())
+        .then(data => {
+            btn.textContent = '获取模型';
+            btn.disabled = false;
+
+            if (data.error) {
+                status.innerHTML = `<span style="color: red;">❌ ${data.error}</span>`;
+                return;
+            }
+
+            const models = data.models || [];
+            if (models.length === 0) {
+                status.innerHTML = '<span style="color: orange;">⚠️ 该站点未返回任何模型</span>';
+                return;
+            }
+
+            const select = document.getElementById('mr-dlg-model-select');
+            const currentManual = document.getElementById('mr-dlg-model-manual').value.trim();
+            select.innerHTML = '<option value="">-- 选择模型 --</option>';
+            models.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m;
+                opt.textContent = m;
+                if (m === currentManual) opt.selected = true;
+                select.appendChild(opt);
+            });
+
+            // 从下拉选择时同步到手动输入框
+            select.onchange = function() {
+                if (select.value) {
+                    document.getElementById('mr-dlg-model-manual').value = select.value;
+                }
+            };
+
+            status.innerHTML = `<span style="color: green;">✅ 获取到 ${models.length} 个模型</span>`;
+        })
+        .catch(err => {
+            btn.textContent = '获取模型';
+            btn.disabled = false;
+            status.innerHTML = `<span style="color: red;">❌ 请求失败: ${err.message}</span>`;
+        });
+    };
+
+    // ====== 保存配置 ======
+    window.mrSaveConfig = function() {
+        const mode = document.getElementById('mr-mode').value;
+        const topK = parseInt(document.getElementById('mr-top-k').value) || 5;
+        const fallback = document.getElementById('mr-fallback').checked;
+        const statusEl = document.getElementById('mr-save-status');
+
+        statusEl.innerHTML = '<span style="color: #666;">保存中...</span>';
+
+        fetch('/api/memory_retrieval_config', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                mode: mode,
+                top_k: topK,
+                fallback: fallback,
+                providers: mrProviders
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                statusEl.innerHTML = `<span style="color: red;">❌ ${data.error}</span>`;
+            } else {
+                statusEl.innerHTML = '<span style="color: green;">✅ 保存成功</span>';
+                setTimeout(() => { statusEl.innerHTML = ''; }, 3000);
+            }
+        })
+        .catch(err => {
+            statusEl.innerHTML = `<span style="color: red;">❌ 保存失败: ${err.message}</span>`;
+        });
+    };
+
+    // ====== 页面加载时初始化 ======
+    // 等 sidebar 切换逻辑注册后再加载
+    if (document.readyState === 'complete') {
+        mrLoadConfig();
+    } else {
+        window.addEventListener('load', mrLoadConfig);
+    }
 })();
 </script>
 </body>

@@ -776,7 +776,20 @@ def get_deepseek_response(message, user_id, store_context=True, is_summary=False
             # 2. 检索相关记忆 + 获取系统提示词
             try:
                 from memory_retrieval import retrieve_memories
-                retrieved = retrieve_memories(message)
+                # 拼接最近对话上下文，供 LLM 精筛使用
+                _recent_ctx = ""
+                try:
+                    with queue_lock:
+                        _user_data = chat_contexts.get(user_id, {})
+                        if isinstance(_user_data, dict):
+                            _ctx_list = _user_data.get(prompt_name, [])
+                            # 取最近 6 条（约 3 轮对话），每条截断 300 字
+                            for _msg in _ctx_list[-6:]:
+                                _role = "用户" if _msg.get("role") == "user" else "角色"
+                                _recent_ctx += f"{_role}: {_msg.get('content', '')[:300]}\n"
+                except Exception:
+                    pass
+                retrieved = retrieve_memories(message, recent_context=_recent_ctx)
             except Exception as e:
                 logger.error(f"记忆检索失败: {e}")
                 retrieved = None

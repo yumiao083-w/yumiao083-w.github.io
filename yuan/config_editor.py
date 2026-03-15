@@ -2983,6 +2983,172 @@ def delete_provider(name):
         app.logger.error(f"删除服务商预设失败: {e}")
         return jsonify({'error': str(e)}), 500
 
+
+# =========================================================================
+# 记忆检索管道配置 API
+# =========================================================================
+
+def _read_memory_retrieval_config():
+    """从 config.py 读取记忆检索管道相关配置"""
+    try:
+        import config as cfg
+        import importlib
+        importlib.reload(cfg)
+        return {
+            'mode': getattr(cfg, 'MEMORY_RETRIEVAL_MODE', 'keyword'),
+            'providers': getattr(cfg, 'MEMORY_LLM_PROVIDERS', []),
+            'top_k': getattr(cfg, 'MEMORY_RETRIEVAL_TOP_K', 5),
+            'fallback': getattr(cfg, 'MEMORY_FALLBACK_TO_KEYWORD', True),
+        }
+    except Exception as e:
+        app.logger.error(f"读取记忆检索配置失败: {e}")
+        return {
+            'mode': 'keyword',
+            'providers': [],
+            'top_k': 5,
+            'fallback': True,
+        }
+
+
+def _write_memory_retrieval_config(data):
+    """将记忆检索管道配置写回 config.py"""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(script_dir, 'config.py')
+
+    with open(config_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    import re as _re
+
+    # 更新 MEMORY_RETRIEVAL_MODE
+    if 'mode' in data:
+        mode_val = repr(data['mode'])
+        if 'MEMORY_RETRIEVAL_MODE' in content:
+            content = _re.sub(
+                r"MEMORY_RETRIEVAL_MODE\s*=\s*['\"].*?['\"]",
+                f"MEMORY_RETRIEVAL_MODE = {mode_val}",
+                content
+            )
+
+    # 更新 MEMORY_RETRIEVAL_TOP_K
+    if 'top_k' in data:
+        top_k_val = int(data['top_k'])
+        if 'MEMORY_RETRIEVAL_TOP_K' in content:
+            content = _re.sub(
+                r"MEMORY_RETRIEVAL_TOP_K\s*=\s*\d+",
+                f"MEMORY_RETRIEVAL_TOP_K = {top_k_val}",
+                content
+            )
+
+    # 更新 MEMORY_FALLBACK_TO_KEYWORD
+    if 'fallback' in data:
+        fallback_val = 'True' if data['fallback'] else 'False'
+        if 'MEMORY_FALLBACK_TO_KEYWORD' in content:
+            content = _re.sub(
+                r"MEMORY_FALLBACK_TO_KEYWORD\s*=\s*(True|False)",
+                f"MEMORY_FALLBACK_TO_KEYWORD = {fallback_val}",
+                content
+            )
+
+    # 更新 MEMORY_LLM_PROVIDERS（整块替换）
+    if 'providers' in data:
+        providers_repr = _format_providers_list(data['providers'])
+        # 匹配从 MEMORY_LLM_PROVIDERS = [ 到对应的 ] 的整个块
+        pattern = r"MEMORY_LLM_PROVIDERS\s*=\s*\[.*?\n\]"
+        replacement = f"MEMORY_LLM_PROVIDERS = {providers_repr}"
+        content = _re.sub(pattern, replacement, content, flags=_re.DOTALL)
+
+    with open(config_path, 'w', encoding='utf-8') as f:
+        f.write(content)
+
+
+def _format_providers_list(providers):
+    """把 providers 列表格式化为可读的 Python 代码字符串"""
+    if not providers:
+        return '[]'
+    lines = ['[']
+    for p in providers:
+        lines.append('    {')
+        lines.append(f"        'name': {repr(p.get('name', ''))},")
+        lines.append(f"        'base_url': {repr(p.get('base_url', ''))},")
+        lines.append(f"        'api_key': {repr(p.get('api_key', ''))},")
+        lines.append(f"        'model': {repr(p.get('model', ''))},")
+        lines.append(f"        'timeout': {int(p.get('timeout', 8))},")
+        lines.append('    },')
+    lines.append(']')
+    return '\n'.join(lines)
+
+
+@app.route('/api/memory_retrieval_config', methods=['GET'])
+@login_required
+def get_memory_retrieval_config():
+    """获取记忆检索管道配置"""
+    data = _read_memory_retrieval_config()
+    # 隐藏 API key 的中间部分
+    safe_providers = []
+    for p in data['providers']:
+        safe_p = dict(p)
+        key = safe_p.get('api_key', '')
+        if key and len(key) > 8:
+            safe_p['api_key_masked'] = key[:4] + '****' + key[-4:]
+        else:
+            safe_p['api_key_masked'] = '****' if key else ''
+        safe_p['api_key'] = key  # 前端编辑需要完整 key
+        safe_providers.append(safe_p)
+    data['providers'] = safe_providers
+    return jsonify(data)
+
+
+@app.route('/api/memory_retrieval_config', methods=['POST'])
+@login_required
+def save_memory_retrieval_config():
+    """保存记忆检索管道配置"""
+    try:
+        req = request.get_json()
+        if not req:
+            return jsonify({'error': '请求数据为空'}), 400
+
+        _write_memory_retrieval_config(req)
+
+        # 热重载 config 模块
+        try:
+            import config as cfg
+            import importlib
+            importlib.reload(cfg)
+        except Exception:
+            pass
+
+        return jsonify({'status': 'success', 'message': '记忆检索配置已保存'})
+    except Exception as e:
+        app.logger.error(f"保存记忆检索配置失败: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/memory_retrieval_fetch_models', methods=['POST'])
+@login_required
+def memory_retrieval_fetch_models():
+    """获取记忆检索中转站的可用模型列表（复用 fetch_models 逻辑）"""
+    try:
+        req = request.get_json()
+        if not req:
+            return jsonify({'error': '请求数据为空'}), 400
+        base_url = (req.get('url') or '').strip().rstrip('/')
+        api_key = (req.get('key') or '').strip()
+        if not base_url:
+            return jsonify({'error': 'URL不能为空'}), 400
+
+        from memory_llm_ranker import fetch_provider_models
+        models = fetch_provider_models(base_url, api_key, timeout=15)
+        return jsonify({'models': models})
+    except http_requests.exceptions.Timeout:
+        return jsonify({'error': '请求超时，请检查URL是否正确'}), 504
+    except http_requests.exceptions.ConnectionError:
+        return jsonify({'error': '无法连接到API服务商，请检查URL'}), 502
+    except Exception as e:
+        app.logger.error(f"获取记忆检索模型列表失败: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/fetch_models', methods=['POST'])
 @login_required
 def fetch_models():
