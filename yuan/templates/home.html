@@ -4,410 +4,334 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>yuan 控制台</title>
+    <style id="custom-font-style"></style>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            background: #1a1a2e;
-            background-size: cover;
-            background-position: center;
-            color: #fff;
-            overflow: hidden;
+            font-family: var(--custom-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+            min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: #1a1a2e; background-size: cover; background-position: center;
+            color: var(--text-color, #fff); overflow: hidden;
         }
-
-        /* ===== 时钟区域 ===== */
-        .clock-area {
-            text-align: center;
-            margin-bottom: 40px;
-            user-select: none;
-        }
-        .clock-time {
-            font-size: 56px;
-            font-weight: 200;
-            letter-spacing: 2px;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.3);
-        }
-        .clock-date {
-            font-size: 16px;
-            opacity: 0.7;
-            margin-top: 4px;
-        }
-
-        /* ===== 图标网格 ===== */
-        .app-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 80px);
-            gap: 24px 32px;
-            justify-content: center;
-            margin-bottom: 40px;
-        }
-        .app-icon {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            cursor: pointer;
-            text-decoration: none;
-            color: #fff;
-            -webkit-user-select: none;
-            user-select: none;
-            transition: transform 0.15s;
-        }
-        .app-icon:active {
-            transform: scale(0.9);
-        }
+        .clock-area { text-align: center; margin-bottom: 40px; user-select: none; }
+        .clock-time { font-size: 56px; font-weight: 200; letter-spacing: 2px; text-shadow: var(--text-shadow, 0 2px 10px rgba(0,0,0,0.3)); }
+        .clock-date { font-size: 16px; opacity: 0.7; margin-top: 4px; }
+        .app-grid { display: grid; grid-template-columns: repeat(3, 80px); gap: 24px 32px; justify-content: center; margin-bottom: 40px; }
+        .app-icon { display: flex; flex-direction: column; align-items: center; cursor: pointer; text-decoration: none; color: inherit; user-select: none; transition: transform 0.15s; }
+        .app-icon:active { transform: scale(0.9); }
         .app-icon .icon-box {
-            width: 60px;
-            height: 60px;
-            border-radius: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 28px;
-            margin-bottom: 6px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-            transition: box-shadow 0.2s;
-            /* 默认图标可以被自定义图片覆盖 */
-            background-size: cover;
-            background-position: center;
+            width: 60px; height: 60px; border-radius: 16px; display: flex; align-items: center; justify-content: center;
+            font-size: 28px; margin-bottom: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.25); transition: box-shadow 0.2s;
+            background-size: cover; background-position: center; overflow: hidden; position: relative;
         }
-        .app-icon:hover .icon-box {
-            box-shadow: 0 6px 20px rgba(0,0,0,0.35);
-        }
-        .app-icon .icon-label {
-            font-size: 11px;
-            opacity: 0.9;
-            text-shadow: 0 1px 4px rgba(0,0,0,0.5);
-            white-space: nowrap;
-        }
-
-        /* 图标颜色 */
+        .app-icon:hover .icon-box { box-shadow: 0 6px 20px rgba(0,0,0,0.35); }
+        .app-icon .icon-label { font-size: 11px; opacity: 0.9; text-shadow: var(--text-shadow, 0 1px 4px rgba(0,0,0,0.5)); white-space: nowrap; }
+        /* 自定义图标覆盖层 */
+        .icon-box.has-custom-img .icon-emoji { display: none; }
+        /* 默认渐变 */
         .icon-api { background: linear-gradient(135deg, #667eea, #764ba2); }
         .icon-reply { background: linear-gradient(135deg, #f093fb, #f5576c); }
         .icon-chat { background: linear-gradient(135deg, #4facfe, #00f2fe); }
         .icon-memory { background: linear-gradient(135deg, #43e97b, #38f9d7); }
-        .icon-prompt { background: linear-gradient(135deg, #fa709a, #fee140); }
         .icon-settings { background: linear-gradient(135deg, #a8c0ff, #3f2b96); }
-
-        /* ===== Bot 开关 ===== */
-        .bot-switch-area {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 24px;
-            background: rgba(255,255,255,0.1);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border-radius: 50px;
-            border: 1px solid rgba(255,255,255,0.15);
+        .icon-legacy { background: linear-gradient(135deg, #8e8e93, #636366); }
+        /* 长按编辑提示 */
+        .icon-box .edit-hint {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6);
+            display: none; align-items: center; justify-content: center; font-size: 12px; color: white; border-radius: 16px;
         }
-        .bot-status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #ff4757;
-            transition: background 0.3s;
-        }
+        /* Bot 开关 */
+        .bot-switch-area { display: flex; align-items: center; gap: 12px; padding: 12px 24px; background: rgba(255,255,255,0.1); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 50px; border: 1px solid rgba(255,255,255,0.15); }
+        .bot-status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff4757; transition: background 0.3s; }
         .bot-status-dot.running { background: #2ed573; }
-        .bot-status-text {
-            font-size: 14px;
-            min-width: 60px;
-        }
-        .bot-toggle {
-            position: relative;
-            width: 50px;
-            height: 28px;
-            background: rgba(255,255,255,0.2);
-            border-radius: 14px;
-            cursor: pointer;
-            transition: background 0.3s;
-            border: none;
-            outline: none;
-        }
+        .bot-status-text { font-size: 14px; min-width: 60px; }
+        .bot-toggle { position: relative; width: 50px; height: 28px; background: rgba(255,255,255,0.2); border-radius: 14px; cursor: pointer; transition: background 0.3s; border: none; outline: none; }
         .bot-toggle.on { background: #2ed573; }
-        .bot-toggle .toggle-knob {
-            position: absolute;
-            top: 3px;
-            left: 3px;
-            width: 22px;
-            height: 22px;
-            background: white;
-            border-radius: 50%;
-            transition: left 0.2s;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
+        .bot-toggle .toggle-knob { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; background: white; border-radius: 50%; transition: left 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
         .bot-toggle.on .toggle-knob { left: 25px; }
-
-        /* ===== 设置按钮（右上角） ===== */
-        .settings-btn {
-            position: fixed;
-            top: 16px;
-            right: 16px;
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.15);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.2);
-            color: white;
-            font-size: 16px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 100;
-        }
-
-        /* ===== 背景设置弹窗 ===== */
-        .bg-modal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.6);
-            backdrop-filter: blur(5px);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
-        .bg-modal.show { display: flex; }
-        .bg-modal-content {
-            background: #2d2d44;
-            border-radius: 16px;
-            padding: 24px;
-            width: 320px;
-            max-width: 90vw;
-        }
-        .bg-modal-content h3 { margin-bottom: 16px; font-size: 18px; }
-        .bg-modal-content label {
-            display: block;
-            font-size: 13px;
-            color: #aaa;
-            margin-bottom: 4px;
-            margin-top: 12px;
-        }
-        .bg-modal-content input[type="text"],
-        .bg-modal-content input[type="file"] {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #444;
-            border-radius: 8px;
-            background: #1a1a2e;
-            color: white;
-            font-size: 14px;
-        }
-        .bg-modal-content .btn-row {
-            display: flex;
-            gap: 8px;
-            margin-top: 16px;
-        }
-        .bg-modal-content button {
-            flex: 1;
-            padding: 10px;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            cursor: pointer;
-        }
+        /* 设置按钮 */
+        .settings-btn { position: fixed; top: 16px; right: 16px; width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.15); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); color: inherit; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 100; }
+        /* 弹窗 */
+        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.show { display: flex; }
+        .modal-content { background: #2d2d44; border-radius: 16px; padding: 24px; width: 340px; max-width: 90vw; max-height: 80vh; overflow-y: auto; color: #fff; }
+        .modal-content h3 { margin-bottom: 16px; font-size: 18px; }
+        .modal-content label { display: block; font-size: 13px; color: #aaa; margin-bottom: 4px; margin-top: 12px; }
+        .modal-content input[type="text"], .modal-content input[type="file"] { width: 100%; padding: 8px; border: 1px solid #444; border-radius: 8px; background: #1a1a2e; color: white; font-size: 14px; }
+        .modal-content select { width: 100%; padding: 8px; border: 1px solid #444; border-radius: 8px; background: #1a1a2e; color: white; font-size: 14px; }
+        .btn-row { display: flex; gap: 8px; margin-top: 16px; }
+        .btn-row button { flex: 1; padding: 10px; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; }
         .btn-save { background: #667eea; color: white; }
         .btn-cancel { background: #444; color: white; }
         .btn-reset { background: #ff4757; color: white; }
+        .section-divider { border-top: 1px solid #444; margin: 16px 0 8px 0; }
     </style>
 </head>
 <body>
 
-    <!-- 右上角设置按钮 -->
-    <button class="settings-btn" onclick="openBgModal()">🎨</button>
+<button class="settings-btn" onclick="openSettingsModal()">🎨</button>
 
-    <!-- 时钟 -->
-    <div class="clock-area">
-        <div class="clock-time" id="clock-time">--:--</div>
-        <div class="clock-date" id="clock-date"></div>
-    </div>
+<div class="clock-area">
+    <div class="clock-time" id="clock-time">--:--</div>
+    <div class="clock-date" id="clock-date"></div>
+</div>
 
-    <!-- 图标网格 -->
-    <div class="app-grid">
-        <a class="app-icon" href="/panel/api">
-            <div class="icon-box icon-api" id="icon-api">🔌</div>
-            <span class="icon-label">API配置</span>
-        </a>
-        <a class="app-icon" href="/panel/reply">
-            <div class="icon-box icon-reply" id="icon-reply">💬</div>
-            <span class="icon-label">回复设置</span>
-        </a>
-        <a class="app-icon" href="/panel/chat">
-            <div class="icon-box icon-chat" id="icon-chat">🎭</div>
-            <span class="icon-label">聊天配置</span>
-        </a>
-        <a class="app-icon" href="/panel/memory">
-            <div class="icon-box icon-memory" id="icon-memory">🧠</div>
-            <span class="icon-label">记忆</span>
-        </a>
-        <a class="app-icon" href="/panel/settings">
-            <div class="icon-box icon-settings" id="icon-settings">⚙️</div>
-            <span class="icon-label">程序设置</span>
-        </a>
-        <a class="app-icon" href="/legacy">
-            <div class="icon-box" id="icon-legacy" style="background: linear-gradient(135deg, #8e8e93, #636366);">📋</div>
-            <span class="icon-label">旧版配置</span>
-        </a>
-    </div>
+<div class="app-grid" id="app-grid">
+    <a class="app-icon" href="/panel/api">
+        <div class="icon-box icon-api" id="icon-api" oncontextmenu="return editIcon(event,'api')" ontouchstart="startLongPress('api')" ontouchend="cancelLongPress()">
+            <span class="icon-emoji">🔌</span><div class="edit-hint">换图标</div>
+        </div>
+        <span class="icon-label">API配置</span>
+    </a>
+    <a class="app-icon" href="/panel/reply">
+        <div class="icon-box icon-reply" id="icon-reply" oncontextmenu="return editIcon(event,'reply')" ontouchstart="startLongPress('reply')" ontouchend="cancelLongPress()">
+            <span class="icon-emoji">💬</span><div class="edit-hint">换图标</div>
+        </div>
+        <span class="icon-label">回复设置</span>
+    </a>
+    <a class="app-icon" href="/panel/chat">
+        <div class="icon-box icon-chat" id="icon-chat" oncontextmenu="return editIcon(event,'chat')" ontouchstart="startLongPress('chat')" ontouchend="cancelLongPress()">
+            <span class="icon-emoji">🎭</span><div class="edit-hint">换图标</div>
+        </div>
+        <span class="icon-label">聊天配置</span>
+    </a>
+    <a class="app-icon" href="/panel/memory">
+        <div class="icon-box icon-memory" id="icon-memory" oncontextmenu="return editIcon(event,'memory')" ontouchstart="startLongPress('memory')" ontouchend="cancelLongPress()">
+            <span class="icon-emoji">🧠</span><div class="edit-hint">换图标</div>
+        </div>
+        <span class="icon-label">记忆</span>
+    </a>
+    <a class="app-icon" href="/panel/settings">
+        <div class="icon-box icon-settings" id="icon-settings" oncontextmenu="return editIcon(event,'settings')" ontouchstart="startLongPress('settings')" ontouchend="cancelLongPress()">
+            <span class="icon-emoji">⚙️</span><div class="edit-hint">换图标</div>
+        </div>
+        <span class="icon-label">程序设置</span>
+    </a>
+    <a class="app-icon" href="/legacy">
+        <div class="icon-box icon-legacy" id="icon-legacy" oncontextmenu="return editIcon(event,'legacy')" ontouchstart="startLongPress('legacy')" ontouchend="cancelLongPress()">
+            <span class="icon-emoji">📋</span><div class="edit-hint">换图标</div>
+        </div>
+        <span class="icon-label">旧版配置</span>
+    </a>
+</div>
 
-    <!-- Bot 开关 -->
-    <div class="bot-switch-area">
-        <div class="bot-status-dot" id="bot-dot"></div>
-        <span class="bot-status-text" id="bot-text">检查中...</span>
-        <button class="bot-toggle" id="bot-toggle" onclick="toggleBot()">
-            <div class="toggle-knob"></div>
-        </button>
-    </div>
+<div class="bot-switch-area">
+    <div class="bot-status-dot" id="bot-dot"></div>
+    <span class="bot-status-text" id="bot-text">检查中...</span>
+    <button class="bot-toggle" id="bot-toggle" onclick="toggleBot()"><div class="toggle-knob"></div></button>
+</div>
 
-    <!-- 背景设置弹窗 -->
-    <div class="bg-modal" id="bg-modal">
-        <div class="bg-modal-content">
-            <h3>🎨 桌面设置</h3>
+<!-- 设置弹窗 -->
+<div class="modal" id="settings-modal">
+    <div class="modal-content">
+        <h3>🎨 桌面设置</h3>
 
-            <label>背景图片 URL</label>
-            <input type="text" id="bg-url-input" placeholder="https://example.com/bg.jpg">
+        <label>背景图片 URL</label>
+        <input type="text" id="bg-url-input" placeholder="https://example.com/bg.jpg">
+        <label>或上传本地图片</label>
+        <input type="file" id="bg-file-input" accept="image/*">
 
-            <label>或上传本地图片</label>
-            <input type="file" id="bg-file-input" accept="image/*">
+        <div class="section-divider"></div>
 
-            <div class="btn-row">
-                <button class="btn-reset" onclick="resetBg()">恢复默认</button>
-                <button class="btn-cancel" onclick="closeBgModal()">取消</button>
-                <button class="btn-save" onclick="saveBg()">保存</button>
-            </div>
+        <label>文字颜色</label>
+        <select id="text-color-select">
+            <option value="white">白色（适合深色背景）</option>
+            <option value="black">黑色（适合浅色背景）</option>
+        </select>
+
+        <div class="section-divider"></div>
+
+        <label>自定义字体 URL（Google Fonts 等）</label>
+        <input type="text" id="font-url-input" placeholder="https://fonts.googleapis.com/css2?family=...">
+        <label>字体名称</label>
+        <input type="text" id="font-name-input" placeholder="例：Noto Sans SC">
+
+        <div class="btn-row">
+            <button class="btn-reset" onclick="resetAll()">全部重置</button>
+            <button class="btn-cancel" onclick="closeSettingsModal()">取消</button>
+            <button class="btn-save" onclick="saveSettings()">保存</button>
         </div>
     </div>
+</div>
+
+<!-- 图标编辑弹窗 -->
+<div class="modal" id="icon-modal">
+    <div class="modal-content">
+        <h3 id="icon-modal-title">更换图标</h3>
+        <label>图片 URL</label>
+        <input type="text" id="icon-url-input" placeholder="https://example.com/icon.png">
+        <label>或上传本地图片</label>
+        <input type="file" id="icon-file-input" accept="image/*">
+        <div class="btn-row">
+            <button class="btn-reset" onclick="resetIcon()">恢复默认</button>
+            <button class="btn-cancel" onclick="closeIconModal()">取消</button>
+            <button class="btn-save" onclick="saveIcon()">保存</button>
+        </div>
+    </div>
+</div>
 
 <script>
 // ===== 时钟 =====
 function updateClock() {
     const now = new Date();
-    const h = String(now.getHours()).padStart(2, '0');
-    const m = String(now.getMinutes()).padStart(2, '0');
-    document.getElementById('clock-time').textContent = `${h}:${m}`;
-
-    const days = ['日', '一', '二', '三', '四', '五', '六'];
-    const dateStr = `${now.getMonth()+1}月${now.getDate()}日 星期${days[now.getDay()]}`;
-    document.getElementById('clock-date').textContent = dateStr;
+    document.getElementById('clock-time').textContent = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+    const days = ['日','一','二','三','四','五','六'];
+    document.getElementById('clock-date').textContent = `${now.getMonth()+1}月${now.getDate()}日 星期${days[now.getDay()]}`;
 }
-updateClock();
-setInterval(updateClock, 10000);
+updateClock(); setInterval(updateClock, 10000);
 
 // ===== Bot 开关 =====
 let botRunning = false;
-
 function checkBotStatus() {
-    fetch('/bot_status')
-        .then(r => r.json())
-        .then(data => {
-            botRunning = data.status === 'running';
-            updateBotUI();
-        })
-        .catch(() => {
-            document.getElementById('bot-text').textContent = '未知';
-        });
+    fetch('/bot_status').then(r => r.json()).then(d => { botRunning = d.status === 'running'; updateBotUI(); }).catch(() => {});
 }
-
 function updateBotUI() {
-    const dot = document.getElementById('bot-dot');
-    const text = document.getElementById('bot-text');
-    const toggle = document.getElementById('bot-toggle');
-
-    if (botRunning) {
-        dot.classList.add('running');
-        text.textContent = '运行中';
-        toggle.classList.add('on');
-    } else {
-        dot.classList.remove('running');
-        text.textContent = '已停止';
-        toggle.classList.remove('on');
-    }
+    const dot = document.getElementById('bot-dot'), text = document.getElementById('bot-text'), toggle = document.getElementById('bot-toggle');
+    if (botRunning) { dot.classList.add('running'); text.textContent = '运行中'; toggle.classList.add('on'); }
+    else { dot.classList.remove('running'); text.textContent = '已停止'; toggle.classList.remove('on'); }
 }
-
 function toggleBot() {
-    const toggle = document.getElementById('bot-toggle');
-    const text = document.getElementById('bot-text');
-    text.textContent = '处理中...';
-
-    const url = botRunning ? '/stop_bot' : '/start_bot';
-    fetch(url, { method: 'POST' })
-        .then(r => r.json())
-        .then(() => {
-            // 等一秒再检查状态
-            setTimeout(checkBotStatus, 1500);
-        })
-        .catch(err => {
-            text.textContent = '操作失败';
-            setTimeout(checkBotStatus, 2000);
-        });
+    document.getElementById('bot-text').textContent = '处理中...';
+    fetch(botRunning ? '/stop_bot' : '/start_bot', { method: 'POST' }).then(() => setTimeout(checkBotStatus, 1500)).catch(() => setTimeout(checkBotStatus, 2000));
 }
+checkBotStatus(); setInterval(checkBotStatus, 15000);
 
-checkBotStatus();
-setInterval(checkBotStatus, 15000);
-
-// ===== 背景设置 =====
-function openBgModal() {
-    document.getElementById('bg-modal').classList.add('show');
+// ===== 设置弹窗 =====
+function openSettingsModal() {
     document.getElementById('bg-url-input').value = localStorage.getItem('home-bg-url') || '';
+    document.getElementById('text-color-select').value = localStorage.getItem('home-text-color') || 'white';
+    document.getElementById('font-url-input').value = localStorage.getItem('home-font-url') || '';
+    document.getElementById('font-name-input').value = localStorage.getItem('home-font-name') || '';
+    document.getElementById('settings-modal').classList.add('show');
 }
+function closeSettingsModal() { document.getElementById('settings-modal').classList.remove('show'); }
 
-function closeBgModal() {
-    document.getElementById('bg-modal').classList.remove('show');
-}
-
-function saveBg() {
-    const urlInput = document.getElementById('bg-url-input').value.trim();
+function saveSettings() {
+    // 背景
     const fileInput = document.getElementById('bg-file-input');
-
+    const urlInput = document.getElementById('bg-url-input').value.trim();
     if (fileInput.files.length > 0) {
-        // 本地上传 → 转 data URL 存 localStorage
         const reader = new FileReader();
-        reader.onload = function(e) {
-            const dataUrl = e.target.result;
-            localStorage.setItem('home-bg-data', dataUrl);
-            localStorage.removeItem('home-bg-url');
-            applyBg();
-            closeBgModal();
-        };
+        reader.onload = e => { localStorage.setItem('home-bg-data', e.target.result); localStorage.removeItem('home-bg-url'); applyAll(); closeSettingsModal(); };
+        reader.readAsDataURL(fileInput.files[0]); 
+    } else {
+        if (urlInput) { localStorage.setItem('home-bg-url', urlInput); localStorage.removeItem('home-bg-data'); }
+    }
+    // 文字颜色
+    localStorage.setItem('home-text-color', document.getElementById('text-color-select').value);
+    // 字体
+    const fontUrl = document.getElementById('font-url-input').value.trim();
+    const fontName = document.getElementById('font-name-input').value.trim();
+    if (fontUrl) localStorage.setItem('home-font-url', fontUrl); else localStorage.removeItem('home-font-url');
+    if (fontName) localStorage.setItem('home-font-name', fontName); else localStorage.removeItem('home-font-name');
+
+    applyAll();
+    if (fileInput.files.length === 0) closeSettingsModal();
+}
+
+function resetAll() {
+    ['home-bg-url','home-bg-data','home-text-color','home-font-url','home-font-name'].forEach(k => localStorage.removeItem(k));
+    // 重置所有图标
+    const icons = ['api','reply','chat','memory','settings','legacy'];
+    icons.forEach(id => { localStorage.removeItem('home-icon-' + id); });
+    applyAll(); applyAllIcons(); closeSettingsModal();
+}
+
+// ===== 图标自定义 =====
+let editingIconId = '';
+let longPressTimer = null;
+
+function editIcon(e, id) { e.preventDefault(); e.stopPropagation(); showIconModal(id); return false; }
+
+function startLongPress(id) {
+    longPressTimer = setTimeout(() => { showIconModal(id); }, 600);
+}
+function cancelLongPress() { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } }
+
+function showIconModal(id) {
+    editingIconId = id;
+    const names = {api:'API配置',reply:'回复设置',chat:'聊天配置',memory:'记忆',settings:'程序设置',legacy:'旧版配置'};
+    document.getElementById('icon-modal-title').textContent = '更换图标: ' + (names[id] || id);
+    document.getElementById('icon-url-input').value = '';
+    document.getElementById('icon-file-input').value = '';
+    document.getElementById('icon-modal').classList.add('show');
+}
+function closeIconModal() { document.getElementById('icon-modal').classList.remove('show'); editingIconId = ''; }
+
+function saveIcon() {
+    const fileInput = document.getElementById('icon-file-input');
+    const urlInput = document.getElementById('icon-url-input').value.trim();
+    if (fileInput.files.length > 0) {
+        const reader = new FileReader();
+        reader.onload = e => { localStorage.setItem('home-icon-' + editingIconId, e.target.result); applyIcon(editingIconId); closeIconModal(); };
         reader.readAsDataURL(fileInput.files[0]);
     } else if (urlInput) {
-        localStorage.setItem('home-bg-url', urlInput);
-        localStorage.removeItem('home-bg-data');
-        applyBg();
-        closeBgModal();
+        localStorage.setItem('home-icon-' + editingIconId, urlInput);
+        applyIcon(editingIconId); closeIconModal();
     }
 }
 
-function resetBg() {
-    localStorage.removeItem('home-bg-url');
-    localStorage.removeItem('home-bg-data');
-    document.body.style.backgroundImage = '';
-    closeBgModal();
+function resetIcon() {
+    localStorage.removeItem('home-icon-' + editingIconId);
+    applyIcon(editingIconId); closeIconModal();
 }
 
-function applyBg() {
-    const dataUrl = localStorage.getItem('home-bg-data');
-    const url = localStorage.getItem('home-bg-url');
-    if (dataUrl) {
-        document.body.style.backgroundImage = `url(${dataUrl})`;
-    } else if (url) {
-        document.body.style.backgroundImage = `url(${url})`;
+function applyIcon(id) {
+    const el = document.getElementById('icon-' + id);
+    if (!el) return;
+    const saved = localStorage.getItem('home-icon-' + id);
+    if (saved) {
+        el.style.backgroundImage = `url(${saved})`;
+        el.classList.add('has-custom-img');
+    } else {
+        el.style.backgroundImage = '';
+        el.classList.remove('has-custom-img');
     }
 }
 
-applyBg();
+function applyAllIcons() {
+    ['api','reply','chat','memory','settings','legacy'].forEach(applyIcon);
+}
 
-// 点击弹窗背景关闭
-document.getElementById('bg-modal').addEventListener('click', function(e) {
-    if (e.target === this) closeBgModal();
-});
+// ===== 全局应用 =====
+function applyAll() {
+    // 背景
+    const bgData = localStorage.getItem('home-bg-data');
+    const bgUrl = localStorage.getItem('home-bg-url');
+    if (bgData) document.body.style.backgroundImage = `url(${bgData})`;
+    else if (bgUrl) document.body.style.backgroundImage = `url(${bgUrl})`;
+    else document.body.style.backgroundImage = '';
+
+    // 文字颜色
+    const color = localStorage.getItem('home-text-color') || 'white';
+    if (color === 'black') {
+        document.documentElement.style.setProperty('--text-color', '#1d1d1f');
+        document.documentElement.style.setProperty('--text-shadow', '0 1px 4px rgba(255,255,255,0.3)');
+    } else {
+        document.documentElement.style.setProperty('--text-color', '#fff');
+        document.documentElement.style.setProperty('--text-shadow', '0 2px 10px rgba(0,0,0,0.3)');
+    }
+
+    // 字体
+    const fontUrl = localStorage.getItem('home-font-url');
+    const fontName = localStorage.getItem('home-font-name');
+    const fontStyle = document.getElementById('custom-font-style');
+    if (fontUrl && fontName) {
+        fontStyle.textContent = `@import url('${fontUrl}');`;
+        document.documentElement.style.setProperty('--custom-font', `'${fontName}', sans-serif`);
+    } else {
+        fontStyle.textContent = '';
+        document.documentElement.style.removeProperty('--custom-font');
+    }
+}
+
+// 弹窗点击背景关闭
+document.getElementById('settings-modal').addEventListener('click', function(e) { if (e.target === this) closeSettingsModal(); });
+document.getElementById('icon-modal').addEventListener('click', function(e) { if (e.target === this) closeIconModal(); });
+
+// 初始化
+applyAll();
+applyAllIcons();
 </script>
 
 </body>
