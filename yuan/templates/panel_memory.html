@@ -133,8 +133,8 @@
     <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #f0f0f0;">
         <div class="field">
             <label>核心记忆更新提示词 <span style="font-weight: normal; color: #aaa;">[UPDATE_CORE] 标记触发时使用</span></label>
-            <textarea id="core-prompt" style="height: 160px; font-family: monospace; font-size: 12px; resize: vertical;" placeholder="加载中..."></textarea>
-            <small>可用变量：{tag_description} {recent_context} {existing_content}</small>
+            <textarea id="core-prompt" style="height: 160px; font-family: monospace; font-size: 12px; resize: vertical;" placeholder="加载中..." oninput="document.getElementById('core-prompt-wc').textContent=this.value.length+' 字'"></textarea>
+            <small>可用变量：{tag_description} {recent_context} {existing_content} <span id="core-prompt-wc" style="float:right;color:#999;">0 字</span></small>
         </div>
         <div class="save-bar">
             <button class="save-btn" onclick="saveCorePrompt()">保存提示词</button>
@@ -164,8 +164,8 @@
     <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #f0f0f0;">
         <div class="field">
             <label>碎片记忆总结提示词 <span style="font-weight: normal; color: #aaa;">[SAVE_MEMORY] 标记触发时使用</span></label>
-            <textarea id="save-prompt" style="height: 160px; font-family: monospace; font-size: 12px; resize: vertical;" placeholder="加载中..."></textarea>
-            <small>可用变量：{tag_description} {recent_context}</small>
+            <textarea id="save-prompt" style="height: 160px; font-family: monospace; font-size: 12px; resize: vertical;" placeholder="加载中..." oninput="document.getElementById('save-prompt-wc').textContent=this.value.length+' 字'"></textarea>
+            <small>可用变量：{tag_description} {recent_context} <span id="save-prompt-wc" style="float:right;color:#999;">0 字</span></small>
         </div>
         <div class="save-bar">
             <button class="save-btn" onclick="saveSavePrompt()">保存提示词</button>
@@ -178,10 +178,11 @@
 <div class="modal-overlay" id="edit-modal">
     <div class="modal-box">
         <h3 id="modal-title">编辑</h3>
-        <textarea id="modal-content"></textarea>
+        <textarea id="modal-content" oninput="updateModalWc()"></textarea>
         <div class="modal-bar">
             <button style="background: #007aff; color: white;" onclick="modalSave()">保存</button>
             <button style="background: #8e8e93; color: white;" onclick="modalClose()">取消</button>
+            <span id="modal-wc" style="font-size: 12px; color: #999; margin-left: auto;">0 字</span>
         </div>
     </div>
 </div>
@@ -343,7 +344,7 @@ function saveContextEdit() {
     s.textContent = '保存中...'; s.style.color = '#999';
     fetch(`/api/save_chat_context/${encodeURIComponent(contextUser)}`, {
         method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(contextData)
+        body: JSON.stringify({ context: JSON.stringify(contextData) })
     })
     .then(r => r.json())
     .then(d => {
@@ -525,6 +526,7 @@ function openModal(title, content, onSave) {
     document.getElementById('modal-content').value = content;
     document.getElementById('modal-content').readOnly = !onSave;
     modalCallback = onSave;
+    updateModalWc();
     document.getElementById('edit-modal').classList.add('show');
 }
 
@@ -535,6 +537,12 @@ function modalSave() {
 function modalClose() {
     document.getElementById('edit-modal').classList.remove('show');
     modalCallback = null;
+}
+
+function updateModalWc() {
+    const ta = document.getElementById('modal-content');
+    const wc = document.getElementById('modal-wc');
+    if (ta && wc) wc.textContent = ta.value.length + ' 字';
 }
 
 document.getElementById('edit-modal').addEventListener('click', function(e) {
