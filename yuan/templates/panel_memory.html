@@ -109,6 +109,19 @@
     <div id="core-memory-list">
         <p style="color: #bbb; text-align: center; padding: 10px;">加载中...</p>
     </div>
+
+    <!-- 核心记忆提示词 -->
+    <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #f0f0f0;">
+        <div class="field">
+            <label>核心记忆更新提示词 <span style="font-weight: normal; color: #aaa;">[UPDATE_CORE] 标记触发时使用</span></label>
+            <textarea id="core-prompt" style="height: 160px; font-family: monospace; font-size: 12px; resize: vertical;" placeholder="加载中..."></textarea>
+            <small>可用变量：{tag_description} {recent_context} {existing_content}</small>
+        </div>
+        <div class="save-bar">
+            <button class="save-btn" onclick="saveCorePrompt()">保存提示词</button>
+            <span class="save-status" id="core-prompt-status"></span>
+        </div>
+    </div>
 </div>
 
 <!-- ===== 4. 碎片记忆浏览 ===== -->
@@ -127,6 +140,35 @@
     <div class="load-more" id="load-more-btn" style="display:none;" onclick="showMore()">加载更多...</div>
 
     <div style="margin-top: 10px; font-size: 13px; color: #aaa;" id="entry-count"></div>
+
+    <!-- 碎片记忆提示词 -->
+    <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #f0f0f0;">
+        <div class="field">
+            <label>碎片记忆总结提示词 <span style="font-weight: normal; color: #aaa;">[SAVE_MEMORY] 标记触发时使用</span></label>
+            <textarea id="save-prompt" style="height: 160px; font-family: monospace; font-size: 12px; resize: vertical;" placeholder="加载中..."></textarea>
+            <small>可用变量：{tag_description} {recent_context}</small>
+        </div>
+        <div class="save-bar">
+            <button class="save-btn" onclick="saveSavePrompt()">保存提示词</button>
+            <span class="save-status" id="save-prompt-status"></span>
+        </div>
+    </div>
+
+    <!-- 检索管道提示词 -->
+    <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #f0f0f0;">
+        <div class="field">
+            <label>记忆检索提示词 <span style="font-weight: normal; color: #aaa;">LLM 精筛时发给模型的指令</span></label>
+            <textarea id="retrieval-prompt" style="height: 200px; font-family: monospace; font-size: 12px; resize: vertical;" placeholder="加载中..."></textarea>
+            <small>可用变量：{top_k} {memory_index} {recent_context} {user_message}</small>
+            <div style="margin-top: 6px;">
+                <button style="background: #8e8e93; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-size: 12px; cursor: pointer;" onclick="resetRetrievalPrompt()">重置为默认</button>
+            </div>
+        </div>
+        <div class="save-bar">
+            <button class="save-btn" onclick="saveRetrievalPrompt()">保存提示词</button>
+            <span class="save-status" id="retrieval-prompt-status"></span>
+        </div>
+    </div>
 </div>
 
 <!-- 编辑弹窗 -->
@@ -412,6 +454,81 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s; re
 loadContextUsers();
 loadCoreMemory();
 loadEntries();
+loadPrompts();
+
+// ===== 提示词管理 =====
+function loadPrompts() {
+    // 核心记忆提示词
+    fetch('/api/get_memory_prompt/global/update_core')
+        .then(r => r.json())
+        .then(d => { if (d.prompt) document.getElementById('core-prompt').value = d.prompt; })
+        .catch(() => {});
+
+    // 碎片记忆提示词
+    fetch('/api/get_memory_prompt/global/save_memory')
+        .then(r => r.json())
+        .then(d => { if (d.prompt) document.getElementById('save-prompt').value = d.prompt; })
+        .catch(() => {});
+
+    // 检索管道提示词
+    fetch('/api/memory_retrieval_prompt')
+        .then(r => r.json())
+        .then(d => { if (d.content) document.getElementById('retrieval-prompt').value = d.content; })
+        .catch(() => {});
+}
+
+function saveCorePrompt() {
+    const s = document.getElementById('core-prompt-status');
+    s.textContent = '保存中...'; s.style.color = '#999';
+    fetch('/api/save_memory_prompt/global/update_core', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ prompt: document.getElementById('core-prompt').value })
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.error) { s.textContent = '❌ ' + d.error; s.style.color = '#ff3b30'; }
+        else { s.textContent = '✅ 已保存'; s.style.color = '#34c759'; setTimeout(() => s.textContent = '', 3000); }
+    })
+    .catch(e => { s.textContent = '❌ ' + e.message; s.style.color = '#ff3b30'; });
+}
+
+function saveSavePrompt() {
+    const s = document.getElementById('save-prompt-status');
+    s.textContent = '保存中...'; s.style.color = '#999';
+    fetch('/api/save_memory_prompt/global/save_memory', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ prompt: document.getElementById('save-prompt').value })
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.error) { s.textContent = '❌ ' + d.error; s.style.color = '#ff3b30'; }
+        else { s.textContent = '✅ 已保存'; s.style.color = '#34c759'; setTimeout(() => s.textContent = '', 3000); }
+    })
+    .catch(e => { s.textContent = '❌ ' + e.message; s.style.color = '#ff3b30'; });
+}
+
+function saveRetrievalPrompt() {
+    const s = document.getElementById('retrieval-prompt-status');
+    s.textContent = '保存中...'; s.style.color = '#999';
+    fetch('/api/memory_retrieval_prompt', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ content: document.getElementById('retrieval-prompt').value })
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.error) { s.textContent = '❌ ' + d.error; s.style.color = '#ff3b30'; }
+        else { s.textContent = '✅ 已保存'; s.style.color = '#34c759'; setTimeout(() => s.textContent = '', 3000); }
+    })
+    .catch(e => { s.textContent = '❌ ' + e.message; s.style.color = '#ff3b30'; });
+}
+
+function resetRetrievalPrompt() {
+    if (!confirm('确定重置为默认提示词？')) return;
+    fetch('/api/memory_retrieval_prompt/reset', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => { if (d.content) document.getElementById('retrieval-prompt').value = d.content; })
+        .catch(e => alert('重置失败: ' + e.message));
+}
 </script>
 
 </body>
