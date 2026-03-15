@@ -333,9 +333,13 @@ function renderProviders(area) {
                 <div class="full-width">
                     <label>模型</label>
                     <div class="model-row">
-                        <input type="text" value="${esc(p.model||'')}" onchange="providerData['${area}'][${idx}].model=this.value">
+                        <select id="model-select-${area}-${idx}" onchange="if(this.value) providerData['${area}'][${idx}].model=this.value; document.getElementById('model-input-${area}-${idx}').value=this.value;" style="flex:1;">
+                            <option value="">-- 获取模型列表 --</option>
+                            ${p.model ? '<option value="'+esc(p.model)+'" selected>'+esc(p.model)+'</option>' : ''}
+                        </select>
                         <button class="fetch-btn" onclick="fetchForCard('${area}',${idx})" style="font-size:12px; padding:7px 10px;">获取</button>
                     </div>
+                    <input type="text" id="model-input-${area}-${idx}" value="${esc(p.model||'')}" placeholder="或手动输入" onchange="providerData['${area}'][${idx}].model=this.value" style="margin-top:4px;">
                 </div>
             </div>
         `;
@@ -369,16 +373,32 @@ function removeProvider(area, idx) {
 function fetchForCard(area, idx) {
     const p = providerData[area][idx];
     if (!p.base_url) { alert('请先填写 Base URL'); return; }
+    const select = document.getElementById(`model-select-${area}-${idx}`);
+    const input = document.getElementById(`model-input-${area}-${idx}`);
+    if (select) select.innerHTML = '<option>获取中...</option>';
+
     fetch('/api/fetch_models', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ url: p.base_url, key: p.api_key }) })
     .then(r => r.json())
     .then(d => {
-        if (d.error) { alert('获取失败: ' + d.error); return; }
+        if (d.error) { if (select) select.innerHTML = `<option>❌ ${d.error}</option>`; return; }
         const models = d.models || [];
-        if (models.length === 0) { alert('未返回任何模型'); return; }
-        const choice = prompt('可用模型 (' + models.length + ' 个):\n' + models.slice(0,30).join('\n') + (models.length>30?'\n...':'') + '\n\n输入模型名:', p.model);
-        if (choice) { providerData[area][idx].model = choice; renderProviders(area); }
+        if (models.length === 0) { if (select) select.innerHTML = '<option>未返回任何模型</option>'; return; }
+        const cur = input ? input.value.trim() : (p.model || '');
+        select.innerHTML = '<option value="">-- 选择模型 --</option>';
+        models.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m; opt.textContent = m;
+            if (m === cur) opt.selected = true;
+            select.appendChild(opt);
+        });
+        select.onchange = function() {
+            if (select.value) {
+                providerData[area][idx].model = select.value;
+                if (input) input.value = select.value;
+            }
+        };
     })
-    .catch(e => alert('获取失败: ' + e.message));
+    .catch(e => { if (select) select.innerHTML = `<option>❌ ${e.message}</option>`; });
 }
 
 // ===== LLM 模式条件显示 =====

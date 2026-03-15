@@ -112,6 +112,7 @@
             <option value="info">仅 INFO</option>
         </select>
         <input type="text" id="log-search" placeholder="搜索日志..." oninput="applyLogFilter()" style="flex: 1; min-width: 120px; padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px;">
+        <button onclick="refreshLogs()" style="padding: 6px 12px; background: #007aff; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer;">🔄 刷新</button>
         <button onclick="clearLogs()" style="padding: 6px 12px; background: #8e8e93; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer;">清空</button>
     </div>
 
@@ -209,8 +210,17 @@ function clearLogs() {
     if (logElement) logElement.innerHTML = '';
 }
 
+function refreshLogs() {
+    // 断开并重新连接 SSE，触发立即拉取
+    if (window._logES) { window._logES.close(); window._logES = null; }
+    addLogEntry('[系统] 正在重新连接日志流...', 'info');
+    initEventSource();
+}
+
 function initEventSource() {
+    if (window._logES) window._logES.close();
     const es = new EventSource('/stream');
+    window._logES = es;
     es.addEventListener('message', e => {
         if (e.data.trim()) {
             const type = e.data.includes('ERROR') ? 'error' : e.data.includes('WARNING') ? 'warning' : 'info';

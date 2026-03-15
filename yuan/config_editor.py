@@ -271,6 +271,81 @@ def home():
     return render_template('home.html')
 
 
+# 人设/预设子目录文件管理 API
+@app.route('/api/prompt_file/<area>/<filename>', methods=['GET'])
+@login_required
+def get_prompt_file(area, filename):
+    """获取 prompts/characters/ 或 prompts/presets/ 下的文件"""
+    area_map = {'characters': 'characters', 'presets': 'presets'}
+    if area not in area_map:
+        return jsonify({'error': '无效的区域'}), 400
+    filepath = os.path.join('prompts', area_map[area], safe_filename(filename))
+    if not os.path.exists(filepath):
+        return jsonify({'error': '文件不存在'}), 404
+    with open(filepath, 'r', encoding='utf-8') as f:
+        content = f.read()
+    return jsonify({'filename': filename, 'content': content})
+
+
+@app.route('/api/prompt_file/<area>/<filename>', methods=['POST'])
+@login_required
+def save_prompt_file(area, filename):
+    """保存 prompts/characters/ 或 prompts/presets/ 下的文件"""
+    area_map = {'characters': 'characters', 'presets': 'presets'}
+    if area not in area_map:
+        return jsonify({'error': '无效的区域'}), 400
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': '请求为空'}), 400
+    content = data.get('content', '')
+    new_filename = data.get('filename', filename)
+    dir_path = os.path.join('prompts', area_map[area])
+    os.makedirs(dir_path, exist_ok=True)
+    filepath = os.path.join(dir_path, safe_filename(new_filename))
+    with open(filepath, 'w', encoding='utf-8') as f:
+        f.write(content)
+    return jsonify({'status': 'success'})
+
+
+@app.route('/api/prompt_file/<area>', methods=['PUT'])
+@login_required
+def create_prompt_file(area):
+    """在 prompts/characters/ 或 prompts/presets/ 下新建文件"""
+    area_map = {'characters': 'characters', 'presets': 'presets'}
+    if area not in area_map:
+        return jsonify({'error': '无效的区域'}), 400
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': '请求为空'}), 400
+    filename = safe_filename(data.get('filename', ''))
+    if not filename:
+        return jsonify({'error': '文件名不能为空'}), 400
+    if not filename.endswith('.md'):
+        filename += '.md'
+    dir_path = os.path.join('prompts', area_map[area])
+    os.makedirs(dir_path, exist_ok=True)
+    filepath = os.path.join(dir_path, filename)
+    if os.path.exists(filepath):
+        return jsonify({'error': '文件已存在'}), 409
+    with open(filepath, 'w', encoding='utf-8') as f:
+        f.write(data.get('content', ''))
+    return jsonify({'status': 'success', 'filename': filename})
+
+
+@app.route('/api/prompt_file/<area>/<filename>', methods=['DELETE'])
+@login_required
+def delete_prompt_file(area, filename):
+    """删除 prompts/characters/ 或 prompts/presets/ 下的文件"""
+    area_map = {'characters': 'characters', 'presets': 'presets'}
+    if area not in area_map:
+        return jsonify({'error': '无效的区域'}), 400
+    filepath = os.path.join('prompts', area_map[area], safe_filename(filename))
+    if not os.path.exists(filepath):
+        return jsonify({'error': '文件不存在'}), 404
+    os.remove(filepath)
+    return jsonify({'status': 'success'})
+
+
 @app.route('/panel/<name>')
 @login_required
 def panel(name):
@@ -280,13 +355,17 @@ def panel(name):
         return redirect(url_for('home'))
     config = parse_config()
 
-    # 聊天配置页需要 prompt_files 列表
+    # 聊天配置页需要文件列表
     extra = {}
     if name == 'chat':
-        prompt_files_dir = 'prompts'
-        if not os.path.exists(prompt_files_dir):
-            os.makedirs(prompt_files_dir)
-        extra['prompt_files'] = [f[:-3] for f in os.listdir(prompt_files_dir) if f.endswith('.md')]
+        char_dir = os.path.join('prompts', 'characters')
+        preset_dir = os.path.join('prompts', 'presets')
+        os.makedirs(char_dir, exist_ok=True)
+        os.makedirs(preset_dir, exist_ok=True)
+        extra['character_files'] = [f[:-3] for f in os.listdir(char_dir) if f.endswith('.md')]
+        extra['preset_files'] = [f[:-3] for f in os.listdir(preset_dir) if f.endswith('.md')]
+        # 兼容：也读老的 prompts/ 根目录
+        extra['prompt_files'] = [f[:-3] for f in os.listdir('prompts') if f.endswith('.md') and os.path.isfile(os.path.join('prompts', f))]
 
     return render_template(f'panel_{name}.html', config=config, **extra)
 
@@ -934,7 +1013,13 @@ def quick_start():
         app.logger.error(f"加载快速配置页面错误: {e}")
         return "加载快速配置页面错误，请检查日志。"
 
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/')
+@login_required
+def root_redirect():
+    return redirect(url_for('home'))
+
+
+@app.route('/legacy', methods=['GET', 'POST'])
 @login_required
 def index():
     # 在处理 POST 或渲染模板之前检查 API KEY

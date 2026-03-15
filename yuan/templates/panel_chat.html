@@ -21,12 +21,10 @@
         .save-btn { padding: 10px 24px; background: #007aff; color: white; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; }
         .save-btn:active { opacity: 0.7; }
         .save-status { font-size: 13px; color: #999; }
-        .switch-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; }
         .toggle { position: relative; width: 44px; height: 26px; background: #e0e0e0; border-radius: 13px; cursor: pointer; transition: background 0.2s; border: none; }
         .toggle.on { background: #34c759; }
         .toggle .knob { position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; background: white; border-radius: 50%; transition: left 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
         .toggle.on .knob { left: 20px; }
-        /* 用户列表 */
         .user-entry { background: #f8f8fa; border: 1px solid #e8e8ea; border-radius: 10px; padding: 14px; margin-bottom: 8px; }
         .user-entry .entry-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
         .user-entry .entry-row:last-child { margin-bottom: 0; }
@@ -35,14 +33,12 @@
         .user-entry .del-btn { background: #ff3b30; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
         .add-btn { width: 100%; padding: 10px; background: #f0f0f2; border: 2px dashed #ccc; border-radius: 10px; font-size: 14px; color: #666; cursor: pointer; text-align: center; margin-top: 8px; }
         .add-btn:hover { border-color: #007aff; color: #007aff; }
-        /* 文件列表 */
         .file-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8f8fa; border-radius: 8px; margin-bottom: 6px; }
         .file-item .name { font-size: 15px; font-weight: 500; }
         .file-item .actions { display: flex; gap: 6px; }
         .file-item .actions button { border: none; padding: 5px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
         .btn-edit { background: #007aff; color: white; }
         .btn-del { background: #ff3b30; color: white; }
-        /* 编辑器 */
         .editor-area { display: none; margin-top: 12px; }
         .editor-area.show { display: block; }
         .editor-area textarea { width: 100%; height: 400px; font-family: monospace; font-size: 13px; padding: 12px; border: 1px solid #ddd; border-radius: 8px; resize: vertical; }
@@ -76,22 +72,17 @@
             <div class="entry-row">
                 <select data-field="character">
                     <option value="">-- 人设 --</option>
-                    {% for file in prompt_files %}
-                    <option value="{{ file }}" {% if item[1] == file %}selected{% endif %}>{{ file }}</option>
-                    {% endfor %}
+                    {% for f in character_files %}<option value="{{ f }}" {% if item[1] == f %}selected{% endif %}>{{ f }}</option>{% endfor %}
                 </select>
                 <select data-field="preset">
                     <option value="">-- 预设 --</option>
-                    {% for file in prompt_files %}
-                    <option value="{{ file }}" {% if item|length >= 4 and item[3] == file %}selected{% endif %}>{{ file }}</option>
-                    {% endfor %}
+                    {% for f in preset_files %}<option value="{{ f }}" {% if item|length >= 4 and item[3] == f %}selected{% endif %}>{{ f }}</option>{% endfor %}
                 </select>
             </div>
         </div>
         {% endfor %}
     </div>
     <div class="add-btn" onclick="addUser()">+ 添加用户</div>
-
     <div class="save-bar">
         <button class="save-btn" onclick="saveUsers()">保存</button>
         <span class="save-status" id="user-status"></span>
@@ -101,49 +92,34 @@
 <!-- ===== 2. 人设管理 ===== -->
 <div class="section-card">
     <h2>人设管理</h2>
-    <small style="color: #999; display: block; margin-bottom: 12px;">角色人设卡（character），定义角色的身份、性格、背景</small>
-
+    <small style="color: #999; display: block; margin-bottom: 12px;">prompts/characters/ — 角色人设卡，定义身份、性格、背景</small>
     <div id="character-list">
-        {% for file in prompt_files %}
-        <div class="file-item" data-file="{{ file }}.md">
-            <span class="name">{{ file }}</span>
-            <div class="actions">
-                <button class="btn-edit" onclick="openEditor('character', '{{ file }}.md')">编辑</button>
-                <button class="btn-del" onclick="deleteFile('{{ file }}.md')">删除</button>
-            </div>
-        </div>
+        {% for f in character_files %}
+        <div class="file-item"><span class="name">{{ f }}</span><div class="actions">
+            <button class="btn-edit" onclick="openEditor('characters','{{ f }}.md')">编辑</button>
+            <button class="btn-del" onclick="deleteFile('characters','{{ f }}.md')">删除</button>
+        </div></div>
         {% endfor %}
     </div>
-
     <div style="margin-top: 10px;">
-        <button style="background: #34c759; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 14px; cursor: pointer;" onclick="showNewEditor('character')">+ 新建人设</button>
+        <button style="background:#34c759;color:white;border:none;padding:8px 16px;border-radius:6px;font-size:14px;cursor:pointer;" onclick="showNewEditor('characters')">+ 新建人设</button>
     </div>
-
-    <!-- 新建 -->
-    <div class="editor-area" id="character-new-area">
-        <div class="field">
-            <label>文件名（不含 .md）</label>
-            <input type="text" id="character-new-name" placeholder="例：角色名">
-        </div>
-        <textarea id="character-new-content" placeholder="在此输入人设内容..." oninput="updateWc('character-new')"></textarea>
+    <div class="editor-area" id="characters-new-area">
+        <div class="field"><label>文件名（不含 .md）</label><input type="text" id="characters-new-name" placeholder="例：角色名"></div>
+        <textarea id="characters-new-content" placeholder="输入人设内容..." oninput="updateWc('characters-new')"></textarea>
         <div class="editor-bar">
-            <button style="background: #34c759; color: white;" onclick="createFile('character')">创建</button>
-            <button style="background: #8e8e93; color: white;" onclick="hideEditor('character-new')">取消</button>
-            <span class="word-count" id="character-new-wc">0 字</span>
+            <button style="background:#34c759;color:white;" onclick="createFile('characters')">创建</button>
+            <button style="background:#8e8e93;color:white;" onclick="hideEditor('characters-new')">取消</button>
+            <span class="word-count" id="characters-new-wc">0 字</span>
         </div>
     </div>
-
-    <!-- 编辑 -->
-    <div class="editor-area" id="character-edit-area">
-        <div class="field">
-            <label>文件名</label>
-            <input type="text" id="character-edit-name">
-        </div>
-        <textarea id="character-edit-content" oninput="updateWc('character-edit')"></textarea>
+    <div class="editor-area" id="characters-edit-area">
+        <div class="field"><label>文件名</label><input type="text" id="characters-edit-name"></div>
+        <textarea id="characters-edit-content" oninput="updateWc('characters-edit')"></textarea>
         <div class="editor-bar">
-            <button style="background: #007aff; color: white;" onclick="saveFile('character')">保存</button>
-            <button style="background: #8e8e93; color: white;" onclick="hideEditor('character-edit')">取消</button>
-            <span class="word-count" id="character-edit-wc">0 字</span>
+            <button style="background:#007aff;color:white;" onclick="saveFile('characters')">保存</button>
+            <button style="background:#8e8e93;color:white;" onclick="hideEditor('characters-edit')">取消</button>
+            <span class="word-count" id="characters-edit-wc">0 字</span>
         </div>
     </div>
 </div>
@@ -151,54 +127,39 @@
 <!-- ===== 3. 预设管理 ===== -->
 <div class="section-card">
     <h2>预设管理</h2>
-    <small style="color: #999; display: block; margin-bottom: 12px;">预设（preset）定义角色行为规则、记忆标记协议等。支持新建多套预设、导入文件</small>
-
-    <div id="preset-list">
-        {% for file in prompt_files %}
-        <div class="file-item" data-file="{{ file }}.md">
-            <span class="name">{{ file }}</span>
-            <div class="actions">
-                <button class="btn-edit" onclick="openEditor('preset', '{{ file }}.md')">编辑</button>
-                <button class="btn-del" onclick="deleteFile('{{ file }}.md')">删除</button>
-            </div>
-        </div>
+    <small style="color: #999; display: block; margin-bottom: 12px;">prompts/presets/ — 行为规则、记忆标记协议等</small>
+    <div id="presets-list">
+        {% for f in preset_files %}
+        <div class="file-item"><span class="name">{{ f }}</span><div class="actions">
+            <button class="btn-edit" onclick="openEditor('presets','{{ f }}.md')">编辑</button>
+            <button class="btn-del" onclick="deleteFile('presets','{{ f }}.md')">删除</button>
+        </div></div>
         {% endfor %}
     </div>
-
     <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
-        <button style="background: #34c759; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 14px; cursor: pointer;" onclick="showNewEditor('preset')">+ 新建预设</button>
-        <label style="background: #007aff; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 14px; cursor: pointer; display: inline-block;">
+        <button style="background:#34c759;color:white;border:none;padding:8px 16px;border-radius:6px;font-size:14px;cursor:pointer;" onclick="showNewEditor('presets')">+ 新建预设</button>
+        <label style="background:#007aff;color:white;border:none;padding:8px 16px;border-radius:6px;font-size:14px;cursor:pointer;display:inline-block;">
             📂 导入文件
-            <input type="file" accept=".md,.txt,.json" style="display: none;" onchange="importPreset(this)">
+            <input type="file" accept=".md,.txt,.json" style="display:none;" onchange="importFile('presets',this)">
         </label>
     </div>
-    <small style="color: #aaa; margin-top: 6px; display: block;">支持导入 .md / .txt 文件（未来将支持酒馆 JSON 预设格式）</small>
-
-    <!-- 新建 -->
-    <div class="editor-area" id="preset-new-area">
-        <div class="field">
-            <label>文件名（不含 .md）</label>
-            <input type="text" id="preset-new-name" placeholder="例：preset_v2">
-        </div>
-        <textarea id="preset-new-content" placeholder="在此输入预设内容..." oninput="updateWc('preset-new')"></textarea>
+    <small style="color: #aaa; margin-top: 6px; display: block;">支持 .md / .txt（未来支持酒馆 JSON 预设）</small>
+    <div class="editor-area" id="presets-new-area">
+        <div class="field"><label>文件名（不含 .md）</label><input type="text" id="presets-new-name" placeholder="例：preset_v2"></div>
+        <textarea id="presets-new-content" placeholder="输入预设内容..." oninput="updateWc('presets-new')"></textarea>
         <div class="editor-bar">
-            <button style="background: #34c759; color: white;" onclick="createFile('preset')">创建</button>
-            <button style="background: #8e8e93; color: white;" onclick="hideEditor('preset-new')">取消</button>
-            <span class="word-count" id="preset-new-wc">0 字</span>
+            <button style="background:#34c759;color:white;" onclick="createFile('presets')">创建</button>
+            <button style="background:#8e8e93;color:white;" onclick="hideEditor('presets-new')">取消</button>
+            <span class="word-count" id="presets-new-wc">0 字</span>
         </div>
     </div>
-
-    <!-- 编辑 -->
-    <div class="editor-area" id="preset-edit-area">
-        <div class="field">
-            <label>文件名</label>
-            <input type="text" id="preset-edit-name">
-        </div>
-        <textarea id="preset-edit-content" oninput="updateWc('preset-edit')"></textarea>
+    <div class="editor-area" id="presets-edit-area">
+        <div class="field"><label>文件名</label><input type="text" id="presets-edit-name"></div>
+        <textarea id="presets-edit-content" oninput="updateWc('presets-edit')"></textarea>
         <div class="editor-bar">
-            <button style="background: #007aff; color: white;" onclick="saveFile('preset')">保存</button>
-            <button style="background: #8e8e93; color: white;" onclick="hideEditor('preset-edit')">取消</button>
-            <span class="word-count" id="preset-edit-wc">0 字</span>
+            <button style="background:#007aff;color:white;" onclick="saveFile('presets')">保存</button>
+            <button style="background:#8e8e93;color:white;" onclick="hideEditor('presets-edit')">取消</button>
+            <span class="word-count" id="presets-edit-wc">0 字</span>
         </div>
     </div>
 </div>
@@ -207,11 +168,10 @@
 <div class="section-card">
     <h2>世界书</h2>
     <p style="color: #bbb; text-align: center; padding: 30px 0; font-size: 14px;">🚧 功能开发中，敬请期待</p>
-    <small style="color: #999;">世界书用于存储角色次要设定，通过关键词触发注入到对话上下文中。</small>
+    <small style="color: #999;">prompts/worldbooks/ — 角色次要设定，关键词触发注入</small>
 </div>
 
 <script>
-// ===== 通用工具 =====
 function saveFields(fields, statusId) {
     const s = document.getElementById(statusId);
     s.textContent = '保存中...'; s.style.color = '#999';
@@ -238,23 +198,17 @@ function addUser() {
     div.innerHTML = `
         <div class="entry-row">
             <input type="text" placeholder="微信昵称" data-field="nick">
-            <label style="font-size: 12px; white-space: nowrap; display: flex; align-items: center; gap: 4px;">
+            <label style="font-size:12px;white-space:nowrap;display:flex;align-items:center;gap:4px;">
                 <input type="checkbox" data-field="auto" checked> 主动消息
             </label>
             <button class="del-btn" onclick="this.closest('.user-entry').remove()">删除</button>
         </div>
         <div class="entry-row">
-            <select data-field="character">
-                <option value="">-- 人设 --</option>
-                {% for file in prompt_files %}
-                <option value="{{ file }}">{{ file }}</option>
-                {% endfor %}
+            <select data-field="character"><option value="">-- 人设 --</option>
+                {% for f in character_files %}<option value="{{ f }}">{{ f }}</option>{% endfor %}
             </select>
-            <select data-field="preset">
-                <option value="">-- 预设 --</option>
-                {% for file in prompt_files %}
-                <option value="{{ file }}">{{ file }}</option>
-                {% endfor %}
+            <select data-field="preset"><option value="">-- 预设 --</option>
+                {% for f in preset_files %}<option value="{{ f }}">{{ f }}</option>{% endfor %}
             </select>
         </div>
     `;
@@ -274,8 +228,8 @@ function saveUsers() {
     saveFields({ LISTEN_LIST: listenList }, 'user-status');
 }
 
-// ===== 文件管理（人设 & 预设共用） =====
-let editingFile = {};  // { character: 'xxx.md', preset: 'yyy.md' }
+// ===== 文件管理（人设 & 预设共用新 API） =====
+let editingFile = {};
 
 function showNewEditor(area) {
     document.getElementById(area + '-new-area').classList.add('show');
@@ -285,16 +239,13 @@ function showNewEditor(area) {
     updateWc(area + '-new');
 }
 
-function hideEditor(areaId) {
-    document.getElementById(areaId + '-area').classList.remove('show');
-}
+function hideEditor(areaId) { document.getElementById(areaId + '-area').classList.remove('show'); }
 
 function openEditor(area, filename) {
     editingFile[area] = filename;
     document.getElementById(area + '-edit-area').classList.add('show');
     document.getElementById(area + '-new-area').classList.remove('show');
-
-    fetch(`/edit_prompt/${encodeURIComponent(filename)}`)
+    fetch(`/api/prompt_file/${area}/${encodeURIComponent(filename)}`)
         .then(r => r.json())
         .then(d => {
             document.getElementById(area + '-edit-name').value = d.filename || filename;
@@ -308,91 +259,58 @@ function saveFile(area) {
     const filename = document.getElementById(area + '-edit-name').value.trim();
     const content = document.getElementById(area + '-edit-content').value;
     if (!filename) { alert('文件名不能为空'); return; }
-
-    const formData = new FormData();
-    formData.append('filename', filename);
-    formData.append('content', content);
-
-    fetch(`/edit_prompt/${encodeURIComponent(editingFile[area])}`, { method: 'POST', body: formData })
-        .then(r => r.json())
-        .then(d => {
-            if (d.error) alert('保存失败: ' + d.error);
-            else { alert('✅ 已保存'); location.reload(); }
-        })
-        .catch(e => alert('保存失败: ' + e.message));
+    fetch(`/api/prompt_file/${area}/${encodeURIComponent(editingFile[area])}`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ filename: filename, content: content })
+    })
+    .then(r => r.json())
+    .then(d => { if (d.error) alert('保存失败: ' + d.error); else { alert('✅ 已保存'); location.reload(); } })
+    .catch(e => alert('保存失败: ' + e.message));
 }
 
 function createFile(area) {
     const name = document.getElementById(area + '-new-name').value.trim();
     const content = document.getElementById(area + '-new-content').value;
     if (!name) { alert('请输入文件名'); return; }
-
-    const formData = new FormData();
-    formData.append('filename', name.endsWith('.md') ? name : name + '.md');
-    formData.append('content', content);
-
-    fetch('/create_prompt', { method: 'POST', body: formData })
-        .then(r => r.json())
-        .then(d => {
-            if (d.error) alert('创建失败: ' + d.error);
-            else { alert('✅ 已创建'); location.reload(); }
-        })
-        .catch(e => alert('创建失败: ' + e.message));
+    fetch(`/api/prompt_file/${area}`, {
+        method: 'PUT', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ filename: name.endsWith('.md') ? name : name + '.md', content: content })
+    })
+    .then(r => r.json())
+    .then(d => { if (d.error) alert('创建失败: ' + d.error); else { alert('✅ 已创建'); location.reload(); } })
+    .catch(e => alert('创建失败: ' + e.message));
 }
 
-function deleteFile(filename) {
+function deleteFile(area, filename) {
     if (!confirm(`确定删除 "${filename}"？`)) return;
-    fetch(`/delete_prompt/${encodeURIComponent(filename)}`, { method: 'POST' })
-        .then(r => r.json())
-        .then(d => {
-            if (d.error) alert('删除失败: ' + d.error);
-            else location.reload();
-        })
-        .catch(e => alert('删除失败: ' + e.message));
+    fetch(`/api/prompt_file/${area}/${encodeURIComponent(filename)}`, { method: 'DELETE' })
+    .then(r => r.json())
+    .then(d => { if (d.error) alert('删除失败: ' + d.error); else location.reload(); })
+    .catch(e => alert('删除失败: ' + e.message));
 }
 
-// ===== 预设导入 =====
-function importPreset(input) {
+function importFile(area, input) {
     const file = input.files[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = function(e) {
         let content = e.target.result;
         let filename = file.name;
-
-        // JSON 格式预设（未来扩展：酒馆格式解析）
         if (filename.endsWith('.json')) {
-            try {
-                const json = JSON.parse(content);
-                // 简单处理：如果 JSON 有 content/description 字段就提取
-                content = json.content || json.description || JSON.stringify(json, null, 2);
-                filename = filename.replace('.json', '.md');
-            } catch(e) {
-                alert('JSON 解析失败: ' + e.message);
-                return;
-            }
+            try { const j = JSON.parse(content); content = j.content || j.description || content; filename = filename.replace('.json', '.md'); } catch(e) { alert('JSON 解析失败'); return; }
         }
-
-        // 去掉扩展名作为预设名
-        const name = filename.replace(/\.(md|txt|json)$/, '');
-
-        const formData = new FormData();
-        formData.append('filename', name + '.md');
-        formData.append('content', content);
-
-        fetch('/create_prompt', { method: 'POST', body: formData })
-            .then(r => r.json())
-            .then(d => {
-                if (d.error) alert('导入失败: ' + d.error);
-                else { alert(`✅ 已导入 "${name}"`); location.reload(); }
-            })
-            .catch(e => alert('导入失败: ' + e.message));
+        const name = filename.replace(/\.(md|txt|json)$/, '') + '.md';
+        fetch(`/api/prompt_file/${area}`, {
+            method: 'PUT', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ filename: name, content: content })
+        })
+        .then(r => r.json())
+        .then(d => { if (d.error) alert('导入失败: ' + d.error); else { alert('✅ 已导入'); location.reload(); } })
+        .catch(e => alert('导入失败: ' + e.message));
     };
     reader.readAsText(file);
-    input.value = '';  // 重置 file input
+    input.value = '';
 }
 </script>
-
 </body>
 </html>
