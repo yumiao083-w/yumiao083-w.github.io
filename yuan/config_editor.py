@@ -3074,6 +3074,7 @@ def _format_providers_list(providers):
         lines.append(f"        'api_key': {repr(p.get('api_key', ''))},")
         lines.append(f"        'model': {repr(p.get('model', ''))},")
         lines.append(f"        'timeout': {int(p.get('timeout', 8))},")
+        lines.append(f"        'temperature': {float(p.get('temperature', 0.3))},")
         lines.append('    },')
     lines.append(']')
     return '\n'.join(lines)

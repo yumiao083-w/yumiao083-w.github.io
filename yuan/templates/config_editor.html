@@ -4743,7 +4743,8 @@ content: 一段详细记忆`,
                 <div style="font-size: 12px; color: #666;">
                     <span>URL: ${_escHtml(p.base_url || '—')}</span> · 
                     <span>模型: <strong>${_escHtml(p.model || '未选择')}</strong></span> · 
-                    <span>超时: ${p.timeout || 8}s</span>
+                    <span>超时: ${p.timeout || 8}s</span> · 
+                    <span>温度: ${p.temperature !== undefined ? p.temperature : 0.3}</span>
                 </div>
             `;
 
@@ -4834,6 +4835,12 @@ content: 一段详细记忆`,
                     <small style="color: #888; margin-left: 8px;">单次请求超时，超时后自动切换下一个中转站</small>
                 </div>
 
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 4px;">温度 (Temperature):</label>
+                    <input type="number" id="mr-dlg-temperature" value="${existing.temperature !== undefined ? existing.temperature : 0.3}" min="0" max="2" step="0.1" style="width: 80px; padding: 6px;">
+                    <small style="color: #888; margin-left: 8px;">检索任务建议 0.1-0.5，越低越稳定</small>
+                </div>
+
                 <div id="mr-dlg-status" style="margin: 10px 0; font-size: 13px;"></div>
 
                 <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
@@ -4878,6 +4885,7 @@ content: 一段详细记忆`,
         const modelSelect = document.getElementById('mr-dlg-model-select').value;
         const modelManual = document.getElementById('mr-dlg-model-manual').value.trim();
         const timeout = parseInt(document.getElementById('mr-dlg-timeout').value) || 8;
+        const temperature = parseFloat(document.getElementById('mr-dlg-temperature').value);
 
         const model = modelManual || modelSelect;  // 手动输入优先
 
@@ -4895,7 +4903,8 @@ content: 一段详细记忆`,
             base_url: url,
             api_key: key,
             model: model,
-            timeout: Math.max(3, Math.min(30, timeout))
+            timeout: Math.max(3, Math.min(30, timeout)),
+            temperature: isNaN(temperature) ? 0.3 : Math.max(0, Math.min(2, temperature))
         };
 
         if (editIdx !== null && editIdx !== undefined) {

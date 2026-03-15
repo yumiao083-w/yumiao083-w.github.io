@@ -214,6 +214,7 @@ MEMORY_LLM_PROVIDERS = [
         'api_key': 'sk-tujpMKTbaMm3OLvDhP87Tp8q1xKyvH63BWyLrqqNvX3Her8r',
         'model': 'gemini-2.0-flash',
         'timeout': 8,
+        'temperature': 0.3,
     },
 ]
 
