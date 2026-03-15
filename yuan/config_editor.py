@@ -3381,6 +3381,14 @@ def reset_memory_retrieval_prompt():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/memory_summary_users', methods=['GET'])
+@login_required
+def api_get_memory_summary_users():
+    """获取有核心记忆的用户列表"""
+    users = get_memory_summary_users()
+    return jsonify({'users': users})
+
+
 @app.route('/api/memory_entries', methods=['GET'])
 @login_required
 def get_memory_entries():
