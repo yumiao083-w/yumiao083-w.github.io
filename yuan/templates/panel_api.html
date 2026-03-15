@@ -195,6 +195,20 @@
             <input type="number" id="img-temp" step="0.1" min="0" max="2" value="{{ config.MOONSHOT_TEMPERATURE }}" oninput="document.getElementById('img-temp-slider').value=this.value">
         </div>
     </div>
+
+    <div class="sub-section">
+        <div class="field">
+            <label>图片识别提示词</label>
+            <textarea id="img-prompt" style="height: 80px; font-family: monospace; font-size: 12px; resize: vertical;">{{ config.IMAGE_RECOGNITION_PROMPT or '' }}</textarea>
+            <small>识别普通图片时发给模型的指令</small>
+        </div>
+        <div class="field">
+            <label>表情包识别提示词</label>
+            <textarea id="emoji-prompt" style="height: 80px; font-family: monospace; font-size: 12px; resize: vertical;">{{ config.EMOJI_RECOGNITION_PROMPT or '' }}</textarea>
+            <small>识别表情包时发给模型的指令</small>
+        </div>
+    </div>
+
     <div class="save-bar">
         <button class="save-btn" onclick="saveImage()">保存</button>
         <span class="save-status" id="img-status"></span>
@@ -431,6 +445,8 @@ function saveImage() {
         MOONSHOT_TEMPERATURE: document.getElementById('img-temp').value,
         ENABLE_IMAGE_RECOGNITION: document.getElementById('img-enable').classList.contains('on'),
         ENABLE_EMOJI_RECOGNITION: document.getElementById('emoji-enable').classList.contains('on'),
+        IMAGE_RECOGNITION_PROMPT: document.getElementById('img-prompt').value,
+        EMOJI_RECOGNITION_PROMPT: document.getElementById('emoji-prompt').value,
     }, 'img-status');
 }
 

@@ -43,6 +43,11 @@ MOONSHOT_TEMPERATURE = 0.8
 ENABLE_IMAGE_RECOGNITION = True
 ENABLE_EMOJI_RECOGNITION = True
 
+# 图片识别提示词
+IMAGE_RECOGNITION_PROMPT = '请用中文描述这张图片的主要内容或主题，尽可能详细全面。不要使用"这是"、"这张"等开头，直接描述。如果有文字，请包含在描述中。'
+# 表情包识别提示词
+EMOJI_RECOGNITION_PROMPT = '请用中文简洁地描述这个聊天窗口最后一张表情包所表达的情绪、含义或内容。如果表情包含文字，请一并描述。注意：1. 只描述表情包本身，不要添加其他内容 2. 不要出现"这是"、"这个"等词语'
+
 # 消息队列等待时间
 QUEUE_WAITING_TIME = 7
 
