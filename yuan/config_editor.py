@@ -275,11 +275,20 @@ def home():
 @login_required
 def panel(name):
     """子页面路由"""
-    valid_panels = ['api', 'reply', 'chat', 'memory', 'prompt', 'settings']
+    valid_panels = ['api', 'reply', 'chat', 'memory', 'settings']
     if name not in valid_panels:
         return redirect(url_for('home'))
     config = parse_config()
-    return render_template(f'panel_{name}.html', config=config)
+
+    # 聊天配置页需要 prompt_files 列表
+    extra = {}
+    if name == 'chat':
+        prompt_files_dir = 'prompts'
+        if not os.path.exists(prompt_files_dir):
+            os.makedirs(prompt_files_dir)
+        extra['prompt_files'] = [f[:-3] for f in os.listdir(prompt_files_dir) if f.endswith('.md')]
+
+    return render_template(f'panel_{name}.html', config=config, **extra)
 
 
 @app.route('/api/save_section', methods=['POST'])
@@ -302,6 +311,9 @@ def save_section():
             original = config.get(key)
             if original is None:
                 converted[key] = value
+            elif isinstance(original, list):
+                # 列表类型直接透传（如 LISTEN_LIST）
+                converted[key] = value if isinstance(value, list) else original
             elif isinstance(original, bool):
                 converted[key] = value if isinstance(value, bool) else str(value).lower() in ('true', '1', 'on')
             elif isinstance(original, int):
@@ -1498,16 +1510,12 @@ logging.getLogger().addHandler(web_handler)
 @login_required
 def stream():
     def event_stream():
-        retry_count = 0
         while True:
             try:
-                log = log_queue.get(timeout=5)
+                log = log_queue.get(timeout=2)
                 yield f"data: {log}\n\n"
-                retry_count = 0  # 成功时重置重试计数器
             except Empty:
-                yield ":keep-alive\n\n"  # 发送心跳包
-                retry_count = min(retry_count + 1, 5)
-                time.sleep(2 ** retry_count)  # 指数退避
+                yield ":keep-alive\n\n"
             except Exception as e:
                 app.logger.error(f"SSE Error: {str(e)}")
                 yield "event: error\ndata: Connection closed\n\n"

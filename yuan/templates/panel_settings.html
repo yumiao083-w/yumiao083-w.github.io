@@ -103,6 +103,18 @@
 <!-- ===== 3. 程序运行日志 ===== -->
 <div class="section-card">
     <h2>程序运行日志</h2>
+
+    <div style="display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap;">
+        <select id="log-filter" onchange="applyLogFilter()" style="padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px;">
+            <option value="all">全部</option>
+            <option value="error">仅错误</option>
+            <option value="warning">警告+错误</option>
+            <option value="info">仅 INFO</option>
+        </select>
+        <input type="text" id="log-search" placeholder="搜索日志..." oninput="applyLogFilter()" style="flex: 1; min-width: 120px; padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px;">
+        <button onclick="clearLogs()" style="padding: 6px 12px; background: #8e8e93; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer;">清空</button>
+    </div>
+
     <div class="log-container" id="log-container">
         <div id="logs"><div class="log-entry info">连接日志流...</div></div>
     </div>
@@ -155,13 +167,46 @@ function addLogEntry(text, type) {
     const entry = document.createElement('div');
     entry.className = 'log-entry ' + type;
     entry.textContent = text;
+    entry.dataset.type = type;
+    entry.dataset.text = text.toLowerCase();
     logElement.appendChild(entry);
     // 限制行数
     while (logElement.children.length > maxLogLines) {
         logElement.removeChild(logElement.firstChild);
     }
+    // 应用过滤
+    applyFilterToEntry(entry);
     // 自动滚动到底部
     logContainer.scrollTop = logContainer.scrollHeight;
+}
+
+function applyLogFilter() {
+    const filter = document.getElementById('log-filter').value;
+    const search = (document.getElementById('log-search').value || '').toLowerCase();
+    const entries = logElement.querySelectorAll('.log-entry');
+    entries.forEach(e => applyFilterToEntry(e, filter, search));
+}
+
+function applyFilterToEntry(entry, filter, search) {
+    if (!filter) filter = document.getElementById('log-filter').value;
+    if (search === undefined) search = (document.getElementById('log-search').value || '').toLowerCase();
+
+    const type = entry.dataset.type || 'info';
+    const text = entry.dataset.text || '';
+
+    let show = true;
+    // 类型过滤
+    if (filter === 'error' && type !== 'error') show = false;
+    if (filter === 'warning' && type !== 'error' && type !== 'warning') show = false;
+    if (filter === 'info' && type !== 'info') show = false;
+    // 搜索过滤
+    if (show && search && !text.includes(search)) show = false;
+
+    entry.style.display = show ? '' : 'none';
+}
+
+function clearLogs() {
+    if (logElement) logElement.innerHTML = '';
 }
 
 function initEventSource() {
