@@ -242,7 +242,7 @@ _DEFAULT_RANK_PROMPT = """你是记忆检索助手。下面是一个人的所有
 
 请返回一个包含恰好 {top_k} 个元素的 JSON 数组。每个元素包含 id（记忆条目编号，整数）和 reason（一句话说明为什么相关）。
 格式要求：只返回 JSON 数组，不要 markdown 代码块，不要任何其他解释文字。
-示例：[{{"id": 42, "reason": "她上次也是这种心情低落的状态"}}, {{"id": 7, "reason": "这个话题和她的XX偏好有关"}}, {{"id": 156, "reason": "最近发生的相关事件"}}, {{"id": 88, "reason": "她的一个重要习惯"}}, {{"id": 23, "reason": "之前类似情境的记忆"}}]"""
+示例：[{"id": 42, "reason": "她上次也是这种心情低落的状态"}, {"id": 7, "reason": "这个话题和她的XX偏好有关"}, {"id": 156, "reason": "最近发生的相关事件"}, {"id": 88, "reason": "她的一个重要习惯"}, {"id": 23, "reason": "之前类似情境的记忆"}]"""
 
 # 提示词文件路径
 import os as _os
@@ -355,12 +355,12 @@ def rank_memories(user_message, recent_context, memory_index, providers,
     # 从文件加载提示词模板
     prompt_template = _load_rank_prompt()
 
-    prompt = prompt_template.format(
-        top_k=top_k,
-        memory_index=memory_index,
-        recent_context=recent_context or "(无上下文)",
-        user_message=user_message or "(空消息)"
-    )
+    # 用替换而非 .format()，避免 memory_index/context 里的花括号被误解析
+    prompt = prompt_template
+    prompt = prompt.replace('{top_k}', str(top_k))
+    prompt = prompt.replace('{memory_index}', memory_index or '')
+    prompt = prompt.replace('{recent_context}', recent_context or '(无上下文)')
+    prompt = prompt.replace('{user_message}', user_message or '(空消息)')
 
     response_text = _failover_call(prompt, providers, max_tokens)
 
