@@ -3214,7 +3214,7 @@ def reset_memory_retrieval_prompt():
 @app.route('/api/memory_retrieval_fetch_models', methods=['POST'])
 @login_required
 def memory_retrieval_fetch_models():
-    """获取记忆检索中转站的可用模型列表（复用 fetch_models 逻辑）"""
+    """获取记忆检索中转站的可用模型列表"""
     try:
         req = request.get_json()
         if not req:
@@ -3224,16 +3224,17 @@ def memory_retrieval_fetch_models():
         if not base_url:
             return jsonify({'error': 'URL不能为空'}), 400
 
-        from memory_llm_ranker import fetch_provider_models
+        try:
+            from memory_llm_ranker import fetch_provider_models
+        except ImportError as e:
+            app.logger.error(f"导入 memory_llm_ranker 失败: {e}")
+            return jsonify({'error': f'模块导入失败: {e}'}), 500
+
         models = fetch_provider_models(base_url, api_key, timeout=15)
         return jsonify({'models': models})
-    except http_requests.exceptions.Timeout:
-        return jsonify({'error': '请求超时，请检查URL是否正确'}), 504
-    except http_requests.exceptions.ConnectionError:
-        return jsonify({'error': '无法连接到API服务商，请检查URL'}), 502
     except Exception as e:
-        app.logger.error(f"获取记忆检索模型列表失败: {e}")
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"获取记忆检索模型列表失败: {type(e).__name__}: {e}")
+        return jsonify({'error': f'{type(e).__name__}: {e}'}), 500
 
 
 @app.route('/api/fetch_models', methods=['POST'])

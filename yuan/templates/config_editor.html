@@ -4671,7 +4671,10 @@ content: 一段详细记忆`,
     // ====== 初始化：从后端加载配置 ======
     function mrLoadConfig() {
         fetch('/api/memory_retrieval_config')
-            .then(r => r.json())
+            .then(r => {
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                return r.json();
+            })
             .then(data => {
                 // 模式
                 const modeSelect = document.getElementById('mr-mode');
@@ -4692,7 +4695,10 @@ content: 一段详细记忆`,
 
         // 加载提示词
         fetch('/api/memory_retrieval_prompt')
-            .then(r => r.json())
+            .then(r => {
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                return r.json();
+            })
             .then(data => {
                 const editor = document.getElementById('mr-prompt-editor');
                 if (editor && data.content) {
@@ -4923,7 +4929,12 @@ content: 一段详细记忆`,
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({url: url, key: key})
         })
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) {
+                return r.text().then(t => { throw new Error(`HTTP ${r.status}: ${t.substring(0, 100)}`); });
+            }
+            return r.json();
+        })
         .then(data => {
             btn.textContent = '获取模型';
             btn.disabled = false;
@@ -4986,13 +4997,19 @@ content: 一段详细记忆`,
                 fallback: fallback,
                 providers: mrProviders
             })
-        }).then(r => r.json());
+        }).then(r => {
+            if (!r.ok) return r.text().then(t => ({error: `HTTP ${r.status}: ${t.substring(0, 100)}`}));
+            return r.json();
+        });
 
         const savePrompt = fetch('/api/memory_retrieval_prompt', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ content: promptContent })
-        }).then(r => r.json());
+        }).then(r => {
+            if (!r.ok) return r.text().then(t => ({error: `HTTP ${r.status}: ${t.substring(0, 100)}`}));
+            return r.json();
+        });
 
         Promise.all([saveConfig, savePrompt])
             .then(([configRes, promptRes]) => {
@@ -5013,7 +5030,10 @@ content: 一段详细记忆`,
         if (!confirm('确定重置提示词为默认？当前修改将丢失。')) return;
 
         fetch('/api/memory_retrieval_prompt/reset', { method: 'POST' })
-            .then(r => r.json())
+            .then(r => {
+                if (!r.ok) return r.text().then(t => ({error: `HTTP ${r.status}`}));
+                return r.json();
+            })
             .then(data => {
                 if (data.error) {
                     alert('重置失败: ' + data.error);
