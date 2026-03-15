@@ -6,102 +6,53 @@
     <title>API 配置</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f5f5f7;
-            color: #1d1d1f;
-            padding-bottom: 40px;
-        }
-        .top-bar {
-            position: sticky; top: 0; z-index: 100;
-            background: rgba(245,245,247,0.85);
-            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-            padding: 12px 16px;
-            display: flex; align-items: center;
-            border-bottom: 1px solid rgba(0,0,0,0.1);
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f7; color: #1d1d1f; padding-bottom: 40px; }
+        .top-bar { position: sticky; top: 0; z-index: 100; background: rgba(245,245,247,0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); padding: 12px 16px; display: flex; align-items: center; border-bottom: 1px solid rgba(0,0,0,0.1); }
         .back-btn { text-decoration: none; color: #007aff; font-size: 16px; }
         .top-bar h1 { flex: 1; text-align: center; font-size: 17px; font-weight: 600; margin-right: 40px; }
-
-        .section-card {
-            background: white; margin: 16px; border-radius: 12px;
-            padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-        }
-        .section-card h2 {
-            font-size: 18px; font-weight: 600; margin-bottom: 16px;
-            padding-bottom: 10px; border-bottom: 1px solid #f0f0f0;
-        }
+        .section-card { background: white; margin: 16px; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .section-card h2 { font-size: 18px; font-weight: 600; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid #f0f0f0; }
         .field { margin-bottom: 14px; }
         .field label { display: block; font-size: 13px; font-weight: 500; color: #666; margin-bottom: 4px; }
         .field input[type="text"], .field input[type="number"], .field input[type="password"], .field select, .field textarea {
-            width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px;
-            font-size: 15px; background: #fafafa; transition: border-color 0.2s;
-        }
+            width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; background: #fafafa; }
         .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: #007aff; background: white; }
         .field small { display: block; font-size: 12px; color: #999; margin-top: 4px; }
-
         .model-row { display: flex; gap: 8px; }
-        .model-row select { flex: 1; }
-        .fetch-btn {
-            padding: 10px 14px; background: #007aff; color: white; border: none;
-            border-radius: 8px; font-size: 13px; cursor: pointer; white-space: nowrap;
-        }
-        .fetch-btn:disabled { opacity: 0.5; }
-
+        .model-row select, .model-row input[type="text"] { flex: 1; }
+        .fetch-btn { padding: 10px 14px; background: #007aff; color: white; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; white-space: nowrap; }
         .switch-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; }
         .switch-row label { font-size: 15px; color: #333; }
-        .toggle {
-            position: relative; width: 44px; height: 26px; background: #e0e0e0;
-            border-radius: 13px; cursor: pointer; transition: background 0.2s; border: none;
-        }
+        .toggle { position: relative; width: 44px; height: 26px; background: #e0e0e0; border-radius: 13px; cursor: pointer; transition: background 0.2s; border: none; }
         .toggle.on { background: #34c759; }
-        .toggle .knob {
-            position: absolute; top: 2px; left: 2px; width: 22px; height: 22px;
-            background: white; border-radius: 50%; transition: left 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-        }
+        .toggle .knob { position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; background: white; border-radius: 50%; transition: left 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
         .toggle.on .knob { left: 20px; }
-
         .save-bar { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding-top: 12px; border-top: 1px solid #f0f0f0; }
         .save-btn { padding: 10px 24px; background: #007aff; color: white; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; }
         .save-btn:active { opacity: 0.7; }
         .save-status { font-size: 13px; color: #999; }
-
-        /* 滑动条+输入框组合 */
         .slider-combo { display: flex; align-items: center; gap: 10px; }
         .slider-combo input[type="range"] { flex: 1; height: 6px; -webkit-appearance: none; background: #ddd; border-radius: 3px; outline: none; }
         .slider-combo input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #007aff; cursor: pointer; }
         .slider-combo input[type="number"] { width: 70px; padding: 6px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; text-align: center; }
-
         /* 中转站卡片 */
-        .provider-card {
-            background: #f8f8fa; border: 1px solid #e8e8ea; border-radius: 10px;
-            padding: 14px; margin-bottom: 8px; cursor: grab; transition: box-shadow 0.2s;
-        }
-        .provider-card:active { cursor: grabbing; }
+        .provider-card { background: #f8f8fa; border: 1px solid #e8e8ea; border-radius: 10px; padding: 14px; margin-bottom: 8px; cursor: grab; transition: box-shadow 0.2s; }
         .provider-card.dragging { opacity: 0.5; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .provider-card.drag-over { border-top: 3px solid #007aff; }
-        .provider-card .card-header {
-            display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
-        }
-        .provider-card .card-header .drag-handle { font-size: 16px; color: #ccc; cursor: grab; user-select: none; }
-        .provider-card .card-header .card-title { font-weight: 600; font-size: 14px; flex: 1; margin: 0 10px; }
-        .provider-card .remove-btn {
-            background: #ff3b30; color: white; border: none; padding: 4px 10px;
-            border-radius: 6px; font-size: 12px; cursor: pointer;
-        }
+        .provider-card .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .provider-card .drag-handle { font-size: 16px; color: #ccc; cursor: grab; user-select: none; }
+        .provider-card .card-title { font-weight: 600; font-size: 14px; flex: 1; margin: 0 10px; }
+        .provider-card .remove-btn { background: #ff3b30; color: white; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
         .provider-card .card-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .provider-card .card-fields .full-width { grid-column: 1 / -1; }
         .provider-card .card-fields label { font-size: 11px; color: #888; margin-bottom: 2px; display: block; }
-        .provider-card .card-fields input, .provider-card .card-fields select {
-            width: 100%; padding: 7px 8px; border: 1px solid #ddd; border-radius: 6px;
-            font-size: 13px; background: white;
-        }
-        .add-provider-btn {
-            width: 100%; padding: 10px; background: #f0f0f2; border: 2px dashed #ccc;
-            border-radius: 10px; font-size: 14px; color: #666; cursor: pointer;
-            text-align: center; margin-top: 8px;
-        }
+        .provider-card .card-fields input, .provider-card .card-fields select { width: 100%; padding: 7px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; background: white; }
+        .add-provider-btn { width: 100%; padding: 10px; background: #f0f0f2; border: 2px dashed #ccc; border-radius: 10px; font-size: 14px; color: #666; cursor: pointer; text-align: center; margin-top: 8px; }
         .add-provider-btn:hover { border-color: #007aff; color: #007aff; }
+        /* 条件显示 */
+        .llm-only { display: none; }
+        .llm-only.show { display: block; }
+        .sub-section { margin-top: 16px; padding-top: 14px; border-top: 1px solid #f0f0f0; }
     </style>
 </head>
 <body>
@@ -112,26 +63,8 @@
 </div>
 
 <!-- ===== 1. 聊天模型 ===== -->
-<div class="section-card" id="card-chat">
+<div class="section-card">
     <h2>聊天模型</h2>
-    <div class="field">
-        <label>Base URL</label>
-        <input type="text" id="chat-url" value="{{ config.DEEPSEEK_BASE_URL }}">
-    </div>
-    <div class="field">
-        <label>API Key</label>
-        <input type="password" id="chat-key" value="{{ config.DEEPSEEK_API_KEY }}">
-    </div>
-    <div class="field">
-        <label>模型</label>
-        <div class="model-row">
-            <select id="chat-model-select"><option value="">-- 获取模型列表 --</option>
-                {% if config.MODEL %}<option value="{{ config.MODEL }}" selected>{{ config.MODEL }}</option>{% endif %}
-            </select>
-            <button class="fetch-btn" onclick="fetchModels('chat')">获取</button>
-        </div>
-        <input type="text" id="chat-model-manual" value="{{ config.MODEL }}" placeholder="或手动输入模型名" style="margin-top: 6px;">
-    </div>
     <div class="field">
         <label>温度</label>
         <div class="slider-combo">
@@ -143,6 +76,11 @@
         <label>最大 Token</label>
         <input type="number" id="chat-max-token" step="100" value="{{ config.MAX_TOKEN }}">
     </div>
+
+    <div class="field"><label>中转站列表（拖拽排序优先级，从上到下依次故障转移）</label></div>
+    <div id="chat-providers-list"></div>
+    <div class="add-provider-btn" onclick="addProvider('chat')">+ 添加中转站</div>
+
     <div class="save-bar">
         <button class="save-btn" onclick="saveChat()">保存</button>
         <span class="save-status" id="chat-status"></span>
@@ -150,72 +88,67 @@
 </div>
 
 <!-- ===== 2. 记忆筛选模型 ===== -->
-<div class="section-card" id="card-memory-retrieval">
+<div class="section-card">
     <h2>记忆筛选模型</h2>
     <small style="color: #999; display: block; margin-bottom: 12px;">用于从记忆库中智能检索相关记忆的模型（推荐快速便宜的模型）</small>
 
     <div class="field">
         <label>检索模式</label>
-        <select id="mr-mode">
+        <select id="mr-mode" onchange="toggleLlmOnly()">
             <option value="llm" {% if config.MEMORY_RETRIEVAL_MODE == 'llm' %}selected{% endif %}>LLM 精筛（推荐）</option>
             <option value="keyword" {% if config.MEMORY_RETRIEVAL_MODE == 'keyword' %}selected{% endif %}>仅关键词匹配</option>
             <option value="off" {% if config.MEMORY_RETRIEVAL_MODE == 'off' %}selected{% endif %}>关闭检索</option>
         </select>
     </div>
 
-    <div class="field">
-        <label>温度</label>
-        <div class="slider-combo">
-            <input type="range" id="mr-temp-slider" min="0" max="2" step="0.1" value="0.3" oninput="document.getElementById('mr-temp-val').value=this.value">
-            <input type="number" id="mr-temp-val" step="0.1" min="0" max="2" value="0.3" oninput="document.getElementById('mr-temp-slider').value=this.value">
+    <!-- 以下仅 LLM 模式显示 -->
+    <div class="llm-only" id="llm-only-section">
+        <div class="field">
+            <label>温度</label>
+            <div class="slider-combo">
+                <input type="range" id="mr-temp-slider" min="0" max="2" step="0.1" value="0.3" oninput="document.getElementById('mr-temp-val').value=this.value">
+                <input type="number" id="mr-temp-val" step="0.1" min="0" max="2" value="0.3" oninput="document.getElementById('mr-temp-slider').value=this.value">
+            </div>
+            <small>检索任务建议 0.1-0.5</small>
         </div>
-        <small>所有中转站共用，检索任务建议 0.1-0.5</small>
-    </div>
 
-    <div class="field">
-        <label>超时（秒）</label>
-        <div class="slider-combo">
-            <input type="range" id="mr-timeout-slider" min="5" max="60" step="1" value="30" oninput="document.getElementById('mr-timeout-val').value=this.value">
-            <input type="number" id="mr-timeout-val" min="5" max="60" value="30" oninput="document.getElementById('mr-timeout-slider').value=this.value">
+        <div class="field">
+            <label>超时（秒）</label>
+            <input type="number" id="mr-timeout" min="5" max="120" value="30" style="width: 100px;">
+            <small>单次请求超时后自动切换下一个中转站</small>
         </div>
-        <small>单次请求超时，超时后自动切换下一个中转站</small>
-    </div>
 
-    <!-- 中转站列表 -->
-    <div class="field">
-        <label>中转站列表（拖拽排序优先级，从上到下依次故障转移）</label>
-    </div>
-    <div id="mr-providers-list">
-        <!-- JS 渲染 -->
-    </div>
-    <div class="add-provider-btn" onclick="mrAddProvider()">+ 添加中转站</div>
+        <div class="field"><label>中转站列表（拖拽排序优先级，从上到下依次故障转移）</label></div>
+        <div id="mr-providers-list"></div>
+        <div class="add-provider-btn" onclick="addProvider('mr')">+ 添加中转站</div>
 
-    <div class="field" style="margin-top: 14px;">
-        <label>最大输出 Token</label>
-        <input type="number" id="mr-max-tokens" step="500" value="{{ config.MEMORY_RETRIEVAL_MAX_TOKENS or 4000 }}">
-        <small>LLM 精筛输出上限，建议 2000-8000</small>
-    </div>
+        <div class="field" style="margin-top: 14px;">
+            <label>最大输出 Token</label>
+            <input type="number" id="mr-max-tokens" step="500" value="{{ config.MEMORY_RETRIEVAL_MAX_TOKENS or 4000 }}">
+            <small>LLM 精筛输出上限，建议 2000-8000</small>
+        </div>
 
-    <div class="field">
-        <label>关键词降级条数</label>
-        <input type="number" id="mr-topk" min="1" max="15" value="{{ config.MEMORY_RETRIEVAL_TOP_K or 5 }}">
-        <small>LLM 全部失败降级到关键词时返回的条数</small>
-    </div>
+        <div class="switch-row">
+            <label>LLM 失败时降级到关键词</label>
+            <button class="toggle {% if config.MEMORY_FALLBACK_TO_KEYWORD %}on{% endif %}" id="mr-fallback" onclick="this.classList.toggle('on')"><div class="knob"></div></button>
+        </div>
 
-    <div class="switch-row">
-        <label>LLM 失败时降级到关键词</label>
-        <button class="toggle {% if config.MEMORY_FALLBACK_TO_KEYWORD %}on{% endif %}" id="mr-fallback" onclick="this.classList.toggle('on')">
-            <div class="knob"></div>
-        </button>
-    </div>
+        <div class="field">
+            <label>关键词降级条数</label>
+            <input type="number" id="mr-topk" min="1" max="15" value="{{ config.MEMORY_RETRIEVAL_TOP_K or 5 }}" style="width: 100px;">
+            <small>LLM 全部失败降级到关键词时返回的条数</small>
+        </div>
 
-    <!-- 检索提示词 -->
-    <div class="field" style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #f0f0f0;">
-        <label>检索提示词 <span style="font-weight: normal; color: #aaa;">（LLM 精筛时发给模型的指令）</span></label>
-        <textarea id="mr-prompt" style="height: 200px; font-family: monospace; font-size: 12px; resize: vertical;" placeholder="加载中..."></textarea>
-        <small>可用变量：{top_k} {memory_index} {recent_context} {user_message}</small>
-        <div style="margin-top: 6px;">
-            <button style="background: #8e8e93; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-size: 12px; cursor: pointer;" onclick="mrResetPrompt()">重置为默认</button>
+        <!-- 检索提示词 -->
+        <div class="sub-section">
+            <div class="field">
+                <label>检索提示词 <span style="font-weight: normal; color: #aaa;">（LLM 精筛时发给模型的指令）</span></label>
+                <textarea id="mr-prompt" style="height: 200px; font-family: monospace; font-size: 12px; resize: vertical;" placeholder="加载中..."></textarea>
+                <small>可用变量：{top_k} {memory_index} {recent_context} {user_message}</small>
+                <div style="margin-top: 6px;">
+                    <button style="background: #8e8e93; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-size: 12px; cursor: pointer;" onclick="mrResetPrompt()">重置为默认</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -226,7 +159,7 @@
 </div>
 
 <!-- ===== 3. 识图模型 ===== -->
-<div class="section-card" id="card-image">
+<div class="section-card">
     <h2>识图模型</h2>
     <div class="switch-row">
         <label>启用图片识别</label>
@@ -236,6 +169,7 @@
         <label>启用表情包识别</label>
         <button class="toggle {% if config.ENABLE_EMOJI_RECOGNITION %}on{% endif %}" id="emoji-enable" onclick="this.classList.toggle('on')"><div class="knob"></div></button>
     </div>
+
     <div class="field">
         <label>Base URL</label>
         <input type="text" id="img-url" value="{{ config.MOONSHOT_BASE_URL }}">
@@ -250,7 +184,7 @@
             <select id="img-model-select"><option value="">-- 获取模型列表 --</option>
                 {% if config.MOONSHOT_MODEL %}<option value="{{ config.MOONSHOT_MODEL }}" selected>{{ config.MOONSHOT_MODEL }}</option>{% endif %}
             </select>
-            <button class="fetch-btn" onclick="fetchModels('image')">获取</button>
+            <button class="fetch-btn" onclick="fetchModelsSimple('img')">获取</button>
         </div>
         <input type="text" id="img-model-manual" value="{{ config.MOONSHOT_MODEL }}" placeholder="或手动输入" style="margin-top: 6px;">
     </div>
@@ -268,7 +202,7 @@
 </div>
 
 <!-- ===== 4. 联网搜索 ===== -->
-<div class="section-card" id="card-online">
+<div class="section-card">
     <h2>联网搜索</h2>
     <div class="switch-row">
         <label>启用联网搜索</label>
@@ -288,7 +222,7 @@
             <select id="online-model-select"><option value="">-- 获取模型列表 --</option>
                 {% if config.ONLINE_MODEL %}<option value="{{ config.ONLINE_MODEL }}" selected>{{ config.ONLINE_MODEL }}</option>{% endif %}
             </select>
-            <button class="fetch-btn" onclick="fetchModels('online')">获取</button>
+            <button class="fetch-btn" onclick="fetchModelsSimple('online')">获取</button>
         </div>
         <input type="text" id="online-model-manual" value="{{ config.ONLINE_MODEL }}" placeholder="或手动输入" style="margin-top: 6px;">
     </div>
@@ -320,15 +254,14 @@
 </div>
 
 <script>
-// ===== 通用保存 =====
+// ===== 通用工具 =====
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
 function saveFields(fields, statusId) {
     const s = document.getElementById(statusId);
     s.textContent = '保存中...'; s.style.color = '#999';
-    fetch('/api/save_section', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ fields })
-    })
-    .then(r => { if (!r.ok) return r.text().then(t => { throw new Error(t.substring(0, 80)); }); return r.json(); })
+    fetch('/api/save_section', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ fields }) })
+    .then(r => { if (!r.ok) return r.text().then(t => { throw new Error(t.substring(0,80)); }); return r.json(); })
     .then(d => {
         if (d.error) { s.textContent = '❌ ' + d.error; s.style.color = '#ff3b30'; }
         else { s.textContent = '✅ 已保存'; s.style.color = '#34c759'; setTimeout(() => s.textContent = '', 3000); }
@@ -336,18 +269,11 @@ function saveFields(fields, statusId) {
     .catch(e => { s.textContent = '❌ ' + e.message; s.style.color = '#ff3b30'; });
 }
 
-// ===== 获取模型列表 =====
-function fetchModels(area) {
-    const map = {
-        chat:   { url: 'chat-url', key: 'chat-key', sel: 'chat-model-select', man: 'chat-model-manual' },
-        image:  { url: 'img-url', key: 'img-key', sel: 'img-model-select', man: 'img-model-manual' },
-        online: { url: 'online-url', key: 'online-key', sel: 'online-model-select', man: 'online-model-manual' },
-    };
-    const m = map[area]; if (!m) return;
-    const url = document.getElementById(m.url).value.trim();
-    const key = document.getElementById(m.key).value.trim();
-    const sel = document.getElementById(m.sel);
-    const man = document.getElementById(m.man);
+function fetchModelsSimple(prefix) {
+    const url = document.getElementById(prefix + '-url').value.trim();
+    const key = document.getElementById(prefix + '-key').value.trim();
+    const sel = document.getElementById(prefix + '-model-select');
+    const man = document.getElementById(prefix + '-model-manual');
     if (!url) { alert('请先填写 Base URL'); return; }
     sel.innerHTML = '<option>获取中...</option>';
     fetch('/api/fetch_models', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ url, key }) })
@@ -362,15 +288,139 @@ function fetchModels(area) {
     .catch(e => { sel.innerHTML = `<option>❌ ${e.message}</option>`; });
 }
 
-// ===== 各区块保存 =====
+// ===== 通用中转站管理 =====
+const providerData = { chat: [], mr: [] };
+let dragState = { area: null, idx: null };
+
+function renderProviders(area) {
+    const list = document.getElementById(area + '-providers-list');
+    const providers = providerData[area];
+    list.innerHTML = '';
+    if (providers.length === 0) {
+        list.innerHTML = '<p style="color:#bbb; text-align:center; padding:16px; font-size:13px;">尚未添加中转站</p>';
+        return;
+    }
+    providers.forEach((p, idx) => {
+        const card = document.createElement('div');
+        card.className = 'provider-card';
+        card.draggable = true;
+        card.dataset.idx = idx;
+        card.dataset.area = area;
+        card.innerHTML = `
+            <div class="card-header">
+                <span class="drag-handle">☰</span>
+                <span class="card-title">#${idx+1}</span>
+                <button class="remove-btn" onclick="removeProvider('${area}',${idx})">删除</button>
+            </div>
+            <div class="card-fields">
+                <div class="full-width"><label>名称</label><input type="text" value="${esc(p.name||'')}" onchange="providerData['${area}'][${idx}].name=this.value"></div>
+                <div class="full-width"><label>Base URL</label><input type="text" value="${esc(p.base_url||'')}" onchange="providerData['${area}'][${idx}].base_url=this.value"></div>
+                <div class="full-width"><label>API Key</label><input type="password" value="${esc(p.api_key||'')}" onchange="providerData['${area}'][${idx}].api_key=this.value"></div>
+                <div class="full-width">
+                    <label>模型</label>
+                    <div class="model-row">
+                        <input type="text" value="${esc(p.model||'')}" onchange="providerData['${area}'][${idx}].model=this.value">
+                        <button class="fetch-btn" onclick="fetchForCard('${area}',${idx})" style="font-size:12px; padding:7px 10px;">获取</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        card.addEventListener('dragstart', () => { dragState = {area, idx}; card.classList.add('dragging'); });
+        card.addEventListener('dragend', () => card.classList.remove('dragging'));
+        card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('drag-over'); });
+        card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+        card.addEventListener('drop', e => {
+            e.preventDefault(); card.classList.remove('drag-over');
+            if (dragState.area === area && dragState.idx !== null && dragState.idx !== idx) {
+                const item = providerData[area].splice(dragState.idx, 1)[0];
+                providerData[area].splice(idx, 0, item);
+                renderProviders(area);
+            }
+            dragState = {area: null, idx: null};
+        });
+        list.appendChild(card);
+    });
+}
+
+function addProvider(area) {
+    providerData[area].push({ name: '新中转站', base_url: '', api_key: '', model: '' });
+    renderProviders(area);
+    setTimeout(() => { const list = document.getElementById(area + '-providers-list'); list.lastElementChild?.scrollIntoView({ behavior: 'smooth' }); }, 100);
+}
+
+function removeProvider(area, idx) {
+    if (confirm('确定删除?')) { providerData[area].splice(idx, 1); renderProviders(area); }
+}
+
+function fetchForCard(area, idx) {
+    const p = providerData[area][idx];
+    if (!p.base_url) { alert('请先填写 Base URL'); return; }
+    fetch('/api/fetch_models', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ url: p.base_url, key: p.api_key }) })
+    .then(r => r.json())
+    .then(d => {
+        if (d.error) { alert('获取失败: ' + d.error); return; }
+        const models = d.models || [];
+        if (models.length === 0) { alert('未返回任何模型'); return; }
+        const choice = prompt('可用模型 (' + models.length + ' 个):\n' + models.slice(0,30).join('\n') + (models.length>30?'\n...':'') + '\n\n输入模型名:', p.model);
+        if (choice) { providerData[area][idx].model = choice; renderProviders(area); }
+    })
+    .catch(e => alert('获取失败: ' + e.message));
+}
+
+// ===== LLM 模式条件显示 =====
+function toggleLlmOnly() {
+    const mode = document.getElementById('mr-mode').value;
+    const section = document.getElementById('llm-only-section');
+    if (mode === 'llm') section.classList.add('show');
+    else section.classList.remove('show');
+}
+
+// ===== 保存函数 =====
 function saveChat() {
+    // 聊天模型当前只有一个中转站时仍走旧字段（兼容 bot.py）
+    // 有多个时第一个写入主字段，其余存储待后端支持
+    const providers = providerData.chat;
+    const first = providers[0] || {};
     saveFields({
-        DEEPSEEK_BASE_URL: document.getElementById('chat-url').value.trim(),
-        DEEPSEEK_API_KEY: document.getElementById('chat-key').value.trim(),
-        MODEL: document.getElementById('chat-model-manual').value.trim() || document.getElementById('chat-model-select').value,
+        DEEPSEEK_BASE_URL: first.base_url || '',
+        DEEPSEEK_API_KEY: first.api_key || '',
+        MODEL: first.model || '',
         TEMPERATURE: document.getElementById('chat-temp').value,
         MAX_TOKEN: document.getElementById('chat-max-token').value,
     }, 'chat-status');
+    // TODO: 后端支持多中转站后，额外保存 providers 列表
+}
+
+function saveMr() {
+    const temp = parseFloat(document.getElementById('mr-temp-val').value) || 0.3;
+    const timeout = parseInt(document.getElementById('mr-timeout').value) || 30;
+    providerData.mr.forEach(p => { p.temperature = temp; p.timeout = timeout; });
+
+    const s = document.getElementById('mr-status');
+    s.textContent = '保存中...'; s.style.color = '#999';
+
+    const p1 = fetch('/api/memory_retrieval_config', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            mode: document.getElementById('mr-mode').value,
+            top_k: parseInt(document.getElementById('mr-topk').value) || 5,
+            max_tokens: parseInt(document.getElementById('mr-max-tokens').value) || 4000,
+            fallback: document.getElementById('mr-fallback').classList.contains('on'),
+            providers: providerData.mr
+        })
+    }).then(r => r.json());
+
+    const p2 = fetch('/api/memory_retrieval_prompt', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ content: document.getElementById('mr-prompt').value })
+    }).then(r => r.json());
+
+    Promise.all([p1, p2])
+        .then(([r1, r2]) => {
+            if (r1.error || r2.error) { s.textContent = '❌ ' + (r1.error || r2.error); s.style.color = '#ff3b30'; }
+            else { s.textContent = '✅ 已保存'; s.style.color = '#34c759'; setTimeout(() => s.textContent = '', 3000); }
+        })
+        .catch(e => { s.textContent = '❌ ' + e.message; s.style.color = '#ff3b30'; });
 }
 
 function saveImage() {
@@ -397,148 +447,6 @@ function saveOnline() {
     }, 'online-status');
 }
 
-// ===== 记忆筛选 =====
-let mrProviders = [];
-let mrDragIdx = null;
-
-function mrLoad() {
-    fetch('/api/memory_retrieval_config')
-        .then(r => r.json())
-        .then(d => {
-            mrProviders = d.providers || [];
-            // 从第一个 provider 读温度/超时作为全局值
-            if (mrProviders.length > 0) {
-                const p0 = mrProviders[0];
-                document.getElementById('mr-temp-val').value = p0.temperature !== undefined ? p0.temperature : 0.3;
-                document.getElementById('mr-temp-slider').value = p0.temperature !== undefined ? p0.temperature : 0.3;
-                document.getElementById('mr-timeout-val').value = p0.timeout || 30;
-                document.getElementById('mr-timeout-slider').value = p0.timeout || 30;
-            }
-            mrRender();
-        }).catch(() => {});
-
-    fetch('/api/memory_retrieval_prompt')
-        .then(r => r.json())
-        .then(d => { if (d.content) document.getElementById('mr-prompt').value = d.content; })
-        .catch(() => {});
-}
-
-function mrRender() {
-    const c = document.getElementById('mr-providers-list');
-    c.innerHTML = '';
-    if (mrProviders.length === 0) {
-        c.innerHTML = '<p style="color: #bbb; text-align: center; padding: 16px; font-size: 13px;">尚未添加中转站</p>';
-        return;
-    }
-    mrProviders.forEach((p, idx) => {
-        const card = document.createElement('div');
-        card.className = 'provider-card';
-        card.draggable = true;
-        card.dataset.idx = idx;
-        card.innerHTML = `
-            <div class="card-header">
-                <span class="drag-handle">☰</span>
-                <span class="card-title">#${idx+1}</span>
-                <button class="remove-btn" onclick="mrRemove(${idx})">删除</button>
-            </div>
-            <div class="card-fields">
-                <div class="full-width"><label>名称</label><input type="text" value="${esc(p.name||'')}" onchange="mrProviders[${idx}].name=this.value"></div>
-                <div class="full-width"><label>Base URL</label><input type="text" value="${esc(p.base_url||'')}" onchange="mrProviders[${idx}].base_url=this.value"></div>
-                <div class="full-width"><label>API Key</label><input type="password" value="${esc(p.api_key||'')}" onchange="mrProviders[${idx}].api_key=this.value"></div>
-                <div class="full-width">
-                    <label>模型</label>
-                    <div class="model-row">
-                        <input type="text" value="${esc(p.model||'')}" onchange="mrProviders[${idx}].model=this.value" style="flex:1;">
-                        <button class="fetch-btn" onclick="mrFetchForCard(${idx})" style="font-size:12px; padding:7px 10px;">获取</button>
-                    </div>
-                </div>
-            </div>
-        `;
-        // 拖拽
-        card.addEventListener('dragstart', e => { mrDragIdx = idx; card.classList.add('dragging'); });
-        card.addEventListener('dragend', () => { card.classList.remove('dragging'); });
-        card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('drag-over'); });
-        card.addEventListener('dragleave', () => { card.classList.remove('drag-over'); });
-        card.addEventListener('drop', e => {
-            e.preventDefault(); card.classList.remove('drag-over');
-            if (mrDragIdx !== null && mrDragIdx !== idx) {
-                const item = mrProviders.splice(mrDragIdx, 1)[0];
-                mrProviders.splice(idx, 0, item);
-                mrRender();
-            }
-            mrDragIdx = null;
-        });
-        c.appendChild(card);
-    });
-}
-
-function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-
-function mrAddProvider() {
-    mrProviders.push({ name: '新中转站', base_url: '', api_key: '', model: '', temperature: 0.3, timeout: 30 });
-    mrRender();
-    // 滚动到新卡片
-    setTimeout(() => { const list = document.getElementById('mr-providers-list'); list.lastElementChild?.scrollIntoView({ behavior: 'smooth' }); }, 100);
-}
-
-function mrRemove(idx) {
-    if (confirm('确定删除?')) { mrProviders.splice(idx, 1); mrRender(); }
-}
-
-function mrFetchForCard(idx) {
-    const p = mrProviders[idx];
-    if (!p.base_url) { alert('请先填写 Base URL'); return; }
-    const model = prompt('当前模型: ' + (p.model || '无') + '\n获取模型列表中...');
-    // 实际获取
-    fetch('/api/memory_retrieval_fetch_models', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ url: p.base_url, key: p.api_key })
-    })
-    .then(r => r.json())
-    .then(d => {
-        if (d.error) { alert('获取失败: ' + d.error); return; }
-        const models = d.models || [];
-        if (models.length === 0) { alert('该站点未返回任何模型'); return; }
-        const choice = prompt('可用模型 (' + models.length + ' 个):\n' + models.slice(0, 30).join('\n') + (models.length > 30 ? '\n...' : '') + '\n\n请输入模型名:', p.model);
-        if (choice) { mrProviders[idx].model = choice; mrRender(); }
-    })
-    .catch(e => alert('获取失败: ' + e.message));
-}
-
-function saveMr() {
-    // 把外层温度/超时写入每个 provider
-    const temp = parseFloat(document.getElementById('mr-temp-val').value) || 0.3;
-    const timeout = parseInt(document.getElementById('mr-timeout-val').value) || 30;
-    mrProviders.forEach(p => { p.temperature = temp; p.timeout = timeout; });
-
-    const statusEl = document.getElementById('mr-status');
-    statusEl.textContent = '保存中...'; statusEl.style.color = '#999';
-
-    // 保存 providers + config + prompt 并行
-    const p1 = fetch('/api/memory_retrieval_config', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            mode: document.getElementById('mr-mode').value,
-            top_k: parseInt(document.getElementById('mr-topk').value) || 5,
-            max_tokens: parseInt(document.getElementById('mr-max-tokens').value) || 4000,
-            fallback: document.getElementById('mr-fallback').classList.contains('on'),
-            providers: mrProviders
-        })
-    }).then(r => r.json());
-
-    const p2 = fetch('/api/memory_retrieval_prompt', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ content: document.getElementById('mr-prompt').value })
-    }).then(r => r.json());
-
-    Promise.all([p1, p2])
-        .then(([r1, r2]) => {
-            if (r1.error || r2.error) { statusEl.textContent = '❌ ' + (r1.error || r2.error); statusEl.style.color = '#ff3b30'; }
-            else { statusEl.textContent = '✅ 已保存'; statusEl.style.color = '#34c759'; setTimeout(() => statusEl.textContent = '', 3000); }
-        })
-        .catch(e => { statusEl.textContent = '❌ ' + e.message; statusEl.style.color = '#ff3b30'; });
-}
-
 function mrResetPrompt() {
     if (!confirm('确定重置为默认提示词?')) return;
     fetch('/api/memory_retrieval_prompt/reset', { method: 'POST' })
@@ -547,8 +455,41 @@ function mrResetPrompt() {
         .catch(e => alert('重置失败: ' + e.message));
 }
 
-// 初始化
-mrLoad();
+// ===== 初始化 =====
+function init() {
+    // 聊天模型：从 config 初始化第一个中转站
+    providerData.chat = [{
+        name: '主中转站',
+        base_url: '{{ config.DEEPSEEK_BASE_URL }}',
+        api_key: '{{ config.DEEPSEEK_API_KEY }}',
+        model: '{{ config.MODEL }}'
+    }];
+    renderProviders('chat');
+
+    // 记忆筛选
+    fetch('/api/memory_retrieval_config')
+        .then(r => r.json())
+        .then(d => {
+            providerData.mr = d.providers || [];
+            if (providerData.mr.length > 0) {
+                const p0 = providerData.mr[0];
+                document.getElementById('mr-temp-val').value = p0.temperature !== undefined ? p0.temperature : 0.3;
+                document.getElementById('mr-temp-slider').value = p0.temperature !== undefined ? p0.temperature : 0.3;
+                document.getElementById('mr-timeout').value = p0.timeout || 30;
+            }
+            renderProviders('mr');
+        }).catch(() => {});
+
+    fetch('/api/memory_retrieval_prompt')
+        .then(r => r.json())
+        .then(d => { if (d.content) document.getElementById('mr-prompt').value = d.content; })
+        .catch(() => {});
+
+    // LLM 条件显示
+    toggleLlmOnly();
+}
+
+init();
 </script>
 
 </body>
