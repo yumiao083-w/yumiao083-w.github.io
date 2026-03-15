@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>回复设置</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f7; color: #1d1d1f; padding-bottom: 40px; }
+        .top-bar { position: sticky; top: 0; z-index: 100; background: rgba(245,245,247,0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); padding: 12px 16px; display: flex; align-items: center; border-bottom: 1px solid rgba(0,0,0,0.1); }
+        .back-btn { text-decoration: none; color: #007aff; font-size: 16px; }
+        .top-bar h1 { flex: 1; text-align: center; font-size: 17px; font-weight: 600; margin-right: 40px; }
+        .section-card { background: white; margin: 16px; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .section-card h2 { font-size: 18px; font-weight: 600; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid #f0f0f0; }
+        .field { margin-bottom: 14px; }
+        .field label { display: block; font-size: 13px; font-weight: 500; color: #666; margin-bottom: 4px; }
+        .field input[type="text"], .field input[type="number"], .field select { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; background: #fafafa; }
+        .field input:focus, .field select:focus { outline: none; border-color: #007aff; background: white; }
+        .field small { display: block; font-size: 12px; color: #999; margin-top: 4px; }
+        .range-row { display: flex; gap: 10px; align-items: center; }
+        .range-row input { flex: 1; }
+        .range-row span { color: #999; font-size: 14px; }
+        .switch-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; }
+        .switch-row label { font-size: 15px; color: #333; }
+        .toggle { position: relative; width: 44px; height: 26px; background: #e0e0e0; border-radius: 13px; cursor: pointer; transition: background 0.2s; border: none; }
+        .toggle.on { background: #34c759; }
+        .toggle .knob { position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; background: white; border-radius: 50%; transition: left 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+        .toggle.on .knob { left: 20px; }
+        .save-bar { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding-top: 12px; border-top: 1px solid #f0f0f0; }
+        .save-btn { padding: 10px 24px; background: #007aff; color: white; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; }
+        .save-btn:active { opacity: 0.7; }
+        .save-status { font-size: 13px; color: #999; }
+    </style>
+</head>
+<body>
+
+<div class="top-bar">
+    <a href="/home" class="back-btn">← 返回</a>
+    <h1>💬 回复设置</h1>
+</div>
+
+<!-- ===== 1. 回复间隔 ===== -->
+<div class="section-card">
+    <h2>回复间隔</h2>
+    <small style="color: #999; display: block; margin-bottom: 12px;">消息间隔时间 = 字数 × (平均速度 + 随机速度)</small>
+
+    <div class="field">
+        <label>平均打字速度（秒/字）</label>
+        <input type="number" id="avg-speed" step="0.01" value="{{ config.AVERAGE_TYPING_SPEED }}">
+    </div>
+
+    <div class="field">
+        <label>随机打字速度范围（秒/字）</label>
+        <div class="range-row">
+            <input type="number" id="rand-speed-min" step="0.01" value="{{ config.RANDOM_TYPING_SPEED_MIN }}">
+            <span>至</span>
+            <input type="number" id="rand-speed-max" step="0.01" value="{{ config.RANDOM_TYPING_SPEED_MAX }}">
+        </div>
+    </div>
+
+    <div class="field">
+        <label>消息队列等待时间（秒）</label>
+        <input type="number" id="queue-wait" step="1" value="{{ config.QUEUE_WAITING_TIME }}">
+        <small>建议 5-10 秒</small>
+    </div>
+
+    <div class="switch-row">
+        <label>以换行符分隔消息</label>
+        <button class="toggle {% if config.SEPARATE_ROW_SYMBOLS %}on{% endif %}" id="separate-row" onclick="this.classList.toggle('on')"><div class="knob"></div></button>
+    </div>
+    <small style="color: #999;">开启后同时使用换行符和反斜线分隔；关闭时仅使用反斜线</small>
+
+    <div class="switch-row">
+        <label>强制移除括号及其内容</label>
+        <button class="toggle {% if config.REMOVE_PARENTHESES %}on{% endif %}" id="remove-paren" onclick="this.classList.toggle('on')"><div class="knob"></div></button>
+    </div>
+    <small style="color: #999;">开启后自动删除 AI 回复中括号内的内容（如心理、动作描述）</small>
+
+    <div class="save-bar">
+        <button class="save-btn" onclick="saveInterval()">保存</button>
+        <span class="save-status" id="interval-status"></span>
+    </div>
+</div>
+
+<!-- ===== 2. 主动表情包 ===== -->
+<div class="section-card">
+    <h2>主动表情包</h2>
+
+    <div class="switch-row">
+        <label>启用主动表情包</label>
+        <button class="toggle {% if config.ENABLE_EMOJI_SENDING %}on{% endif %}" id="emoji-send-enable" onclick="this.classList.toggle('on')"><div class="knob"></div></button>
+    </div>
+
+    <div class="field">
+        <label>触发概率（0-100）</label>
+        <input type="number" id="emoji-prob" step="1" min="0" max="100" value="{{ config.EMOJI_SENDING_PROBABILITY }}">
+    </div>
+
+    <div class="field">
+        <label>表情包存放目录</label>
+        <input type="text" id="emoji-dir" value="{{ config.EMOJI_DIR }}">
+    </div>
+
+    <div class="save-bar">
+        <button class="save-btn" onclick="saveEmoji()">保存</button>
+        <span class="save-status" id="emoji-status"></span>
+    </div>
+</div>
+
+<!-- ===== 3. 主动消息 ===== -->
+<div class="section-card">
+    <h2>主动消息</h2>
+
+    <div class="switch-row">
+        <label>启用主动消息</label>
+        <button class="toggle {% if config.ENABLE_AUTO_MESSAGE %}on{% endif %}" id="auto-msg-enable" onclick="this.classList.toggle('on')"><div class="knob"></div></button>
+    </div>
+
+    <div class="field">
+        <label>主动消息内容（发送给 AI 获取回复）</label>
+        <input type="text" id="auto-msg-content" value="{{ config.AUTO_MESSAGE }}">
+    </div>
+
+    <div class="field">
+        <label>触发时间间隔（小时）</label>
+        <div class="range-row">
+            <input type="number" id="auto-msg-min" step="0.01" value="{{ config.MIN_COUNTDOWN_HOURS }}">
+            <span>至</span>
+            <input type="number" id="auto-msg-max" step="0.01" value="{{ config.MAX_COUNTDOWN_HOURS }}">
+        </div>
+    </div>
+
+    <div class="field">
+        <label>安静时间段</label>
+        <div class="range-row">
+            <input type="text" id="quiet-start" value="{{ config.QUIET_TIME_START }}" placeholder="HH:MM">
+            <span>至</span>
+            <input type="text" id="quiet-end" value="{{ config.QUIET_TIME_END }}" placeholder="HH:MM">
+        </div>
+        <small>此时间段内不发送主动消息</small>
+    </div>
+
+    <div class="switch-row">
+        <label>忽略群聊主动消息</label>
+        <button class="toggle {% if config.IGNORE_GROUP_CHAT_FOR_AUTO_MESSAGE %}on{% endif %}" id="ignore-group" onclick="this.classList.toggle('on')"><div class="knob"></div></button>
+    </div>
+
+    <div class="save-bar">
+        <button class="save-btn" onclick="saveAutoMsg()">保存</button>
+        <span class="save-status" id="auto-msg-status"></span>
+    </div>
+</div>
+
+<!-- ===== 4. 定时器与提醒 ===== -->
+<div class="section-card">
+    <h2>定时器与提醒</h2>
+
+    <div class="switch-row">
+        <label>启用定时提醒</label>
+        <button class="toggle {% if config.ENABLE_REMINDERS %}on{% endif %}" id="reminder-enable" onclick="this.classList.toggle('on')"><div class="knob"></div></button>
+    </div>
+
+    <div class="switch-row">
+        <label>允许在安静时间内发送提醒</label>
+        <button class="toggle {% if config.ALLOW_REMINDERS_IN_QUIET_TIME %}on{% endif %}" id="reminder-quiet" onclick="this.classList.toggle('on')"><div class="knob"></div></button>
+    </div>
+
+    <div class="switch-row">
+        <label>使用语音通话提醒（仅私聊）</label>
+        <button class="toggle {% if config.USE_VOICE_CALL_FOR_REMINDERS %}on{% endif %}" id="reminder-voice" onclick="this.classList.toggle('on')"><div class="knob"></div></button>
+    </div>
+
+    <div class="switch-row">
+        <label>启用已读不回检测</label>
+        <button class="toggle {% if config.ENABLE_IGNORE_DETECTION %}on{% endif %}" id="ignore-detect" onclick="this.classList.toggle('on')"><div class="knob"></div></button>
+    </div>
+
+    <div class="field">
+        <label>已读不回触发拍一拍次数</label>
+        <input type="number" id="ignore-threshold" min="1" value="{{ config.IGNORE_PAT_THRESHOLD }}">
+        <small>连续多少次已读不回后触发拍一拍</small>
+    </div>
+
+    <div class="save-bar">
+        <button class="save-btn" onclick="saveReminder()">保存</button>
+        <span class="save-status" id="reminder-status"></span>
+    </div>
+</div>
+
+<script>
+function saveFields(fields, statusId) {
+    const s = document.getElementById(statusId);
+    s.textContent = '保存中...'; s.style.color = '#999';
+    fetch('/api/save_section', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ fields }) })
+    .then(r => { if (!r.ok) return r.text().then(t => { throw new Error(t.substring(0,80)); }); return r.json(); })
+    .then(d => {
+        if (d.error) { s.textContent = '❌ ' + d.error; s.style.color = '#ff3b30'; }
+        else { s.textContent = '✅ 已保存'; s.style.color = '#34c759'; setTimeout(() => s.textContent = '', 3000); }
+    })
+    .catch(e => { s.textContent = '❌ ' + e.message; s.style.color = '#ff3b30'; });
+}
+
+function saveInterval() {
+    saveFields({
+        AVERAGE_TYPING_SPEED: document.getElementById('avg-speed').value,
+        RANDOM_TYPING_SPEED_MIN: document.getElementById('rand-speed-min').value,
+        RANDOM_TYPING_SPEED_MAX: document.getElementById('rand-speed-max').value,
+        QUEUE_WAITING_TIME: document.getElementById('queue-wait').value,
+        SEPARATE_ROW_SYMBOLS: document.getElementById('separate-row').classList.contains('on'),
+        REMOVE_PARENTHESES: document.getElementById('remove-paren').classList.contains('on'),
+    }, 'interval-status');
+}
+
+function saveEmoji() {
+    saveFields({
+        ENABLE_EMOJI_SENDING: document.getElementById('emoji-send-enable').classList.contains('on'),
+        EMOJI_SENDING_PROBABILITY: document.getElementById('emoji-prob').value,
+        EMOJI_DIR: document.getElementById('emoji-dir').value.trim(),
+    }, 'emoji-status');
+}
+
+function saveAutoMsg() {
+    saveFields({
+        ENABLE_AUTO_MESSAGE: document.getElementById('auto-msg-enable').classList.contains('on'),
+        AUTO_MESSAGE: document.getElementById('auto-msg-content').value,
+        MIN_COUNTDOWN_HOURS: document.getElementById('auto-msg-min').value,
+        MAX_COUNTDOWN_HOURS: document.getElementById('auto-msg-max').value,
+        QUIET_TIME_START: document.getElementById('quiet-start').value.trim(),
+        QUIET_TIME_END: document.getElementById('quiet-end').value.trim(),
+        IGNORE_GROUP_CHAT_FOR_AUTO_MESSAGE: document.getElementById('ignore-group').classList.contains('on'),
+    }, 'auto-msg-status');
+}
+
+function saveReminder() {
+    saveFields({
+        ENABLE_REMINDERS: document.getElementById('reminder-enable').classList.contains('on'),
+        ALLOW_REMINDERS_IN_QUIET_TIME: document.getElementById('reminder-quiet').classList.contains('on'),
+        USE_VOICE_CALL_FOR_REMINDERS: document.getElementById('reminder-voice').classList.contains('on'),
+        ENABLE_IGNORE_DETECTION: document.getElementById('ignore-detect').classList.contains('on'),
+        IGNORE_PAT_THRESHOLD: document.getElementById('ignore-threshold').value,
+    }, 'reminder-status');
+}
+</script>
+
+</body>
+</html>
