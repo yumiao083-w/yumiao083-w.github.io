@@ -174,6 +174,42 @@
     </div>
 </div>
 
+<!-- ===== 5. 短期记忆配置 ===== -->
+<div class="section-card">
+    <h2>短期记忆</h2>
+    <small style="color: #999; display: block; margin-bottom: 12px;">每天定时生成，最近 N 天注入对话，过期自动沉淀为长期记忆</small>
+
+    <div class="switch-row">
+        <label>启用短期记忆</label>
+        <button class="toggle {{ 'on' if config.ENABLE_SHORT_TERM_MEMORY else '' }}" id="stm-enable" onclick="this.classList.toggle('on')"><span class="knob"></span></button>
+    </div>
+
+    <div class="field">
+        <label>每日生成时间</label>
+        <input type="time" id="stm-time" value="{{ config.SHORT_TERM_MEMORY_TIME or '02:00' }}" style="width:140px;">
+        <small>凌晨执行，总结前一天的对话</small>
+    </div>
+
+    <div class="field">
+        <label>保留天数</label>
+        <div class="slider-combo">
+            <input type="range" min="1" max="7" value="{{ config.SHORT_TERM_MEMORY_DAYS or 3 }}" id="stm-days-slider" oninput="document.getElementById('stm-days-val').value=this.value">
+            <input type="number" min="1" max="7" value="{{ config.SHORT_TERM_MEMORY_DAYS or 3 }}" id="stm-days-val" style="width:60px;" oninput="document.getElementById('stm-days-slider').value=this.value">
+        </div>
+        <small>超出天数的记忆由 AI 判断是否升级为长期记忆</small>
+    </div>
+
+    <div class="switch-row">
+        <label>生成时注入人设预设</label>
+        <button class="toggle {{ 'on' if config.SHORT_TERM_INJECT_PERSONA else '' }}" id="stm-persona" onclick="this.classList.toggle('on')"><span class="knob"></span></button>
+    </div>
+
+    <div class="save-bar">
+        <button class="save-btn" onclick="saveStm()">保存</button>
+        <span class="save-status" id="stm-status"></span>
+    </div>
+</div>
+
 <!-- 编辑弹窗 -->
 <div class="modal-overlay" id="edit-modal">
     <div class="modal-box">
@@ -585,6 +621,16 @@ document.getElementById('edit-modal').addEventListener('click', function(e) {
 });
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// ===== 5. 短期记忆配置保存 =====
+function saveStm() {
+    saveFields({
+        ENABLE_SHORT_TERM_MEMORY: document.getElementById('stm-enable').classList.contains('on'),
+        SHORT_TERM_MEMORY_TIME: document.getElementById('stm-time').value || '02:00',
+        SHORT_TERM_MEMORY_DAYS: parseInt(document.getElementById('stm-days-val').value) || 3,
+        SHORT_TERM_INJECT_PERSONA: document.getElementById('stm-persona').classList.contains('on'),
+    }, 'stm-status');
+}
 
 // ===== 初始化 =====
 loadContextUsers();
