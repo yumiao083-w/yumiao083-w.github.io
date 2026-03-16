@@ -6572,14 +6572,10 @@ def send_heartbeat():
 def heartbeat_thread_func():
     """心跳线程, 定期发送心跳，并检查配置文件变更"""
     logger.info(f"机器人心跳线程启动 (PID: {os.getpid()}), 每 {HEARTBEAT_INTERVAL} 秒发送一次心跳.")
-    config_check_counter = 0
     while True:
         send_heartbeat()
-        # 每 6 次心跳（约30秒）检查一次 config.py 是否被修改
-        config_check_counter += 1
-        if config_check_counter >= 6:
-            config_check_counter = 0
-            check_config_reload()
+        # 每次心跳都检查 config.py 是否被修改
+        check_config_reload()
         time.sleep(HEARTBEAT_INTERVAL)
 
 # 保存用户计时器状态的函数

@@ -483,7 +483,7 @@ function renderEntries() {
             <div class="entry-summary">${esc(e.summary || '(无概要)')}</div>
             <div class="entry-event">${esc(e.event || '')}</div>
             <div class="entry-actions">
-                <button class="btn-edit" onclick="viewEntry(${e.id})">查看详情</button>
+                <button class="btn-edit" onclick="viewEntry(${e.id})">编辑</button>
                 <button class="btn-del" onclick="deleteEntry(${e.id})">删除</button>
             </div>
         `;
@@ -501,7 +501,42 @@ function viewEntry(id) {
     const entry = allEntries.find(e => e.id === id);
     if (!entry) return;
     const text = `ID: ${entry.id}\n日期: ${entry.date}\n事件: ${entry.event}\n概要: ${entry.summary}\n\n--- 详细内容 ---\n${entry.content || '(无)'}\n\n--- 备忘录 ---\n${entry.memo || '(无)'}`;
-    openModal('记忆 #' + id, text, null);  // 只读
+    openModal('编辑记忆 #' + id, text, function(newText) {
+        // 解析编辑后的文本，回写到 entry
+        const lines = newText.split('\n');
+        let section = 'header';
+        let contentLines = [];
+        let memoLines = [];
+        for (const line of lines) {
+            if (line.trim() === '--- 详细内容 ---') { section = 'content'; continue; }
+            if (line.trim() === '--- 备忘录 ---') { section = 'memo'; continue; }
+            if (section === 'header') {
+                const m = line.match(/^日期:\s*(.*)$/);
+                if (m) { entry.date = m[1].trim(); continue; }
+                const m2 = line.match(/^事件:\s*(.*)$/);
+                if (m2) { entry.event = m2[1].trim(); continue; }
+                const m3 = line.match(/^概要:\s*(.*)$/);
+                if (m3) { entry.summary = m3[1].trim(); continue; }
+            } else if (section === 'content') {
+                contentLines.push(line);
+            } else if (section === 'memo') {
+                memoLines.push(line);
+            }
+        }
+        const contentText = contentLines.join('\n').trim();
+        const memoText = memoLines.join('\n').trim();
+        if (contentText && contentText !== '(无)') entry.content = contentText;
+        if (memoText && memoText !== '(无)') entry.memo = memoText;
+        
+        // 保存到后端
+        fetch('/api/memory_entries', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(allEntries)
+        })
+        .then(r => r.json())
+        .then(() => { renderEntries(); modalClose(); })
+        .catch(e => alert('保存失败: ' + e.message));
+    });
 }
 
 function deleteEntry(id) {
