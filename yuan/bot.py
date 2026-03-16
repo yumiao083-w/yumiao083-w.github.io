@@ -101,6 +101,65 @@ for entry in LISTEN_LIST:
     else:
         auto_message_mapping[entry[0]] = True  # 兼容旧版本，默认启用
 
+# config.py 热加载支持
+_config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.py')
+_config_last_mtime = os.path.getmtime(_config_path) if os.path.exists(_config_path) else 0
+
+def reload_listen_list():
+    """从 config.py 重新加载 LISTEN_LIST 及相关映射，无需重启 bot"""
+    global user_names, prompt_mapping, preset_mapping, auto_message_mapping, _config_last_mtime
+    try:
+        config_vars = {}
+        with open(_config_path, 'r', encoding='utf-8') as f:
+            exec(f.read(), config_vars)
+        new_list = config_vars.get('LISTEN_LIST', [])
+        if not new_list:
+            logger.warning("热加载: config.py 中 LISTEN_LIST 为空，跳过更新")
+            return False
+        
+        old_names = set(user_names)
+        user_names.clear()
+        user_names.extend([entry[0] for entry in new_list])
+        
+        prompt_mapping.clear()
+        prompt_mapping.update({entry[0]: entry[1] for entry in new_list})
+        
+        preset_mapping.clear()
+        for entry in new_list:
+            if len(entry) >= 4 and entry[3]:
+                preset_mapping[entry[0]] = entry[3]
+        
+        auto_message_mapping.clear()
+        for entry in new_list:
+            if len(entry) >= 3:
+                auto_message_mapping[entry[0]] = entry[2]
+            else:
+                auto_message_mapping[entry[0]] = True
+        
+        _config_last_mtime = os.path.getmtime(_config_path)
+        new_names = set(user_names)
+        added = new_names - old_names
+        removed = old_names - new_names
+        changes = []
+        if added: changes.append(f"新增: {added}")
+        if removed: changes.append(f"移除: {removed}")
+        logger.info(f"热加载 LISTEN_LIST 成功: {len(new_list)} 个用户. {'; '.join(changes) if changes else '无变化'}")
+        return True
+    except Exception as e:
+        logger.error(f"热加载 LISTEN_LIST 失败: {e}")
+        return False
+
+def check_config_reload():
+    """检查 config.py 是否被修改，如果是则热加载"""
+    global _config_last_mtime
+    try:
+        current_mtime = os.path.getmtime(_config_path)
+        if current_mtime > _config_last_mtime:
+            logger.info(f"检测到 config.py 已修改 (mtime: {_config_last_mtime} → {current_mtime})，开始热加载...")
+            reload_listen_list()
+    except Exception as e:
+        logger.debug(f"检查 config.py 修改时间失败: {e}")
+
 
 # 持续监听消息, 并且收到消息后回复
 wait = 1  # 设置1秒查看一次是否有新消息
@@ -6511,10 +6570,16 @@ def send_heartbeat():
 
 # 心跳线程函数
 def heartbeat_thread_func():
-    """心跳线程, 定期发送心跳"""
+    """心跳线程, 定期发送心跳，并检查配置文件变更"""
     logger.info(f"机器人心跳线程启动 (PID: {os.getpid()}), 每 {HEARTBEAT_INTERVAL} 秒发送一次心跳.")
+    config_check_counter = 0
     while True:
         send_heartbeat()
+        # 每 6 次心跳（约30秒）检查一次 config.py 是否被修改
+        config_check_counter += 1
+        if config_check_counter >= 6:
+            config_check_counter = 0
+            check_config_reload()
         time.sleep(HEARTBEAT_INTERVAL)
 
 # 保存用户计时器状态的函数
