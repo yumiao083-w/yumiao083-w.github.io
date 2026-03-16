@@ -170,6 +170,18 @@ def _load_persona(user_id):
     return persona, preset, prompt_name
 
 
+def _get_role_and_key(user_id):
+    """获取用户的角色名和 memory_key，不直接 import bot 避免循环依赖"""
+    from config import LISTEN_LIST
+    role_name = user_id
+    for entry in LISTEN_LIST:
+        if entry[0] == user_id:
+            role_name = entry[1]
+            break
+    user_key = f"{user_id}_{role_name}"
+    return role_name, user_key
+
+
 def generate_short_term_memory(user_id, target_date=None):
     """
     生成指定日期的短期记忆
@@ -192,10 +204,8 @@ def generate_short_term_memory(user_id, target_date=None):
     if target_date is None:
         target_date = datetime.now().strftime('%Y-%m-%d')
     
-    # 获取 user_key
-    from bot import prompt_mapping, get_user_memory_key
-    role_name = prompt_mapping.get(user_id, user_id)
-    user_key = get_user_memory_key(user_id)
+    # 获取 user_key（不 import bot，避免循环依赖）
+    role_name, user_key = _get_role_and_key(user_id)
     
     # 检查是否已经生成过
     existing = _load_short_term(user_key, target_date)
@@ -320,9 +330,7 @@ def get_short_term_prompt(user_id):
     if not ENABLE_SHORT_TERM_MEMORY:
         return ""
     
-    from bot import prompt_mapping, get_user_memory_key
-    role_name = prompt_mapping.get(user_id, user_id)
-    user_key = get_user_memory_key(user_id)
+    role_name, user_key = _get_role_and_key(user_id)
     
     days = SHORT_TERM_MEMORY_DAYS
     today = datetime.now()
@@ -374,9 +382,7 @@ def settle_expired_memory(user_id):
     if not ENABLE_SHORT_TERM_MEMORY:
         return False
     
-    from bot import prompt_mapping, get_user_memory_key
-    role_name = prompt_mapping.get(user_id, user_id)
-    user_key = get_user_memory_key(user_id)
+    role_name, user_key = _get_role_and_key(user_id)
     
     days = SHORT_TERM_MEMORY_DAYS
     today = datetime.now()
