@@ -533,12 +533,18 @@ def submit_config():
         
         processed_listen_list = []
         if nicknames_from_form and prompt_files_from_form and len(nicknames_from_form) == len(prompt_files_from_form):
+            # 读取旧配置中的 preset 映射，旧前端不编辑 preset，保存时保留原值
+            old_preset_map = {}
+            for entry in current_config_before_update.get('LISTEN_LIST', []):
+                if len(entry) >= 4 and entry[3]:
+                    old_preset_map[entry[0]] = entry[3]
             for i, (nick, pf) in enumerate(zip(nicknames_from_form, prompt_files_from_form)):
                 nick_stripped = nick.strip()
                 pf_stripped = pf.strip()
                 if nick_stripped and pf_stripped: 
                     auto_enabled = 'auto_msg_' + str(i) in auto_message_flags
-                    processed_listen_list.append([nick_stripped, pf_stripped, auto_enabled])
+                    preset = old_preset_map.get(nick_stripped, '')
+                    processed_listen_list.append([nick_stripped, pf_stripped, auto_enabled, preset])
         new_values_for_config_py['LISTEN_LIST'] = processed_listen_list
         
         new_listen_list_map = {item[0]: item[1] for item in processed_listen_list}
@@ -1037,15 +1043,25 @@ def index():
             config = parse_config()
             new_values = {}
 
-             # 处理二维数组的LISTEN_LIST
+             # 处理二维数组的LISTEN_LIST（兼容4元素格式，保留preset字段）
             nicknames = request.form.getlist('nickname')
             prompt_files = request.form.getlist('prompt_file')
             auto_message_flags = request.form.getlist('auto_message_enabled')
-            new_values['LISTEN_LIST'] = [
-                [nick.strip(), pf.strip(), 'auto_msg_' + str(i) in auto_message_flags] 
-                for i, (nick, pf) in enumerate(zip(nicknames, prompt_files)) 
-                if nick.strip() and pf.strip()
-            ]
+            # 读取当前配置中的 preset 映射，旧前端不编辑 preset，保存时保留原值
+            old_config = parse_config()
+            old_preset_map = {}
+            for entry in old_config.get('LISTEN_LIST', []):
+                if len(entry) >= 4 and entry[3]:
+                    old_preset_map[entry[0]] = entry[3]
+            new_listen_list = []
+            for i, (nick, pf) in enumerate(zip(nicknames, prompt_files)):
+                nick = nick.strip()
+                pf = pf.strip()
+                if nick and pf:
+                    auto = 'auto_msg_' + str(i) in auto_message_flags
+                    preset = old_preset_map.get(nick, '')
+                    new_listen_list.append([nick, pf, auto, preset])
+            new_values['LISTEN_LIST'] = new_listen_list
 
             # 处理其他字段
             submitted_fields = set(request.form.keys()) - {'listen_list'} # listen_list 已处理
@@ -1150,7 +1166,19 @@ def index():
         prompt_files_dir = 'prompts'
         if not os.path.exists(prompt_files_dir):
             os.makedirs(prompt_files_dir)
-        prompt_files = [f[:-3] for f in os.listdir(prompt_files_dir) if f.endswith('.md')]
+        # 扫描根目录 + characters/ 子目录的 .md 文件（去重）
+        prompt_files_set = set()
+        # 根目录
+        for f in os.listdir(prompt_files_dir):
+            if f.endswith('.md') and os.path.isfile(os.path.join(prompt_files_dir, f)):
+                prompt_files_set.add(f[:-3])
+        # characters/ 子目录
+        char_dir = os.path.join(prompt_files_dir, 'characters')
+        if os.path.isdir(char_dir):
+            for f in os.listdir(char_dir):
+                if f.endswith('.md'):
+                    prompt_files_set.add(f[:-3])
+        prompt_files = sorted(prompt_files_set)
         config = parse_config() # 重新解析以获取最新配置
         # --- 新增：加载动态设置并合并到主配置中 ---
         dynamic_settings = parse_dynamic_settings()
@@ -1189,7 +1217,15 @@ def edit_prompt(filename):
     # 注意：前端JS在调用此接口时，filename参数应该是包含.md的
     # 所以这里的safe_filename应该针对传入的filename
     processed_filename = safe_filename(filename) 
-    filepath = os.path.join(safe_dir, processed_filename)
+    # 搜索优先级: characters/ 子目录 → 根目录
+    filepath = None
+    for search_dir in [os.path.join(safe_dir, 'characters'), safe_dir]:
+        candidate = os.path.join(search_dir, processed_filename)
+        if os.path.exists(candidate):
+            filepath = candidate
+            break
+    if filepath is None:
+        filepath = os.path.join(safe_dir, processed_filename)  # 默认路径，用于新建
 
     if request.method == 'POST':
         content = request.form.get('content', '')
@@ -1198,7 +1234,8 @@ def edit_prompt(filename):
         if not new_filename_from_form.endswith('.md'):
             new_filename_from_form += '.md'
         new_filename_safe = safe_filename(new_filename_from_form)
-        new_filepath = os.path.join(safe_dir, new_filename_safe)
+        # 重命名时保持在原文件所在的目录
+        new_filepath = os.path.join(os.path.dirname(filepath), new_filename_safe)
 
         try:
             # 如果文件名改变了
@@ -1269,9 +1306,16 @@ def create_prompt():
 @login_required
 def delete_prompt(filename):
     safe_dir = os.path.abspath('prompts')
-    filepath = os.path.join(safe_dir, safe_filename(filename))
+    processed = safe_filename(filename)
+    # 搜索根目录和 characters/ 子目录
+    filepath = None
+    for search_dir in [safe_dir, os.path.join(safe_dir, 'characters')]:
+        candidate = os.path.join(search_dir, processed)
+        if os.path.isfile(candidate) and candidate.startswith(safe_dir):
+            filepath = candidate
+            break
     
-    if os.path.isfile(filepath) and filepath.startswith(safe_dir):
+    if filepath:
         try:
             os.remove(filepath)
             return '', 204
