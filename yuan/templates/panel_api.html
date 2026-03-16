@@ -36,11 +36,11 @@
         .slider-combo input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #007aff; cursor: pointer; }
         .slider-combo input[type="number"] { width: 70px; padding: 6px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; text-align: center; }
         /* 中转站卡片 */
-        .provider-card { background: #f8f8fa; border: 1px solid #e8e8ea; border-radius: 10px; padding: 14px; margin-bottom: 8px; cursor: grab; transition: box-shadow 0.2s; }
+        .provider-card { background: #f8f8fa; border: 1px solid #e8e8ea; border-radius: 10px; padding: 14px; margin-bottom: 8px; transition: box-shadow 0.2s; }
         .provider-card.dragging { opacity: 0.5; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .provider-card.drag-over { border-top: 3px solid #007aff; }
         .provider-card .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .provider-card .drag-handle { font-size: 16px; color: #ccc; cursor: grab; user-select: none; }
+        .provider-card .drag-handle { font-size: 16px; color: #ccc; cursor: grab; user-select: none; padding: 8px; touch-action: none; }
         .provider-card .card-title { font-weight: 600; font-size: 14px; flex: 1; margin: 0 10px; }
         .provider-card .remove-btn { background: #ff3b30; color: white; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
         .provider-card .card-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -317,7 +317,6 @@ function renderProviders(area) {
     providers.forEach((p, idx) => {
         const card = document.createElement('div');
         card.className = 'provider-card';
-        card.draggable = true;
         card.dataset.idx = idx;
         card.dataset.area = area;
         card.innerHTML = `
@@ -343,8 +342,14 @@ function renderProviders(area) {
                 </div>
             </div>
         `;
+
+        // === 拖拽：仅通过 ☰ 手柄触发 ===
+        const handle = card.querySelector('.drag-handle');
+
+        // 桌面端：只有从手柄开始才允许拖拽
+        handle.addEventListener('mousedown', () => { card.draggable = true; });
         card.addEventListener('dragstart', () => { dragState = {area, idx}; card.classList.add('dragging'); });
-        card.addEventListener('dragend', () => card.classList.remove('dragging'));
+        card.addEventListener('dragend', () => { card.draggable = false; card.classList.remove('dragging'); });
         card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('drag-over'); });
         card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
         card.addEventListener('drop', e => {
@@ -356,6 +361,45 @@ function renderProviders(area) {
             }
             dragState = {area: null, idx: null};
         });
+
+        // 移动端：手柄 touch 拖拽
+        handle.addEventListener('touchstart', e => {
+            e.preventDefault();
+            dragState = {area, idx};
+            card.classList.add('dragging');
+        }, {passive: false});
+        handle.addEventListener('touchmove', e => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const target = document.elementFromPoint(touch.clientX, touch.clientY);
+            // 清除所有 drag-over
+            list.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+            if (target) {
+                const overCard = target.closest('.provider-card');
+                if (overCard && overCard !== card && overCard.dataset.area === area) {
+                    overCard.classList.add('drag-over');
+                }
+            }
+        }, {passive: false});
+        handle.addEventListener('touchend', e => {
+            card.classList.remove('dragging');
+            const touch = e.changedTouches[0];
+            const target = document.elementFromPoint(touch.clientX, touch.clientY);
+            list.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+            if (target) {
+                const overCard = target.closest('.provider-card');
+                if (overCard && overCard !== card && overCard.dataset.area === area) {
+                    const toIdx = parseInt(overCard.dataset.idx);
+                    if (dragState.idx !== null && dragState.idx !== toIdx) {
+                        const item = providerData[area].splice(dragState.idx, 1)[0];
+                        providerData[area].splice(toIdx, 0, item);
+                        renderProviders(area);
+                    }
+                }
+            }
+            dragState = {area: null, idx: null};
+        });
+
         list.appendChild(card);
     });
 }
