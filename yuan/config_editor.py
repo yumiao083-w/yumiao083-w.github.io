@@ -350,7 +350,7 @@ def delete_prompt_file(area, filename):
 @login_required
 def panel(name):
     """子页面路由"""
-    valid_panels = ['api', 'reply', 'chat', 'memory', 'settings']
+    valid_panels = ['api', 'reply', 'chat', 'memory', 'settings', 'notes']
     if name not in valid_panels:
         return redirect(url_for('home'))
     config = parse_config()
@@ -3596,3 +3596,142 @@ if __name__ == '__main__':
     Timer(1, open_browser).start()  # 延迟1秒确保服务器已启动
     
     app.run(host="0.0.0.0", debug=False, port=PORT)
+
+
+# ===== 短期记忆 API =====
+
+@app.route('/api/short_term/list', methods=['GET'])
+@login_required
+def api_short_term_list():
+    """列出所有用户的短期记忆日期和状态"""
+    try:
+        config = parse_config()
+        listen_list = config.get('LISTEN_LIST', [])
+        result = {}
+        
+        daily_dir = config.get('MEMORY_DAILY_DIR', 'Memory_Daily')
+        st_dir = config.get('SHORT_TERM_MEMORY_DIR', 'short_term')
+        
+        for entry in listen_list:
+            user = entry[0]
+            role = entry[1] if len(entry) >= 2 else user
+            user_key = f"{user}_{role}"
+            
+            st_path = os.path.join(daily_dir, user_key, st_dir)
+            if not os.path.isdir(st_path):
+                result[user] = []
+                continue
+            
+            notes = []
+            for f in sorted(os.listdir(st_path), reverse=True):
+                if f.endswith('.json'):
+                    fp = os.path.join(st_path, f)
+                    try:
+                        with open(fp, 'r', encoding='utf-8') as fh:
+                            data = json.load(fh)
+                        notes.append({
+                            'date': f[:-5],
+                            'status': data.get('status', 'unknown'),
+                            'summary': (data.get('summary', '') or '')[:100],
+                            'event_count': len(data.get('events', []))
+                        })
+                    except:
+                        notes.append({'date': f[:-5], 'status': 'error', 'summary': '', 'event_count': 0})
+            result[user] = notes
+        
+        return jsonify(result)
+    except Exception as e:
+        app.logger.error(f"短期记忆列表失败: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/short_term/<user>/<date>', methods=['GET'])
+@login_required
+def api_short_term_get(user, date):
+    """获取某用户某天的短期记忆详情"""
+    try:
+        config = parse_config()
+        listen_list = config.get('LISTEN_LIST', [])
+        role = next((item[1] for item in listen_list if item[0] == user), user)
+        user_key = f"{user}_{role}"
+        
+        daily_dir = config.get('MEMORY_DAILY_DIR', 'Memory_Daily')
+        st_dir = config.get('SHORT_TERM_MEMORY_DIR', 'short_term')
+        fp = os.path.join(daily_dir, user_key, st_dir, f'{date}.json')
+        
+        if not os.path.exists(fp):
+            return jsonify({'error': '记录不存在'}), 404
+        
+        with open(fp, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/short_term/<user>/<date>', methods=['POST'])
+@login_required
+def api_short_term_save(user, date):
+    """保存编辑后的短期记忆"""
+    try:
+        config = parse_config()
+        listen_list = config.get('LISTEN_LIST', [])
+        role = next((item[1] for item in listen_list if item[0] == user), user)
+        user_key = f"{user}_{role}"
+        
+        daily_dir = config.get('MEMORY_DAILY_DIR', 'Memory_Daily')
+        st_dir = config.get('SHORT_TERM_MEMORY_DIR', 'short_term')
+        dir_path = os.path.join(daily_dir, user_key, st_dir)
+        os.makedirs(dir_path, exist_ok=True)
+        fp = os.path.join(dir_path, f'{date}.json')
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': '请求为空'}), 400
+        
+        with open(fp, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/short_term/<user>/<date>', methods=['DELETE'])
+@login_required
+def api_short_term_delete(user, date):
+    """删除某天的短期记忆"""
+    try:
+        config = parse_config()
+        listen_list = config.get('LISTEN_LIST', [])
+        role = next((item[1] for item in listen_list if item[0] == user), user)
+        user_key = f"{user}_{role}"
+        
+        daily_dir = config.get('MEMORY_DAILY_DIR', 'Memory_Daily')
+        st_dir = config.get('SHORT_TERM_MEMORY_DIR', 'short_term')
+        fp = os.path.join(daily_dir, user_key, st_dir, f'{date}.json')
+        
+        if os.path.exists(fp):
+            os.remove(fp)
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/short_term/generate', methods=['POST'])
+@login_required
+def api_short_term_generate():
+    """手动触发生成短期记忆"""
+    try:
+        data = request.get_json()
+        user = data.get('user')
+        date = data.get('date')
+        if not user:
+            return jsonify({'error': '缺少 user 参数'}), 400
+        
+        from short_term_memory import generate_short_term_memory
+        success = generate_short_term_memory(user, target_date=date)
+        return jsonify({'status': 'success' if success else 'failed'})
+    except Exception as e:
+        app.logger.error(f"手动生成短期记忆失败: {e}")
+        return jsonify({'error': str(e)}), 500

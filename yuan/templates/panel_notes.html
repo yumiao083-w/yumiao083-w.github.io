@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>备忘录</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f7; color: #1d1d1f; padding-bottom: 80px; }
+        .top-bar { position: sticky; top: 0; z-index: 100; background: rgba(245,245,247,0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); padding: 12px 16px; display: flex; align-items: center; border-bottom: 1px solid rgba(0,0,0,0.1); }
+        .back-btn { text-decoration: none; color: #007aff; font-size: 16px; }
+        .top-bar h1 { flex: 1; text-align: center; font-size: 17px; font-weight: 600; margin-right: 40px; }
+
+        .filter-bar { display: flex; gap: 8px; padding: 12px 16px; overflow-x: auto; }
+        .filter-btn { padding: 6px 14px; background: #e8e8ea; border: none; border-radius: 16px; font-size: 13px; color: #666; cursor: pointer; white-space: nowrap; }
+        .filter-btn.active { background: #007aff; color: white; }
+
+        .notes-list { padding: 0 16px; }
+        .note-card {
+            background: white; border-radius: 12px; padding: 16px; margin-bottom: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06); cursor: pointer; transition: box-shadow 0.2s;
+        }
+        .note-card:active { box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+        .note-card .note-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .note-card .note-date { font-size: 15px; font-weight: 600; }
+        .note-card .note-status { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+        .note-status.active { background: #e3f2fd; color: #1976d2; }
+        .note-status.archived { background: #f3e5f5; color: #7b1fa2; }
+        .note-status.discarded { background: #fbe9e7; color: #d84315; }
+        .note-card .note-summary { font-size: 14px; color: #555; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+        .note-card .note-events { font-size: 12px; color: #999; margin-top: 6px; }
+
+        .empty-hint { text-align: center; padding: 60px 20px; color: #bbb; font-size: 14px; }
+
+        /* 详情/编辑页 */
+        .detail-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 200;
+            background: #f5f5f7; transform: translateX(100%); transition: transform 0.3s ease;
+            overflow-y: auto;
+        }
+        .detail-overlay.show { transform: translateX(0); }
+        .detail-bar { position: sticky; top: 0; z-index: 201; background: rgba(245,245,247,0.85); backdrop-filter: blur(20px); padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(0,0,0,0.1); }
+        .detail-bar .back-link { color: #007aff; font-size: 16px; cursor: pointer; border: none; background: none; }
+        .detail-bar .save-link { color: #007aff; font-size: 16px; cursor: pointer; border: none; background: none; font-weight: 600; }
+        .detail-body { padding: 16px; }
+        .detail-body .section-title { font-size: 13px; font-weight: 600; color: #888; margin: 16px 0 8px 0; text-transform: uppercase; letter-spacing: 1px; }
+        .detail-body .section-title:first-child { margin-top: 0; }
+        .detail-body textarea {
+            width: 100%; border: 1px solid #e0e0e0; border-radius: 10px; padding: 12px; font-size: 15px;
+            line-height: 1.6; resize: vertical; background: white; font-family: inherit;
+        }
+        .detail-body textarea:focus { outline: none; border-color: #007aff; }
+        .detail-body .events-list { list-style: none; }
+        .detail-body .events-list li {
+            background: white; border: 1px solid #e8e8ea; border-radius: 8px; padding: 10px 12px;
+            margin-bottom: 6px; font-size: 14px; display: flex; align-items: flex-start; gap: 8px;
+        }
+        .detail-body .events-list li .num { color: #007aff; font-weight: 600; min-width: 20px; }
+        .detail-body .event-input { flex: 1; border: none; background: none; font-size: 14px; outline: none; font-family: inherit; }
+        .detail-actions { display: flex; gap: 8px; margin-top: 16px; }
+        .detail-actions button { flex: 1; padding: 12px; border: none; border-radius: 10px; font-size: 15px; cursor: pointer; }
+        .btn-add { background: #e3f2fd; color: #1976d2; }
+        .btn-delete { background: #fbe9e7; color: #d84315; }
+        .save-toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 24px; border-radius: 20px; font-size: 14px; display: none; z-index: 300; }
+    </style>
+</head>
+<body>
+
+<div class="top-bar">
+    <a href="/home" class="back-btn">← 返回</a>
+    <h1>📝 备忘录</h1>
+</div>
+
+<div class="filter-bar">
+    <button class="filter-btn active" onclick="setFilter('all')">全部</button>
+    <button class="filter-btn" onclick="setFilter('active')">近期</button>
+    <button class="filter-btn" onclick="setFilter('archived')">已沉淀</button>
+    <button class="filter-btn" onclick="setFilter('discarded')">已丢弃</button>
+</div>
+
+<div class="notes-list" id="notes-list">
+    <div class="empty-hint">加载中...</div>
+</div>
+
+<!-- 详情页 -->
+<div class="detail-overlay" id="detail-overlay">
+    <div class="detail-bar">
+        <button class="back-link" onclick="closeDetail()">← 返回</button>
+        <span id="detail-title" style="font-weight:600;font-size:15px;"></span>
+        <button class="save-link" onclick="saveDetail()">保存</button>
+    </div>
+    <div class="detail-body">
+        <div class="section-title">今日总结</div>
+        <textarea id="detail-summary" rows="6" placeholder="暂无总结"></textarea>
+
+        <div class="section-title">今日事件</div>
+        <ul class="events-list" id="detail-events"></ul>
+
+        <div class="detail-actions">
+            <button class="btn-add" onclick="addEvent()">+ 添加事件</button>
+            <button class="btn-delete" onclick="deleteNote()">删除此条</button>
+        </div>
+    </div>
+</div>
+
+<div class="save-toast" id="save-toast">✅ 已保存</div>
+
+<script>
+let allNotes = {};  // {user: [{date, status, summary, event_count}, ...]}
+let currentFilter = 'all';
+let currentUser = '';
+let currentDate = '';
+let currentData = null;
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
+
+function loadNotes() {
+    fetch('/api/short_term/list')
+        .then(r => r.json())
+        .then(data => {
+            allNotes = data;
+            // 取第一个有数据的用户
+            const users = Object.keys(data);
+            if (users.length > 0) currentUser = users[0];
+            renderNotes();
+        })
+        .catch(() => {
+            document.getElementById('notes-list').innerHTML = '<div class="empty-hint">加载失败</div>';
+        });
+}
+
+function setFilter(f) {
+    currentFilter = f;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+    renderNotes();
+}
+
+function renderNotes() {
+    const list = document.getElementById('notes-list');
+    const notes = allNotes[currentUser] || [];
+    
+    let filtered = notes;
+    if (currentFilter !== 'all') {
+        filtered = notes.filter(n => n.status === currentFilter);
+    }
+    
+    if (filtered.length === 0) {
+        list.innerHTML = '<div class="empty-hint">暂无备忘录<br><small style="color:#ccc">短期记忆会在每天定时自动生成</small></div>';
+        return;
+    }
+    
+    list.innerHTML = '';
+    filtered.forEach(n => {
+        const card = document.createElement('div');
+        card.className = 'note-card';
+        card.onclick = () => openDetail(currentUser, n.date);
+        
+        const statusText = {active: '近期', archived: '已沉淀', discarded: '已丢弃'}[n.status] || n.status;
+        
+        card.innerHTML = `
+            <div class="note-header">
+                <span class="note-date">${n.date}</span>
+                <span class="note-status ${n.status}">${statusText}</span>
+            </div>
+            <div class="note-summary">${esc(n.summary) || '<span style="color:#ccc">暂无内容</span>'}</div>
+            ${n.event_count ? '<div class="note-events">📌 ' + n.event_count + ' 条事件</div>' : ''}
+        `;
+        list.appendChild(card);
+    });
+}
+
+function openDetail(user, date) {
+    currentDate = date;
+    document.getElementById('detail-title').textContent = date;
+    document.getElementById('detail-summary').value = '';
+    document.getElementById('detail-events').innerHTML = '<li style="color:#bbb;text-align:center;border:none;">加载中...</li>';
+    document.getElementById('detail-overlay').classList.add('show');
+    
+    fetch(`/api/short_term/${encodeURIComponent(user)}/${date}`)
+        .then(r => r.json())
+        .then(data => {
+            currentData = data;
+            document.getElementById('detail-summary').value = data.summary || '';
+            renderEvents(data.events || []);
+        })
+        .catch(e => alert('加载失败: ' + e.message));
+}
+
+function renderEvents(events) {
+    const list = document.getElementById('detail-events');
+    list.innerHTML = '';
+    events.forEach((e, i) => {
+        const li = document.createElement('li');
+        li.innerHTML = `<span class="num">${i+1}.</span><input class="event-input" value="${esc(e)}" data-idx="${i}">
+            <button onclick="removeEvent(${i})" style="background:none;border:none;color:#ff3b30;font-size:16px;cursor:pointer;padding:0 4px;">×</button>`;
+        list.appendChild(li);
+    });
+}
+
+function addEvent() {
+    if (!currentData) return;
+    if (!currentData.events) currentData.events = [];
+    currentData.events.push('');
+    renderEvents(currentData.events);
+    // 聚焦最后一个输入框
+    const inputs = document.querySelectorAll('.event-input');
+    if (inputs.length > 0) inputs[inputs.length - 1].focus();
+}
+
+function removeEvent(idx) {
+    if (!currentData || !currentData.events) return;
+    currentData.events.splice(idx, 1);
+    renderEvents(currentData.events);
+}
+
+function saveDetail() {
+    if (!currentData) return;
+    
+    // 收集编辑后的数据
+    currentData.summary = document.getElementById('detail-summary').value;
+    const inputs = document.querySelectorAll('.event-input');
+    currentData.events = Array.from(inputs).map(inp => inp.value.trim()).filter(v => v);
+    
+    fetch(`/api/short_term/${encodeURIComponent(currentUser)}/${currentDate}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(currentData)
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.error) { alert('保存失败: ' + d.error); return; }
+        const toast = document.getElementById('save-toast');
+        toast.style.display = 'block';
+        setTimeout(() => toast.style.display = 'none', 2000);
+        // 刷新列表
+        loadNotes();
+    })
+    .catch(e => alert('保存失败: ' + e.message));
+}
+
+function deleteNote() {
+    if (!confirm(`确定删除 ${currentDate} 的备忘录？`)) return;
+    fetch(`/api/short_term/${encodeURIComponent(currentUser)}/${currentDate}`, { method: 'DELETE' })
+        .then(r => r.json())
+        .then(() => { closeDetail(); loadNotes(); })
+        .catch(e => alert('删除失败: ' + e.message));
+}
+
+function closeDetail() {
+    document.getElementById('detail-overlay').classList.remove('show');
+}
+
+// 初始化
+loadNotes();
+</script>
+
+</body>
+</html>

@@ -758,6 +758,16 @@ def get_user_prompt(user_id, retrieved_memories=None):
         final_prompt_parts.append(f"\n\n{retrieved_text}")
         logger.debug(f"用户 {user_id} 检索记忆已注入，{len(retrieved_memories)} 条")
 
+    # ========== 板块6: 短期记忆（最近N天） ==========
+    try:
+        from short_term_memory import get_short_term_prompt
+        short_term_text = get_short_term_prompt(user_id)
+        if short_term_text:
+            final_prompt_parts.append(f"\n\n{short_term_text}")
+            logger.debug(f"用户 {user_id} 短期记忆已注入，长度: {len(short_term_text)}")
+    except Exception as e:
+        logger.error(f"加载短期记忆失败: {e}")
+
     final_prompt = "".join(final_prompt_parts)
     logger.debug(f"用户 {user_id} 最终提示词长度: {len(final_prompt)}")
     
@@ -6548,6 +6558,44 @@ def scheduled_restart_checker():
         # 每分钟检查一次条件
         time.sleep(60)
 
+# 短期记忆定时任务调度器
+def short_term_memory_scheduler():
+    """每天到指定时间自动生成短期记忆 + 沉淀过期记忆"""
+    from config import SHORT_TERM_MEMORY_TIME
+    logger.info(f"短期记忆调度器启动，计划时间: 每天 {SHORT_TERM_MEMORY_TIME}")
+    
+    last_run_date = None
+    
+    while True:
+        try:
+            now = datetime.now()
+            today_str = now.strftime('%Y-%m-%d')
+            
+            # 解析目标时间
+            try:
+                target_hour, target_minute = map(int, SHORT_TERM_MEMORY_TIME.split(':'))
+            except:
+                target_hour, target_minute = 2, 0
+            
+            # 检查是否到了执行时间且今天还没执行过
+            if now.hour == target_hour and now.minute == target_minute and last_run_date != today_str:
+                last_run_date = today_str
+                logger.info("=== 短期记忆定时任务触发 ===")
+                
+                for user in user_names:
+                    try:
+                        from short_term_memory import daily_short_term_task
+                        daily_short_term_task(user)
+                    except Exception as e:
+                        logger.error(f"用户 {user} 短期记忆任务失败: {e}", exc_info=True)
+                
+                logger.info("=== 短期记忆定时任务完成 ===")
+        except Exception as e:
+            logger.error(f"短期记忆调度器异常: {e}")
+        
+        time.sleep(60)  # 每分钟检查一次
+
+
 # 发送心跳的函数
 def send_heartbeat():
     """向Flask后端发送心跳信号"""
@@ -6814,6 +6862,16 @@ def main():
         # 启动心跳线程
         heartbeat_th = threading.Thread(target=heartbeat_thread_func, name="BotHeartbeatThread", daemon=True)
         heartbeat_th.start()
+
+        # 启动短期记忆定时任务线程
+        try:
+            from config import ENABLE_SHORT_TERM_MEMORY
+            if ENABLE_SHORT_TERM_MEMORY:
+                short_term_th = threading.Thread(target=short_term_memory_scheduler, name="ShortTermMemoryScheduler", daemon=True)
+                short_term_th.start()
+                logger.info("短期记忆定时任务线程已启动.")
+        except Exception as e:
+            logger.error(f"启动短期记忆线程失败: {e}")
 
         logger.info("\033[32mBOT已成功启动并运行中...\033[0m")
 

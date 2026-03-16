@@ -6,150 +6,277 @@
     <title>yuan 控制台</title>
     <style id="custom-font-style"></style>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body {
-            font-family: var(--custom-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
-            min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
-            background: #1a1a2e; background-size: cover; background-position: center;
-            color: var(--text-color, #fff); overflow: hidden;
+        :root {
+            --bg-base: #0a0a0c;
+            /* 桌面字体颜色变量，受JS控制 */
+            --desktop-text: #e5e5e5; 
+            
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.05);
+            --icon-bg: linear-gradient(145deg, #1e1e20, #151516);
+            --hover-bg: linear-gradient(145deg, #262629, #1a1a1c);
         }
-        .clock-area { text-align: center; margin-bottom: 40px; user-select: none; }
-        .clock-time { font-size: 56px; font-weight: 200; letter-spacing: 2px; text-shadow: var(--text-shadow, 0 2px 10px rgba(0,0,0,0.3)); }
-        .clock-date { font-size: 16px; opacity: 0.7; margin-top: 4px; }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        body {
+            /* 默认字体改为现代黑体系列 (苹方, 微软雅黑等) */
+            font-family: var(--custom-font, -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif);
+            min-height: 100vh; 
+            display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+            padding: 8vh 0 6vh 0;
+            background-color: var(--bg-base);
+            color: var(--desktop-text); 
+            overflow-y: auto; overflow-x: hidden;
+            position: relative;
+        }
+
+        /* 动态背景效果 (背景缓慢流动的光影) */
+        .dynamic-bg {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: -1;
+            overflow: hidden; background: #050505;
+        }
+        .dynamic-bg::before, .dynamic-bg::after {
+            content: ''; position: absolute; width: 60vmax; height: 60vmax;
+            border-radius: 50%; filter: blur(80px); opacity: 0.5;
+            animation: float 20s infinite ease-in-out alternate;
+        }
+        .dynamic-bg::before { background: radial-gradient(circle, #1a1a20 0%, transparent 70%); top: -20%; left: -10%; }
+        .dynamic-bg::after { background: radial-gradient(circle, #151518 0%, transparent 70%); bottom: -20%; right: -10%; animation-delay: -10s; }
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(10%, 15%) scale(1.1); }
+        }
+        body.has-custom-bg .dynamic-bg { display: none; }
+        body.has-custom-bg { background-size: cover; background-position: center; }
+
+        /* 上部：时钟区域 */
+        .layout-top { flex: 0 0 auto; text-align: center; user-select: none; z-index: 1; }
+        .clock-time { font-size: 64px; font-weight: 300; letter-spacing: 2px; color: var(--desktop-text); }
+        .clock-date { font-size: 14px; font-weight: 400; letter-spacing: 2px; color: var(--desktop-text); opacity: 0.6; margin-top: 8px; }
+
+        /* 中部：照片区域 */
+        .layout-middle { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; width: 100%; z-index: 1; padding: 20px 0; }
+        .photo-widget {
+            width: 85%; max-width: 360px; height: 160px;
+            border-radius: 24px;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; background-size: cover; background-position: center; position: relative; overflow: hidden;
+            transition: border-color 0.3s, background 0.3s;
+        }
+        .photo-widget:hover { border-color: rgba(255,255,255,0.15); }
+        .photo-widget-hint { font-size: 14px; font-weight: 300; letter-spacing: 1px; color: var(--desktop-text); opacity: 0.4; }
+        .photo-widget.has-photo .photo-widget-hint { display: none; }
+
+        /* 下部：图标与开关区域 */
+        .layout-bottom { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; width: 100%; z-index: 1; }
+        
         .app-grid { display: grid; grid-template-columns: repeat(3, 80px); gap: 24px 32px; justify-content: center; margin-bottom: 40px; }
-        .app-icon { display: flex; flex-direction: column; align-items: center; cursor: pointer; text-decoration: none; color: inherit; user-select: none; transition: transform 0.15s; }
-        .app-icon:active { transform: scale(0.9); }
+        .app-icon { display: flex; flex-direction: column; align-items: center; cursor: pointer; text-decoration: none; color: inherit; user-select: none; }
+        
         .app-icon .icon-box {
-            width: 60px; height: 60px; border-radius: 16px; display: flex; align-items: center; justify-content: center;
-            font-size: 28px; margin-bottom: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.25); transition: box-shadow 0.2s;
+            width: 64px; height: 64px; border-radius: 18px; display: flex; align-items: center; justify-content: center;
+            margin-bottom: 10px; transition: background 0.3s ease;
+            background: var(--icon-bg); border: 1px solid var(--glass-border);
             background-size: cover; background-position: center; overflow: hidden; position: relative;
         }
-        .app-icon:hover .icon-box { box-shadow: 0 6px 20px rgba(0,0,0,0.35); }
-        .app-icon .icon-label { font-size: 11px; opacity: 0.9; text-shadow: var(--text-shadow, 0 1px 4px rgba(0,0,0,0.5)); white-space: nowrap; }
-        /* 自定义图标覆盖层 */
-        .icon-box.has-custom-img .icon-emoji { display: none; }
-        /* 默认渐变 */
-        .icon-api { background: linear-gradient(135deg, #667eea, #764ba2); }
-        .icon-reply { background: linear-gradient(135deg, #f093fb, #f5576c); }
-        .icon-chat { background: linear-gradient(135deg, #4facfe, #00f2fe); }
-        .icon-memory { background: linear-gradient(135deg, #43e97b, #38f9d7); }
-        .icon-settings { background: linear-gradient(135deg, #a8c0ff, #3f2b96); }
-        .icon-legacy { background: linear-gradient(135deg, #8e8e93, #636366); }
-        /* 长按编辑提示 */
+        .app-icon:hover .icon-box { background: var(--hover-bg); }
+        
+        .app-icon .icon-svg { width: 26px; height: 26px; fill: none; stroke: var(--desktop-text); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; opacity: 0.6; transition: opacity 0.3s; }
+        .app-icon:hover .icon-svg { opacity: 1; }
+        
+        .app-icon .icon-label { font-size: 12px; font-weight: 400; color: var(--desktop-text); letter-spacing: 0.5px; white-space: nowrap; opacity: 0.6; transition: opacity 0.3s; }
+        .app-icon:hover .icon-label { opacity: 1; }
+        .icon-box.has-custom-img .icon-svg { display: none; }
         .icon-box .edit-hint {
-            position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6);
-            display: none; align-items: center; justify-content: center; font-size: 12px; color: white; border-radius: 16px;
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(2px);
+            display: none; align-items: center; justify-content: center; font-size: 12px; color: #fff;
         }
+
         /* Bot 开关 */
-        .bot-switch-area { display: flex; align-items: center; gap: 12px; padding: 12px 24px; background: rgba(255,255,255,0.1); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 50px; border: 1px solid rgba(255,255,255,0.15); }
-        .bot-status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff4757; transition: background 0.3s; }
-        .bot-status-dot.running { background: #2ed573; }
-        .bot-status-text { font-size: 14px; min-width: 60px; }
-        .bot-toggle { position: relative; width: 50px; height: 28px; background: rgba(255,255,255,0.2); border-radius: 14px; cursor: pointer; transition: background 0.3s; border: none; outline: none; }
-        .bot-toggle.on { background: #2ed573; }
-        .bot-toggle .toggle-knob { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; background: white; border-radius: 50%; transition: left 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-        .bot-toggle.on .toggle-knob { left: 25px; }
+        .bot-switch-area { display: flex; align-items: center; gap: 14px; padding: 12px 28px; background: var(--glass-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-radius: 40px; border: 1px solid var(--glass-border); }
+        .bot-status-dot { width: 6px; height: 6px; border-radius: 50%; background: #444; transition: all 0.4s ease; }
+        .bot-status-dot.running { background: #dcdcdc; box-shadow: 0 0 8px rgba(255,255,255,0.6); }
+        .bot-status-text { font-size: 13px; font-weight: 400; color: var(--desktop-text); opacity: 0.6; min-width: 50px; text-align: center; transition: opacity 0.3s; }
+        .bot-status-dot.running + .bot-status-text { opacity: 1; }
+        
+        .bot-toggle { position: relative; width: 44px; height: 24px; background: #222; border-radius: 12px; cursor: pointer; transition: background 0.4s ease; border: 1px solid #333; outline: none; }
+        .bot-toggle.on { background: #dcdcdc; border-color: #dcdcdc; }
+        .bot-toggle .toggle-knob { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; background: #888; border-radius: 50%; transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1); }
+        .bot-toggle.on .toggle-knob { left: 22px; background: #111; }
+
         /* 设置按钮 */
-        .settings-btn { position: fixed; top: 16px; right: 16px; width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.15); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); color: inherit; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 100; }
-        /* 弹窗 */
-        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); z-index: 1000; align-items: center; justify-content: center; }
-        .modal.show { display: flex; }
-        .modal-content { background: #2d2d44; border-radius: 16px; padding: 24px; width: 340px; max-width: 90vw; max-height: 80vh; overflow-y: auto; color: #fff; }
-        .modal-content h3 { margin-bottom: 16px; font-size: 18px; }
-        .modal-content label { display: block; font-size: 13px; color: #aaa; margin-bottom: 4px; margin-top: 12px; }
-        .modal-content input[type="text"], .modal-content input[type="file"] { width: 100%; padding: 8px; border: 1px solid #444; border-radius: 8px; background: #1a1a2e; color: white; font-size: 14px; }
-        .modal-content select { width: 100%; padding: 8px; border: 1px solid #444; border-radius: 8px; background: #1a1a2e; color: white; font-size: 14px; }
-        .btn-row { display: flex; gap: 8px; margin-top: 16px; }
-        .btn-row button { flex: 1; padding: 10px; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; }
-        .btn-save { background: #667eea; color: white; }
-        .btn-cancel { background: #444; color: white; }
-        .btn-reset { background: #ff4757; color: white; }
-        .section-divider { border-top: 1px solid #444; margin: 16px 0 8px 0; }
+        .settings-btn { position: fixed; top: 24px; right: 24px; width: 40px; height: 40px; border-radius: 50%; background: transparent; border: 1px solid transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 100; transition: all 0.3s; }
+        .settings-btn:hover { background: var(--glass-bg); border-color: var(--glass-border); }
+        .settings-btn svg { width: 20px; height: 20px; stroke: var(--desktop-text); opacity: 0.6; fill: none; stroke-width: 1.5; transition: opacity 0.3s; }
+        .settings-btn:hover svg { opacity: 1; }
+
+        /* 弹窗样式 */
+        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; }
+        .modal.show { display: flex; opacity: 1; }
+        .modal-content { background: #121214; border: 1px solid #222; border-radius: 16px; padding: 28px; width: 340px; max-width: 90vw; max-height: 80vh; overflow-y: auto; color: #e5e5e5; box-shadow: 0 20px 40px rgba(0,0,0,0.8); transform: translateY(20px); transition: transform 0.3s; }
+        .modal.show .modal-content { transform: translateY(0); }
+        
+        .modal-content h3 { margin-bottom: 20px; font-size: 16px; font-weight: 400; color: #fff; letter-spacing: 1px; display: flex; align-items: center; gap: 8px; }
+        .modal-content label { display: block; font-size: 12px; font-weight: 300; color: #888; margin-bottom: 6px; margin-top: 16px; }
+        .modal-content input[type="text"], .modal-content input[type="file"] { width: 100%; padding: 10px 12px; border: 1px solid #2a2a2d; border-radius: 8px; background: #0a0a0c; color: #e5e5e5; font-size: 13px; outline: none; transition: border-color 0.3s; }
+        .modal-content input[type="text"]:focus { border-color: #555; }
+        .modal-content input[type="file"] { padding: 8px; color: #888; }
+        .modal-content input[type="file"]::file-selector-button { background: #222; border: none; color: #ddd; padding: 6px 12px; border-radius: 4px; cursor: pointer; transition: background 0.3s; margin-right: 10px; font-family: inherit; }
+        .modal-content input[type="file"]::file-selector-button:hover { background: #333; }
+        
+        .color-picker-row { display: flex; gap: 10px; align-items: center; }
+        .color-picker-row input[type="color"] { width: 44px; height: 38px; padding: 0; border: 1px solid #2a2a2d; border-radius: 8px; background: #0a0a0c; cursor: pointer; }
+        .color-picker-row input[type="text"] { flex: 1; }
+
+        .btn-row { display: flex; gap: 10px; margin-top: 24px; }
+        .btn-row button { flex: 1; padding: 10px; border: none; border-radius: 8px; font-size: 13px; font-weight: 400; cursor: pointer; transition: all 0.2s; letter-spacing: 0.5px; font-family: inherit; }
+        .btn-save { background: #ddd; color: #111; }
+        .btn-save:hover { background: #fff; }
+        .btn-cancel { background: #222; color: #aaa; }
+        .btn-cancel:hover { background: #333; color: #fff; }
+        .btn-reset { background: #2a1515; color: #d46b6b; }
+        .btn-reset:hover { background: #3a1c1c; color: #f28585; }
+        .section-divider { border-top: 1px solid #1f1f22; margin: 20px 0 8px 0; }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
     </style>
 </head>
 <body>
 
-<button class="settings-btn" onclick="openSettingsModal()">🎨</button>
+<div class="dynamic-bg"></div>
 
-<div class="clock-area">
+<!-- 设置按钮 -->
+<button class="settings-btn" onclick="openSettingsModal()">
+    <svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+</button>
+
+<!-- 顶部区域：时钟 -->
+<div class="layout-top">
     <div class="clock-time" id="clock-time">--:--</div>
     <div class="clock-date" id="clock-date"></div>
 </div>
 
-<div class="app-grid" id="app-grid">
-    <a class="app-icon" href="/panel/api">
-        <div class="icon-box icon-api" id="icon-api" oncontextmenu="return editIcon(event,'api')" ontouchstart="startLongPress('api')" ontouchend="cancelLongPress()">
-            <span class="icon-emoji">🔌</span><div class="edit-hint">换图标</div>
-        </div>
-        <span class="icon-label">API配置</span>
-    </a>
-    <a class="app-icon" href="/panel/reply">
-        <div class="icon-box icon-reply" id="icon-reply" oncontextmenu="return editIcon(event,'reply')" ontouchstart="startLongPress('reply')" ontouchend="cancelLongPress()">
-            <span class="icon-emoji">💬</span><div class="edit-hint">换图标</div>
-        </div>
-        <span class="icon-label">回复设置</span>
-    </a>
-    <a class="app-icon" href="/panel/chat">
-        <div class="icon-box icon-chat" id="icon-chat" oncontextmenu="return editIcon(event,'chat')" ontouchstart="startLongPress('chat')" ontouchend="cancelLongPress()">
-            <span class="icon-emoji">🎭</span><div class="edit-hint">换图标</div>
-        </div>
-        <span class="icon-label">聊天配置</span>
-    </a>
-    <a class="app-icon" href="/panel/memory">
-        <div class="icon-box icon-memory" id="icon-memory" oncontextmenu="return editIcon(event,'memory')" ontouchstart="startLongPress('memory')" ontouchend="cancelLongPress()">
-            <span class="icon-emoji">🧠</span><div class="edit-hint">换图标</div>
-        </div>
-        <span class="icon-label">记忆</span>
-    </a>
-    <a class="app-icon" href="/panel/settings">
-        <div class="icon-box icon-settings" id="icon-settings" oncontextmenu="return editIcon(event,'settings')" ontouchstart="startLongPress('settings')" ontouchend="cancelLongPress()">
-            <span class="icon-emoji">⚙️</span><div class="edit-hint">换图标</div>
-        </div>
-        <span class="icon-label">程序设置</span>
-    </a>
-    <a class="app-icon" href="/legacy">
-        <div class="icon-box icon-legacy" id="icon-legacy" oncontextmenu="return editIcon(event,'legacy')" ontouchstart="startLongPress('legacy')" ontouchend="cancelLongPress()">
-            <span class="icon-emoji">📋</span><div class="edit-hint">换图标</div>
-        </div>
-        <span class="icon-label">旧版配置</span>
-    </a>
+<!-- 中部区域：照片框 -->
+<div class="layout-middle">
+    <div class="photo-widget" id="photo-widget" onclick="openPhotoModal()">
+        <span class="photo-widget-hint">点击设置照片</span>
+    </div>
 </div>
 
-<div class="bot-switch-area">
-    <div class="bot-status-dot" id="bot-dot"></div>
-    <span class="bot-status-text" id="bot-text">检查中...</span>
-    <button class="bot-toggle" id="bot-toggle" onclick="toggleBot()"><div class="toggle-knob"></div></button>
+<!-- 底部区域：图标与运行开关 -->
+<div class="layout-bottom">
+    <div class="app-grid" id="app-grid">
+        <a class="app-icon" href="/panel/api">
+            <div class="icon-box" id="icon-api" oncontextmenu="return editIcon(event,'api')" ontouchstart="startLongPress('api')" ontouchend="cancelLongPress()">
+                <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                <div class="edit-hint">更换</div>
+            </div>
+            <span class="icon-label">API配置</span>
+        </a>
+        <a class="app-icon" href="/panel/reply">
+            <div class="icon-box" id="icon-reply" oncontextmenu="return editIcon(event,'reply')" ontouchstart="startLongPress('reply')" ontouchend="cancelLongPress()">
+                <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <div class="edit-hint">更换</div>
+            </div>
+            <span class="icon-label">回复设置</span>
+        </a>
+        <a class="app-icon" href="/panel/chat">
+            <div class="icon-box" id="icon-chat" oncontextmenu="return editIcon(event,'chat')" ontouchstart="startLongPress('chat')" ontouchend="cancelLongPress()">
+                <svg class="icon-svg" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="10.5" r="1.5"/><circle cx="15.5" cy="10.5" r="1.5"/><path d="M9 15c1 1 2 1 3 1s2 0 3-1"/></svg>
+                <div class="edit-hint">更换</div>
+            </div>
+            <span class="icon-label">聊天配置</span>
+        </a>
+        <a class="app-icon" href="/panel/memory">
+            <div class="icon-box" id="icon-memory" oncontextmenu="return editIcon(event,'memory')" ontouchstart="startLongPress('memory')" ontouchend="cancelLongPress()">
+                <svg class="icon-svg" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+                <div class="edit-hint">更换</div>
+            </div>
+            <span class="icon-label">记忆存储</span>
+        </a>
+        <a class="app-icon" href="/panel/settings">
+            <div class="icon-box" id="icon-settings" oncontextmenu="return editIcon(event,'settings')" ontouchstart="startLongPress('settings')" ontouchend="cancelLongPress()">
+                <svg class="icon-svg" viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+                <div class="edit-hint">更换</div>
+            </div>
+            <span class="icon-label">程序设置</span>
+        </a>
+        <a class="app-icon" href="/legacy">
+            <div class="icon-box" id="icon-legacy" oncontextmenu="return editIcon(event,'legacy')" ontouchstart="startLongPress('legacy')" ontouchend="cancelLongPress()">
+                <svg class="icon-svg" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                <div class="edit-hint">更换</div>
+            </div>
+            <span class="icon-label">旧版配置</span>
+        </a>
+        <a class="app-icon" href="/panel/notes">
+            <div class="icon-box" id="icon-notes" oncontextmenu="return editIcon(event,'notes')" ontouchstart="startLongPress('notes')" ontouchend="cancelLongPress()">
+                <svg class="icon-svg" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+                <div class="edit-hint">更换</div>
+            </div>
+            <span class="icon-label">备忘录</span>
+        </a>
+    </div>
+
+    <div class="bot-switch-area">
+        <div class="bot-status-dot" id="bot-dot"></div>
+        <span class="bot-status-text" id="bot-text">检查中...</span>
+        <button class="bot-toggle" id="bot-toggle" onclick="toggleBot()"><div class="toggle-knob"></div></button>
+    </div>
 </div>
 
-<!-- 设置弹窗 -->
+<!-- 照片设置弹窗 -->
+<div class="modal" id="photo-modal">
+    <div class="modal-content">
+        <h3>更换中间照片</h3>
+        <label>照片 URL</label>
+        <input type="text" id="photo-url-input" placeholder="输入图片链接">
+        <label>或上传本地照片</label>
+        <input type="file" id="photo-file-input" accept="image/*">
+        <div class="btn-row">
+            <button class="btn-reset" onclick="resetPhoto()">移除照片</button>
+            <button class="btn-cancel" onclick="closePhotoModal()">取消</button>
+            <button class="btn-save" onclick="savePhoto()">保存照片</button>
+        </div>
+    </div>
+</div>
+
+<!-- 主设置弹窗 -->
 <div class="modal" id="settings-modal">
     <div class="modal-content">
-        <h3>🎨 桌面设置</h3>
+        <h3>
+            <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+            桌面外观设置
+        </h3>
 
-        <label>背景图片 URL</label>
-        <input type="text" id="bg-url-input" placeholder="https://example.com/bg.jpg">
+        <label>自定义背景图片 URL</label>
+        <input type="text" id="bg-url-input" placeholder="输入图片链接 (留空使用默认动态背景)">
         <label>或上传本地图片</label>
         <input type="file" id="bg-file-input" accept="image/*">
 
         <div class="section-divider"></div>
 
-        <label>文字颜色</label>
-        <select id="text-color-select">
-            <option value="white">白色（适合深色背景）</option>
-            <option value="black">黑色（适合浅色背景）</option>
-        </select>
+        <label>自定义桌面字体颜色</label>
+        <div class="color-picker-row">
+            <input type="color" id="text-color-picker">
+            <input type="text" id="text-color-input" placeholder="例如：#e5e5e5">
+        </div>
 
         <div class="section-divider"></div>
 
-        <label>自定义字体 URL（Google Fonts 等）</label>
-        <input type="text" id="font-url-input" placeholder="https://fonts.googleapis.com/css2?family=...">
+        <label>自定义字体 URL（可选）</label>
+        <input type="text" id="font-url-input" placeholder="例如 Google Fonts 链接">
         <label>字体名称</label>
-        <input type="text" id="font-name-input" placeholder="例：Noto Sans SC">
+        <input type="text" id="font-name-input" placeholder="例如: Noto Sans SC (默认黑体)">
 
         <div class="btn-row">
             <button class="btn-reset" onclick="resetAll()">全部重置</button>
             <button class="btn-cancel" onclick="closeSettingsModal()">取消</button>
-            <button class="btn-save" onclick="saveSettings()">保存</button>
+            <button class="btn-save" onclick="saveSettings()">保存配置</button>
         </div>
     </div>
 </div>
@@ -157,25 +284,31 @@
 <!-- 图标编辑弹窗 -->
 <div class="modal" id="icon-modal">
     <div class="modal-content">
-        <h3 id="icon-modal-title">更换图标</h3>
-        <label>图片 URL</label>
+        <h3 id="icon-modal-title">自定义图标</h3>
+        <label>输入图片 URL</label>
         <input type="text" id="icon-url-input" placeholder="https://example.com/icon.png">
         <label>或上传本地图片</label>
         <input type="file" id="icon-file-input" accept="image/*">
         <div class="btn-row">
             <button class="btn-reset" onclick="resetIcon()">恢复默认</button>
             <button class="btn-cancel" onclick="closeIconModal()">取消</button>
-            <button class="btn-save" onclick="saveIcon()">保存</button>
+            <button class="btn-save" onclick="saveIcon()">确认更改</button>
         </div>
     </div>
 </div>
 
 <script>
+// ===== 颜色选择器同步 =====
+const colorPicker = document.getElementById('text-color-picker');
+const colorInput = document.getElementById('text-color-input');
+colorPicker.addEventListener('input', e => colorInput.value = e.target.value);
+colorInput.addEventListener('input', e => colorPicker.value = e.target.value);
+
 // ===== 时钟 =====
 function updateClock() {
     const now = new Date();
     document.getElementById('clock-time').textContent = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
-    const days = ['日','一','二','三','四','五','六'];
+    const days =['日','一','二','三','四','五','六'];
     document.getElementById('clock-date').textContent = `${now.getMonth()+1}月${now.getDate()}日 星期${days[now.getDay()]}`;
 }
 updateClock(); setInterval(updateClock, 10000);
@@ -188,18 +321,51 @@ function checkBotStatus() {
 function updateBotUI() {
     const dot = document.getElementById('bot-dot'), text = document.getElementById('bot-text'), toggle = document.getElementById('bot-toggle');
     if (botRunning) { dot.classList.add('running'); text.textContent = '运行中'; toggle.classList.add('on'); }
-    else { dot.classList.remove('running'); text.textContent = '已停止'; toggle.classList.remove('on'); }
+    else { dot.classList.remove('running'); text.textContent = '已休眠'; toggle.classList.remove('on'); }
 }
 function toggleBot() {
-    document.getElementById('bot-text').textContent = '处理中...';
+    document.getElementById('bot-text').textContent = '执行中...';
     fetch(botRunning ? '/stop_bot' : '/start_bot', { method: 'POST' }).then(() => setTimeout(checkBotStatus, 1500)).catch(() => setTimeout(checkBotStatus, 2000));
 }
 checkBotStatus(); setInterval(checkBotStatus, 15000);
 
-// ===== 设置弹窗 =====
+// ===== 照片自定义 =====
+function openPhotoModal() {
+    document.getElementById('photo-url-input').value = '';
+    document.getElementById('photo-file-input').value = '';
+    document.getElementById('photo-modal').classList.add('show');
+}
+function closePhotoModal() { document.getElementById('photo-modal').classList.remove('show'); }
+
+function savePhoto() {
+    const fileInput = document.getElementById('photo-file-input');
+    const urlInput = document.getElementById('photo-url-input').value.trim();
+    if (fileInput.files.length > 0) {
+        const reader = new FileReader();
+        reader.onload = e => { localStorage.setItem('home-photo-data', e.target.result); localStorage.removeItem('home-photo-url'); applyPhoto(); closePhotoModal(); };
+        reader.readAsDataURL(fileInput.files[0]);
+    } else {
+        if (urlInput) { localStorage.setItem('home-photo-url', urlInput); localStorage.removeItem('home-photo-data'); }
+        applyPhoto(); closePhotoModal();
+    }
+}
+function resetPhoto() {
+    localStorage.removeItem('home-photo-data'); localStorage.removeItem('home-photo-url');
+    applyPhoto(); closePhotoModal();
+}
+function applyPhoto() {
+    const el = document.getElementById('photo-widget');
+    const data = localStorage.getItem('home-photo-data'), url = localStorage.getItem('home-photo-url');
+    if (data) { el.style.backgroundImage = `url(${data})`; el.classList.add('has-photo'); }
+    else if (url) { el.style.backgroundImage = `url(${url})`; el.classList.add('has-photo'); }
+    else { el.style.backgroundImage = ''; el.classList.remove('has-photo'); }
+}
+
+// ===== 主设置弹窗 =====
 function openSettingsModal() {
     document.getElementById('bg-url-input').value = localStorage.getItem('home-bg-url') || '';
-    document.getElementById('text-color-select').value = localStorage.getItem('home-text-color') || 'white';
+    const savedColor = localStorage.getItem('home-text-color') || '#e5e5e5';
+    colorPicker.value = savedColor; colorInput.value = savedColor;
     document.getElementById('font-url-input').value = localStorage.getItem('home-font-url') || '';
     document.getElementById('font-name-input').value = localStorage.getItem('home-font-name') || '';
     document.getElementById('settings-modal').classList.add('show');
@@ -216,9 +382,13 @@ function saveSettings() {
         reader.readAsDataURL(fileInput.files[0]); 
     } else {
         if (urlInput) { localStorage.setItem('home-bg-url', urlInput); localStorage.removeItem('home-bg-data'); }
+        else { localStorage.removeItem('home-bg-url'); localStorage.removeItem('home-bg-data'); }
     }
+    
     // 文字颜色
-    localStorage.setItem('home-text-color', document.getElementById('text-color-select').value);
+    const colorVal = document.getElementById('text-color-input').value.trim();
+    if(colorVal) localStorage.setItem('home-text-color', colorVal);
+    
     // 字体
     const fontUrl = document.getElementById('font-url-input').value.trim();
     const fontName = document.getElementById('font-name-input').value.trim();
@@ -229,29 +399,20 @@ function saveSettings() {
     if (fileInput.files.length === 0) closeSettingsModal();
 }
 
-function resetAll() {
-    ['home-bg-url','home-bg-data','home-text-color','home-font-url','home-font-name'].forEach(k => localStorage.removeItem(k));
-    // 重置所有图标
-    const icons = ['api','reply','chat','memory','settings','legacy'];
-    icons.forEach(id => { localStorage.removeItem('home-icon-' + id); });
-    applyAll(); applyAllIcons(); closeSettingsModal();
+function resetAll() {['home-bg-url','home-bg-data','home-text-color','home-font-url','home-font-name'].forEach(k => localStorage.removeItem(k));['api','reply','chat','memory','settings','legacy','notes'].forEach(id => { localStorage.removeItem('home-icon-' + id); });
+    resetPhoto(); applyAll(); applyAllIcons(); closeSettingsModal();
 }
 
 // ===== 图标自定义 =====
-let editingIconId = '';
-let longPressTimer = null;
-
+let editingIconId = '', longPressTimer = null;
 function editIcon(e, id) { e.preventDefault(); e.stopPropagation(); showIconModal(id); return false; }
-
-function startLongPress(id) {
-    longPressTimer = setTimeout(() => { showIconModal(id); }, 600);
-}
+function startLongPress(id) { longPressTimer = setTimeout(() => { showIconModal(id); }, 600); }
 function cancelLongPress() { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } }
 
 function showIconModal(id) {
     editingIconId = id;
-    const names = {api:'API配置',reply:'回复设置',chat:'聊天配置',memory:'记忆',settings:'程序设置',legacy:'旧版配置'};
-    document.getElementById('icon-modal-title').textContent = '更换图标: ' + (names[id] || id);
+    const names = {api:'API配置',reply:'回复设置',chat:'聊天配置',memory:'记忆存储',settings:'程序设置',legacy:'旧版配置',notes:'备忘录'};
+    document.getElementById('icon-modal-title').innerHTML = `更换图标 - ${names[id] || id}`;
     document.getElementById('icon-url-input').value = '';
     document.getElementById('icon-file-input').value = '';
     document.getElementById('icon-modal').classList.add('show');
@@ -259,66 +420,45 @@ function showIconModal(id) {
 function closeIconModal() { document.getElementById('icon-modal').classList.remove('show'); editingIconId = ''; }
 
 function saveIcon() {
-    const fileInput = document.getElementById('icon-file-input');
-    const urlInput = document.getElementById('icon-url-input').value.trim();
+    const fileInput = document.getElementById('icon-file-input'), urlInput = document.getElementById('icon-url-input').value.trim();
     if (fileInput.files.length > 0) {
         const reader = new FileReader();
         reader.onload = e => { localStorage.setItem('home-icon-' + editingIconId, e.target.result); applyIcon(editingIconId); closeIconModal(); };
         reader.readAsDataURL(fileInput.files[0]);
     } else if (urlInput) {
-        localStorage.setItem('home-icon-' + editingIconId, urlInput);
-        applyIcon(editingIconId); closeIconModal();
+        localStorage.setItem('home-icon-' + editingIconId, urlInput); applyIcon(editingIconId); closeIconModal();
     }
 }
-
-function resetIcon() {
-    localStorage.removeItem('home-icon-' + editingIconId);
-    applyIcon(editingIconId); closeIconModal();
-}
+function resetIcon() { localStorage.removeItem('home-icon-' + editingIconId); applyIcon(editingIconId); closeIconModal(); }
 
 function applyIcon(id) {
     const el = document.getElementById('icon-' + id);
     if (!el) return;
     const saved = localStorage.getItem('home-icon-' + id);
-    if (saved) {
-        el.style.backgroundImage = `url(${saved})`;
-        el.classList.add('has-custom-img');
-    } else {
-        el.style.backgroundImage = '';
-        el.classList.remove('has-custom-img');
-    }
+    if (saved) { el.style.backgroundImage = `url(${saved})`; el.classList.add('has-custom-img'); } 
+    else { el.style.backgroundImage = ''; el.classList.remove('has-custom-img'); }
 }
-
-function applyAllIcons() {
-    ['api','reply','chat','memory','settings','legacy'].forEach(applyIcon);
-}
+function applyAllIcons() {['api','reply','chat','memory','settings','legacy','notes'].forEach(applyIcon); }
 
 // ===== 全局应用 =====
 function applyAll() {
     // 背景
-    const bgData = localStorage.getItem('home-bg-data');
-    const bgUrl = localStorage.getItem('home-bg-url');
-    if (bgData) document.body.style.backgroundImage = `url(${bgData})`;
-    else if (bgUrl) document.body.style.backgroundImage = `url(${bgUrl})`;
-    else document.body.style.backgroundImage = '';
+    const bgData = localStorage.getItem('home-bg-data'), bgUrl = localStorage.getItem('home-bg-url');
+    if (bgData) { document.body.style.backgroundImage = `url(${bgData})`; document.body.classList.add('has-custom-bg'); }
+    else if (bgUrl) { document.body.style.backgroundImage = `url(${bgUrl})`; document.body.classList.add('has-custom-bg'); }
+    else { document.body.style.backgroundImage = ''; document.body.classList.remove('has-custom-bg'); }
 
-    // 文字颜色
-    const color = localStorage.getItem('home-text-color') || 'white';
-    if (color === 'black') {
-        document.documentElement.style.setProperty('--text-color', '#1d1d1f');
-        document.documentElement.style.setProperty('--text-shadow', '0 1px 4px rgba(255,255,255,0.3)');
-    } else {
-        document.documentElement.style.setProperty('--text-color', '#fff');
-        document.documentElement.style.setProperty('--text-shadow', '0 2px 10px rgba(0,0,0,0.3)');
-    }
+    // 文字颜色 (应用到CSS变量)
+    const color = localStorage.getItem('home-text-color') || '#e5e5e5';
+    document.documentElement.style.setProperty('--desktop-text', color);
 
-    // 字体
-    const fontUrl = localStorage.getItem('home-font-url');
-    const fontName = localStorage.getItem('home-font-name');
+    // 字体 (应用到黑体)
+    const fontUrl = localStorage.getItem('home-font-url'), fontName = localStorage.getItem('home-font-name');
     const fontStyle = document.getElementById('custom-font-style');
     if (fontUrl && fontName) {
         fontStyle.textContent = `@import url('${fontUrl}');`;
-        document.documentElement.style.setProperty('--custom-font', `'${fontName}', sans-serif`);
+        // 用户如果有自定义，则优先使用自定义，降级使用黑体
+        document.documentElement.style.setProperty('--custom-font', `'${fontName}', 'PingFang SC', 'Microsoft YaHei', sans-serif`);
     } else {
         fontStyle.textContent = '';
         document.documentElement.style.removeProperty('--custom-font');
@@ -326,12 +466,12 @@ function applyAll() {
 }
 
 // 弹窗点击背景关闭
-document.getElementById('settings-modal').addEventListener('click', function(e) { if (e.target === this) closeSettingsModal(); });
-document.getElementById('icon-modal').addEventListener('click', function(e) { if (e.target === this) closeIconModal(); });
+window.addEventListener('click', function(e) {
+    if (e.target.classList.contains('modal')) e.target.classList.remove('show');
+});
 
 // 初始化
-applyAll();
-applyAllIcons();
+applyAll(); applyAllIcons(); applyPhoto();
 </script>
 
 </body>

@@ -241,3 +241,22 @@ MEMORY_RETRIEVAL_PROMPT_FILE = 'prompts/memory_retrieval.md'
 # 自动补充的配置项
 IGNORE_GROUP_CHAT_FOR_AUTO_MESSAGE = False
 ENABLE_GROUP_AT_REPLY_IN_REPLIES = False
+
+# === 短期记忆系统配置 ===
+# 启用短期记忆（每日自动生成 + 滑动窗口 + 自动沉淀）
+ENABLE_SHORT_TERM_MEMORY = True
+# 每天定时生成短期记忆的时间（24小时制，如 "02:00"）
+SHORT_TERM_MEMORY_TIME = '02:00'
+# 保留最近 N 天的短期记忆注入 prompt
+SHORT_TERM_MEMORY_DAYS = 3
+# 短期记忆存储子目录（在 Memory_Daily/{user_key}/ 下）
+SHORT_TERM_MEMORY_DIR = 'short_term'
+# 短期记忆生成/沉淀使用的 API 配置（复用记忆检索管道的中转站）
+# 如果为空列表则使用 MEMORY_LLM_PROVIDERS
+SHORT_TERM_LLM_PROVIDERS = []
+# 生成短期记忆时是否注入人设+预设（推荐开启，让 AI 以角色视角判断）
+SHORT_TERM_INJECT_PERSONA = True
+# 短期记忆生成提示词文件
+SHORT_TERM_GENERATE_PROMPT_FILE = 'prompts/short_term_generate.md'
+# 短期记忆沉淀判断提示词文件
+SHORT_TERM_SETTLE_PROMPT_FILE = 'prompts/short_term_settle.md'
