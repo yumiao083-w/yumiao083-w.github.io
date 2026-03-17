@@ -72,7 +72,7 @@ def _setup_proxy():
 _setup_proxy()
 
 # ===== Telegram Bot Token =====
-TG_BOT_TOKEN = "8740472707:AAHEkt9jRER68BDy9duaE36p_Y1CVctptHg"
+TG_BOT_TOKEN = "8411509133:AAH1zsVwHwLkzQLYvON0AbGAoGeFg3tI56M"
 
 # ===== TG 用户设置文件 =====
 TG_SETTINGS_FILE = os.path.join(YUAN_ROOT, "tg_user_settings.json")
