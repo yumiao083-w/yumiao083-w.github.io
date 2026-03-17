@@ -488,9 +488,8 @@ def _build_system_prompt(user_id: str) -> str:
 你正在通过 Telegram 与用户对话。请注意以下规则：
 
 ### 消息格式
-- 不需要使用反斜杠(\\)来分割消息
-- 如果你想分多条消息发送，用 `---` 单独一行作为分隔符
-- 每段 `---` 之间的内容会作为独立的一条消息发送
+- 用反斜杠 `\` 来分割消息，每个 `\` 前后的内容会作为独立的一条消息发送
+- 也可以用 `---` 单独一行作为分隔符
 - 回复可以更口语化、更自然
 
 ### 语音消息
@@ -703,14 +702,15 @@ async def handle_voice_message(update, context):
 async def _send_parsed_reply(update, full_reply: str):
     """
     解析 AI 回复，处理：
-    1. `---` 分消息发送
-    2. `[[语音]]...[[/语音]]` 标签转语音发送
-    3. 普通文字直接发文字
+    1. `---` 分消息发送（TG 专用分隔符）
+    2. `\` 反斜杠分消息发送（和微信端一致）
+    3. `[[语音]]...[[/语音]]` 标签转语音发送
+    4. 普通文字直接发文字
     """
     import re
     import asyncio
 
-    # 先按 --- 分割成多条消息
+    # 第一层：按 --- 分割成大段
     segments = re.split(r'\n---\n|\n---$|^---\n', full_reply.strip())
 
     for segment in segments:
@@ -718,30 +718,50 @@ async def _send_parsed_reply(update, full_reply: str):
         if not segment:
             continue
 
-        # 检查是否包含语音标签
-        voice_pattern = r'\[\[语音\]\](.*?)\[\[/语音\]\]'
-        voice_matches = re.findall(voice_pattern, segment, flags=re.DOTALL)
+        # 第二层：按反斜杠 \ 分割成小段（和微信端 split_message_with_context 一致）
+        # 支持: 单个 \、连续 \\\ 、$ 符号
+        sub_parts = re.split(r'(\$|\\{3,}|\n|\\)', segment)
+        # 过滤掉分隔符和空字符串
+        sub_messages = []
+        for part in sub_parts:
+            part = part.strip()
+            if not part or part in ['$', '\\']:
+                continue
+            sub_messages.append(part)
 
-        if voice_matches:
-            # 有语音标签：把非语音部分发文字，语音部分发语音
-            # 先发文字部分（去掉语音标签的内容）
-            text_part = re.sub(voice_pattern, '', segment, flags=re.DOTALL).strip()
-            if text_part:
-                for chunk in _split_text(text_part, 4096):
+        # 如果没有被分割（没有反斜杠），就保持原样作为一条
+        if not sub_messages:
+            sub_messages = [segment]
+
+        for sub_msg in sub_messages:
+            sub_msg = sub_msg.strip()
+            if not sub_msg:
+                continue
+
+            # 检查是否包含语音标签
+            voice_pattern = r'\[\[语音\]\](.*?)\[\[/语音\]\]'
+            voice_matches = re.findall(voice_pattern, sub_msg, flags=re.DOTALL)
+
+            if voice_matches:
+                # 有语音标签：把非语音部分发文字，语音部分发语音
+                text_part = re.sub(voice_pattern, '', sub_msg, flags=re.DOTALL).strip()
+                if text_part:
+                    for chunk in _split_text(text_part, 4096):
+                        await update.message.reply_text(chunk)
+                        await asyncio.sleep(0.3)
+
+                for voice_text in voice_matches:
+                    voice_text = voice_text.strip()
+                    if voice_text:
+                        await _send_voice_reply(update, voice_text)
+                        await asyncio.sleep(0.3)
+            else:
+                # 纯文字发送
+                for chunk in _split_text(sub_msg, 4096):
                     await update.message.reply_text(chunk)
-                    await asyncio.sleep(0.3)
 
-            # 再发语音部分
-            for voice_text in voice_matches:
-                voice_text = voice_text.strip()
-                if voice_text:
-                    await _send_voice_reply(update, voice_text)
-                    await asyncio.sleep(0.3)
-        else:
-            # 没有语音标签：纯文字发送
-            for chunk in _split_text(segment, 4096):
-                await update.message.reply_text(chunk)
-                await asyncio.sleep(0.3)
+            # 多条消息之间加延迟，模拟打字节奏
+            await asyncio.sleep(0.5)
 
 
 def _split_text(text: str, max_len: int = 4096) -> list:
