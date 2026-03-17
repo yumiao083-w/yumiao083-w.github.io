@@ -51,7 +51,7 @@ def _setup_proxy():
 
     # 自动探测常见本地代理端口
     import socket
-    for port in [7890, 7891, 1080, 10808, 10809, 2080]:
+    for port in [7897, 7890, 7891, 1080, 10808, 10809, 2080]:
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(0.5)
