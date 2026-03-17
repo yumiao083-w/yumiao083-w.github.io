@@ -92,11 +92,15 @@ def _init_yuan_modules():
     我们不直接 import bot.py（因为它会初始化微信），
     而是手动加载需要的组件。
     """
-    global config, _yuan_initialized
+    global config, _yuan_initialized, _config_mtime
 
     # 导入配置
     import config as cfg
     config = cfg
+    # 记录初始 mtime
+    config_path = os.path.join(YUAN_ROOT, 'config.py')
+    if os.path.exists(config_path):
+        _config_mtime = os.path.getmtime(config_path)
 
     logger.info("yuan 配置加载完毕")
     logger.info(f"  模型: {config.MODEL}")
@@ -108,6 +112,24 @@ def _init_yuan_modules():
 
 _yuan_initialized = False
 config = None
+_config_mtime = 0
+
+
+def _reload_config():
+    """检测 config.py 是否被修改，如果是则热加载。前端改配置后立刻生效。"""
+    global config, _config_mtime
+    config_path = os.path.join(YUAN_ROOT, 'config.py')
+    try:
+        mtime = os.path.getmtime(config_path)
+        if mtime != _config_mtime:
+            import importlib
+            import config as cfg
+            importlib.reload(cfg)
+            config = cfg
+            _config_mtime = mtime
+            logger.info(f"[TG] config.py 热加载完成 (QUEUE_WAITING_TIME={getattr(cfg, 'QUEUE_WAITING_TIME', 7)})")
+    except Exception as e:
+        logger.debug(f"config 热加载跳过: {e}")
 
 
 def _ensure_yuan():
@@ -645,6 +667,8 @@ _tg_queue_lock = asyncio.Lock() if hasattr(asyncio, 'Lock') else None
 async def _process_queued_messages(user_id_str, context):
     """等待用户停止输入后，合并消息统一处理"""
     _ensure_yuan()
+    # 每次实时重新加载 config，这样前端改了秒数立刻生效
+    _reload_config()
     wait_time = getattr(config, 'QUEUE_WAITING_TIME', 7)
 
     # 等待 QUEUE_WAITING_TIME 秒无新消息
