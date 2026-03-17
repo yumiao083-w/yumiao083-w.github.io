@@ -38,6 +38,39 @@ logger = logging.getLogger("telegram_bot")
 # 降低 httpx 日志级别，避免 getUpdates 刷屏
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
+# ===== 代理配置（必须在任何 httpx 客户端创建之前设置）=====
+# python-telegram-bot 在 build() 时创建 AsyncClient，
+# 只有环境变量在那之前就存在才能生效
+def _setup_proxy():
+    """在模块加载阶段就设好代理环境变量"""
+    # 已有环境变量就不管
+    for key in ['https_proxy', 'HTTPS_PROXY', 'http_proxy', 'HTTP_PROXY', 'all_proxy', 'ALL_PROXY']:
+        if os.environ.get(key):
+            logger.info(f"检测到代理环境变量 {key}={os.environ[key]}")
+            return
+
+    # 自动探测常见本地代理端口
+    import socket
+    for port in [7890, 7891, 1080, 10808, 10809, 2080]:
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(0.5)
+            s.connect(('127.0.0.1', port))
+            s.close()
+            proxy = f"http://127.0.0.1:{port}"
+            os.environ['https_proxy'] = proxy
+            os.environ['http_proxy'] = proxy
+            os.environ['HTTPS_PROXY'] = proxy
+            os.environ['HTTP_PROXY'] = proxy
+            logger.info(f"自动检测到代理端口 {port}，已设置环境变量: {proxy}")
+            return
+        except (socket.error, OSError):
+            continue
+
+    logger.warning("未检测到代理，将直连 Telegram API（国内可能超时）")
+
+_setup_proxy()
+
 # ===== Telegram Bot Token =====
 TG_BOT_TOKEN = "8740472707:AAHEkt9jRER68BDy9duaE36p_Y1CVctptHg"
 
@@ -812,36 +845,10 @@ def main():
     # 初始化 yuan 模块
     _ensure_yuan()
 
-    # 代理配置（国内访问 Telegram API 需要代理）
-    # httpx 会自动读取 https_proxy / http_proxy 环境变量
-    # 如果用户没设环境变量，我们自动探测本地代理并设上
-    proxy_url = os.environ.get('https_proxy') or os.environ.get('HTTPS_PROXY') \
-                or os.environ.get('http_proxy') or os.environ.get('HTTP_PROXY') \
-                or os.environ.get('all_proxy') or os.environ.get('ALL_PROXY')
+    proxy = os.environ.get('https_proxy') or os.environ.get('HTTPS_PROXY') or '(无)'
+    logger.info(f"代理: {proxy}")
 
-    if not proxy_url:
-        import socket
-        for port in [7890, 7891, 1080, 10808, 10809, 2080]:
-            try:
-                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                s.settimeout(0.5)
-                s.connect(('127.0.0.1', port))
-                s.close()
-                proxy_url = f"http://127.0.0.1:{port}"
-                # 设到环境变量，httpx 会自动读取
-                os.environ['https_proxy'] = proxy_url
-                os.environ['http_proxy'] = proxy_url
-                logger.info(f"自动检测到代理端口 {port}，已设置环境变量")
-                break
-            except (socket.error, OSError):
-                continue
-
-    if proxy_url:
-        logger.info(f"代理: {proxy_url}")
-    else:
-        logger.warning("未检测到代理，将直连 Telegram API（国内可能超时）")
-
-    # 创建 bot（简单构建，代理通过环境变量自动生效）
+    # 创建 bot
     app = Application.builder().token(TG_BOT_TOKEN).build()
 
     # 注册命令
