@@ -709,9 +709,15 @@ async def _send_parsed_reply(update, full_reply: str):
     """
     import re
     import asyncio
+    import random
+
+    _ensure_yuan()
 
     # 第一层：按 --- 分割成大段
     segments = re.split(r'\n---\n|\n---$|^---\n', full_reply.strip())
+
+    # 收集所有要发送的消息
+    send_queue = []
 
     for segment in segments:
         segment = segment.strip()
@@ -719,9 +725,7 @@ async def _send_parsed_reply(update, full_reply: str):
             continue
 
         # 第二层：按反斜杠 \ 分割成小段（和微信端 split_message_with_context 一致）
-        # 支持: 单个 \、连续 \\\ 、$ 符号
         sub_parts = re.split(r'(\$|\\{3,}|\n|\\)', segment)
-        # 过滤掉分隔符和空字符串
         sub_messages = []
         for part in sub_parts:
             part = part.strip()
@@ -729,7 +733,6 @@ async def _send_parsed_reply(update, full_reply: str):
                 continue
             sub_messages.append(part)
 
-        # 如果没有被分割（没有反斜杠），就保持原样作为一条
         if not sub_messages:
             sub_messages = [segment]
 
@@ -743,25 +746,35 @@ async def _send_parsed_reply(update, full_reply: str):
             voice_matches = re.findall(voice_pattern, sub_msg, flags=re.DOTALL)
 
             if voice_matches:
-                # 有语音标签：把非语音部分发文字，语音部分发语音
                 text_part = re.sub(voice_pattern, '', sub_msg, flags=re.DOTALL).strip()
                 if text_part:
-                    for chunk in _split_text(text_part, 4096):
-                        await update.message.reply_text(chunk)
-                        await asyncio.sleep(0.3)
-
+                    send_queue.append({'type': 'text', 'content': text_part})
                 for voice_text in voice_matches:
                     voice_text = voice_text.strip()
                     if voice_text:
-                        await _send_voice_reply(update, voice_text)
-                        await asyncio.sleep(0.3)
+                        send_queue.append({'type': 'voice', 'content': voice_text})
             else:
-                # 纯文字发送
-                for chunk in _split_text(sub_msg, 4096):
-                    await update.message.reply_text(chunk)
+                send_queue.append({'type': 'text', 'content': sub_msg})
 
-            # 多条消息之间加延迟，模拟打字节奏
-            await asyncio.sleep(0.5)
+    # 发送队列，带打字延迟
+    for i, item in enumerate(send_queue):
+        if item['type'] == 'text':
+            for chunk in _split_text(item['content'], 4096):
+                await update.message.reply_text(chunk)
+        elif item['type'] == 'voice':
+            await _send_voice_reply(update, item['content'])
+
+        # 计算到下一条消息的延迟（和微信端公式一致）
+        if i < len(send_queue) - 1:
+            next_item = send_queue[i + 1]
+            next_len = len(next_item['content']) if next_item['type'] == 'text' else 20
+            avg_speed = getattr(config, 'AVERAGE_TYPING_SPEED', 0.2)
+            rand_min = getattr(config, 'RANDOM_TYPING_SPEED_MIN', 0.05)
+            rand_max = getattr(config, 'RANDOM_TYPING_SPEED_MAX', 0.1)
+            delay = max(1.0, next_len * avg_speed + random.uniform(rand_min, rand_max))
+            # 发送「正在输入」状态
+            await update.message.chat.send_action("typing")
+            await asyncio.sleep(delay)
 
 
 def _split_text(text: str, max_len: int = 4096) -> list:
