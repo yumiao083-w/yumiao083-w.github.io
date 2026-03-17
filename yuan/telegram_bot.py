@@ -633,21 +633,43 @@ async def cmd_status(update, context):
     await update.message.reply_text(status_text)
 
 
-async def handle_text_message(update, context):
-    """处理文字消息"""
-    user_id = update.effective_user.id
-    message_text = update.message.text
+# ===================================================================
+#  TG 消息队列（等待用户发完多条再统一处理，和微信端一致）
+# ===================================================================
 
-    if not message_text or not message_text.strip():
+# {user_id: {'messages': [str], 'last_time': float, 'update': Update, 'task': asyncio.Task}}
+_tg_message_queues = {}
+_tg_queue_lock = asyncio.Lock() if hasattr(asyncio, 'Lock') else None
+
+
+async def _process_queued_messages(user_id_str, context):
+    """等待用户停止输入后，合并消息统一处理"""
+    _ensure_yuan()
+    wait_time = getattr(config, 'QUEUE_WAITING_TIME', 7)
+
+    # 等待 QUEUE_WAITING_TIME 秒无新消息
+    await asyncio.sleep(wait_time)
+
+    # 取出队列
+    queue_data = _tg_message_queues.pop(user_id_str, None)
+    if not queue_data or not queue_data['messages']:
         return
 
-    logger.info(f"[TG] 收到消息 from {update.effective_user.first_name} ({user_id}): {message_text[:100]}")
+    messages = queue_data['messages']
+    update = queue_data['update']
+
+    # 合并多条消息
+    if len(messages) > 1:
+        merged = "\n".join(messages)
+        logger.info(f"[TG] 合并 {len(messages)} 条消息: {merged[:150]}")
+    else:
+        merged = messages[0]
 
     # 发送「正在输入」状态
     await update.message.chat.send_action("typing")
 
     # 获取 AI 回复
-    reply = get_ai_response(message_text, str(user_id))
+    reply = get_ai_response(merged, user_id_str)
 
     if not reply:
         await update.message.reply_text("...")
@@ -655,6 +677,43 @@ async def handle_text_message(update, context):
 
     # 解析回复：分消息 + 语音标签
     await _send_parsed_reply(update, reply)
+
+
+async def handle_text_message(update, context):
+    """处理文字消息（带消息队列等待）"""
+    user_id = update.effective_user.id
+    user_id_str = str(user_id)
+    message_text = update.message.text
+
+    if not message_text or not message_text.strip():
+        return
+
+    logger.info(f"[TG] 收到消息 from {update.effective_user.first_name} ({user_id}): {message_text[:100]}")
+
+    # 放入消息队列
+    if user_id_str in _tg_message_queues:
+        # 已有队列，追加消息并重置计时
+        _tg_message_queues[user_id_str]['messages'].append(message_text.strip())
+        _tg_message_queues[user_id_str]['update'] = update  # 用最新的 update 来回复
+        _tg_message_queues[user_id_str]['last_time'] = asyncio.get_event_loop().time()
+
+        # 取消旧的等待任务，重新计时
+        old_task = _tg_message_queues[user_id_str].get('task')
+        if old_task and not old_task.done():
+            old_task.cancel()
+
+        logger.info(f"[TG] 用户 {user_id} 消息追加到队列 (共 {len(_tg_message_queues[user_id_str]['messages'])} 条)")
+    else:
+        # 新队列
+        _tg_message_queues[user_id_str] = {
+            'messages': [message_text.strip()],
+            'update': update,
+            'last_time': asyncio.get_event_loop().time(),
+        }
+
+    # 启动新的等待任务
+    task = asyncio.create_task(_process_queued_messages(user_id_str, context))
+    _tg_message_queues[user_id_str]['task'] = task
 
 
 async def handle_voice_message(update, context):
