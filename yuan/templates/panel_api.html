@@ -35,18 +35,24 @@
         .slider-combo input[type="range"] { flex: 1; height: 6px; -webkit-appearance: none; background: #ddd; border-radius: 3px; outline: none; }
         .slider-combo input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #007aff; cursor: pointer; }
         .slider-combo input[type="number"] { width: 70px; padding: 6px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; text-align: center; }
-        /* 中转站卡片 */
-        .provider-card { background: #f8f8fa; border: 1px solid #e8e8ea; border-radius: 10px; padding: 14px; margin-bottom: 8px; transition: box-shadow 0.2s; }
+        /* 中转站条目 - 折叠式 */
+        .provider-card { background: #f8f8fa; border: 1px solid #e8e8ea; border-radius: 10px; margin-bottom: 6px; transition: box-shadow 0.2s, border-color 0.2s; overflow: hidden; }
         .provider-card.dragging { opacity: 0.5; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
-        .provider-card.drag-over { border-top: 3px solid #007aff; }
-        .provider-card .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .provider-card .drag-handle { font-size: 16px; color: #ccc; cursor: grab; user-select: none; padding: 8px; touch-action: none; }
-        .provider-card .card-title { font-weight: 600; font-size: 14px; flex: 1; margin: 0 10px; }
-        .provider-card .remove-btn { background: #ff3b30; color: white; border: none; padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
-        .provider-card .card-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .provider-card .card-fields .full-width { grid-column: 1 / -1; }
+        .provider-card.drag-over { border-color: #007aff; box-shadow: 0 0 0 1px #007aff; }
+        .provider-card .card-header { display: flex; align-items: center; padding: 10px 12px; cursor: pointer; user-select: none; gap: 8px; }
+        .provider-card .drag-handle { font-size: 14px; color: #ccc; cursor: grab; user-select: none; padding: 4px; touch-action: none; flex-shrink: 0; }
+        .provider-card .card-idx { font-size: 12px; color: #999; font-weight: 500; width: 22px; text-align: center; flex-shrink: 0; }
+        .provider-card .card-name { font-weight: 500; font-size: 14px; color: #333; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .provider-card .card-model { font-size: 12px; color: #888; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
+        .provider-card .card-arrow { font-size: 12px; color: #ccc; transition: transform 0.2s; flex-shrink: 0; margin-left: 4px; }
+        .provider-card.expanded .card-arrow { transform: rotate(90deg); }
+        .provider-card .card-body { display: none; padding: 0 14px 14px; }
+        .provider-card.expanded .card-body { display: block; }
+        .provider-card .card-fields { display: grid; grid-template-columns: 1fr; gap: 10px; }
         .provider-card .card-fields label { font-size: 11px; color: #888; margin-bottom: 2px; display: block; }
         .provider-card .card-fields input, .provider-card .card-fields select { width: 100%; padding: 7px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; background: white; }
+        .provider-card .card-actions { display: flex; justify-content: flex-end; margin-top: 10px; }
+        .provider-card .remove-btn { background: none; color: #ff3b30; border: none; padding: 6px 0; font-size: 13px; cursor: pointer; }
         .add-provider-btn { width: 100%; padding: 10px; background: #f0f0f2; border: 2px dashed #ccc; border-radius: 10px; font-size: 14px; color: #666; cursor: pointer; text-align: center; margin-top: 8px; }
         .add-provider-btn:hover { border-color: #007aff; color: #007aff; }
         /* 条件显示 */
@@ -319,26 +325,37 @@ function renderProviders(area) {
         card.className = 'provider-card';
         card.dataset.idx = idx;
         card.dataset.area = area;
+
+        const displayName = p.name || '未命名';
+        const displayModel = p.model || '未设置模型';
+
         card.innerHTML = `
-            <div class="card-header">
-                <span class="drag-handle">☰</span>
-                <span class="card-title">#${idx+1}</span>
-                <button class="remove-btn" onclick="removeProvider('${area}',${idx})">删除</button>
+            <div class="card-header" onclick="toggleCard(this)">
+                <span class="drag-handle" onclick="event.stopPropagation()">☰</span>
+                <span class="card-idx">${idx+1}</span>
+                <span class="card-name">${esc(displayName)}</span>
+                <span class="card-model">${esc(displayModel)}</span>
+                <span class="card-arrow">▶</span>
             </div>
-            <div class="card-fields">
-                <div class="full-width"><label>名称</label><input type="text" value="${esc(p.name||'')}" onchange="providerData['${area}'][${idx}].name=this.value"></div>
-                <div class="full-width"><label>Base URL</label><input type="text" value="${esc(p.base_url||'')}" onchange="providerData['${area}'][${idx}].base_url=this.value"></div>
-                <div class="full-width"><label>API Key</label><input type="password" value="${esc(p.api_key||'')}" onchange="providerData['${area}'][${idx}].api_key=this.value"></div>
-                <div class="full-width">
-                    <label>模型</label>
-                    <div class="model-row">
-                        <select id="model-select-${area}-${idx}" onchange="if(this.value) providerData['${area}'][${idx}].model=this.value; document.getElementById('model-input-${area}-${idx}').value=this.value;" style="flex:1;">
-                            <option value="">-- 获取模型列表 --</option>
-                            ${p.model ? '<option value="'+esc(p.model)+'" selected>'+esc(p.model)+'</option>' : ''}
-                        </select>
-                        <button class="fetch-btn" onclick="fetchForCard('${area}',${idx})" style="font-size:12px; padding:7px 10px;">获取</button>
+            <div class="card-body">
+                <div class="card-fields">
+                    <div><label>名称</label><input type="text" value="${esc(p.name||'')}" onchange="providerData['${area}'][${idx}].name=this.value; updateCardHeader(this,'${area}',${idx})"></div>
+                    <div><label>Base URL</label><input type="text" value="${esc(p.base_url||'')}" onchange="providerData['${area}'][${idx}].base_url=this.value"></div>
+                    <div><label>API Key</label><input type="password" value="${esc(p.api_key||'')}" onchange="providerData['${area}'][${idx}].api_key=this.value"></div>
+                    <div>
+                        <label>模型</label>
+                        <div class="model-row">
+                            <select id="model-select-${area}-${idx}" onchange="if(this.value){providerData['${area}'][${idx}].model=this.value; document.getElementById('model-input-${area}-${idx}').value=this.value; updateCardHeader(this,'${area}',${idx});}" style="flex:1;">
+                                <option value="">-- 获取模型列表 --</option>
+                                ${p.model ? '<option value="'+esc(p.model)+'" selected>'+esc(p.model)+'</option>' : ''}
+                            </select>
+                            <button class="fetch-btn" onclick="fetchForCard('${area}',${idx})" style="font-size:12px; padding:7px 10px;">获取</button>
+                        </div>
+                        <input type="text" id="model-input-${area}-${idx}" value="${esc(p.model||'')}" placeholder="或手动输入" onchange="providerData['${area}'][${idx}].model=this.value; updateCardHeader(this,'${area}',${idx})" style="margin-top:4px;">
                     </div>
-                    <input type="text" id="model-input-${area}-${idx}" value="${esc(p.model||'')}" placeholder="或手动输入" onchange="providerData['${area}'][${idx}].model=this.value" style="margin-top:4px;">
+                </div>
+                <div class="card-actions">
+                    <button class="remove-btn" onclick="removeProvider('${area}',${idx})">删除此中转站</button>
                 </div>
             </div>
         `;
@@ -346,7 +363,6 @@ function renderProviders(area) {
         // === 拖拽：仅通过 ☰ 手柄触发 ===
         const handle = card.querySelector('.drag-handle');
 
-        // 桌面端：只有从手柄开始才允许拖拽
         handle.addEventListener('mousedown', () => { card.draggable = true; });
         card.addEventListener('dragstart', () => { dragState = {area, idx}; card.classList.add('dragging'); });
         card.addEventListener('dragend', () => { card.draggable = false; card.classList.remove('dragging'); });
@@ -362,7 +378,7 @@ function renderProviders(area) {
             dragState = {area: null, idx: null};
         });
 
-        // 移动端：手柄 touch 拖拽
+        // 移动端 touch 拖拽
         handle.addEventListener('touchstart', e => {
             e.preventDefault();
             dragState = {area, idx};
@@ -372,7 +388,6 @@ function renderProviders(area) {
             e.preventDefault();
             const touch = e.touches[0];
             const target = document.elementFromPoint(touch.clientX, touch.clientY);
-            // 清除所有 drag-over
             list.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
             if (target) {
                 const overCard = target.closest('.provider-card');
@@ -404,10 +419,33 @@ function renderProviders(area) {
     });
 }
 
+function toggleCard(headerEl) {
+    const card = headerEl.closest('.provider-card');
+    card.classList.toggle('expanded');
+}
+
+function updateCardHeader(inputEl, area, idx) {
+    // 实时更新折叠状态下的名称和模型显示
+    const card = inputEl.closest('.provider-card');
+    const p = providerData[area][idx];
+    const nameEl = card.querySelector('.card-name');
+    const modelEl = card.querySelector('.card-model');
+    if (nameEl) nameEl.textContent = p.name || '未命名';
+    if (modelEl) modelEl.textContent = p.model || '未设置模型';
+}
+
 function addProvider(area) {
     providerData[area].push({ name: '新中转站', base_url: '', api_key: '', model: '' });
     renderProviders(area);
-    setTimeout(() => { const list = document.getElementById(area + '-providers-list'); list.lastElementChild?.scrollIntoView({ behavior: 'smooth' }); }, 100);
+    // 自动展开新添加的卡片
+    setTimeout(() => {
+        const list = document.getElementById(area + '-providers-list');
+        const last = list.lastElementChild;
+        if (last) {
+            last.classList.add('expanded');
+            last.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, 50);
 }
 
 function removeProvider(area, idx) {
