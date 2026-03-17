@@ -272,3 +272,20 @@ SHORT_TERM_INJECT_PERSONA = True
 SHORT_TERM_GENERATE_PROMPT_FILE = 'prompts/short_term_generate.md'
 # 短期记忆沉淀判断提示词文件
 SHORT_TERM_SETTLE_PROMPT_FILE = 'prompts/short_term_settle.md'
+
+# === TTS 语音合成配置 ===
+# 引擎选择: "minimax"（克隆声音）| "edge"（免费微软音色）
+TTS_ENGINE = 'minimax'
+
+# --- MiniMax 配置 ---
+TTS_MINIMAX_API_KEY = 'sk-api-3tSxXYsPDn0nOHEtvZSgLSKPiPGuyR39ntu-7LtfwXlet3-LCvnUN7SiA-FUFEXaCp7pXq00NTst0X0p42aOukELFA-r_AtEJcL-C30UCmPcbqISrPAQYXs'
+TTS_MINIMAX_GROUP_ID = '1977563833656418958'
+TTS_MINIMAX_VOICE_ID = 'yuanlang'          # 克隆的声音 ID
+TTS_MINIMAX_MODEL = 'speech-02-hd'         # 模型: speech-02-hd / speech-02
+TTS_MINIMAX_SPEED = 1.0                    # 语速 0.5~2.0
+TTS_MINIMAX_VOL = 1.0                      # 音量 0.1~10.0
+TTS_MINIMAX_PITCH = 0                      # 音调 -12~12
+TTS_MINIMAX_API_URL = 'https://api.minimax.chat'  # 国内用 minimax.chat，海外用 minimaxi.com
+
+# --- Edge TTS 配置（备用/免费方案）---
+TTS_EDGE_VOICE = 'zh-CN-YunxiNeural'      # edge-tts 默认音色（云希 - 年轻男声）

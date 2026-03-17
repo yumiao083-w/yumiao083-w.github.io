@@ -78,7 +78,6 @@ TG_BOT_TOKEN = "8411509133:AAH1zsVwHwLkzQLYvON0AbGAoGeFg3tI56M"
 TG_SETTINGS_FILE = os.path.join(YUAN_ROOT, "tg_user_settings.json")
 
 # ===== TTS 配置 =====
-TTS_VOICE = "zh-CN-XiaoxiaoNeural"  # 默认语音，后续可换成克隆声音
 TTS_ENABLED_DEFAULT = True  # 默认是否发语音
 
 
@@ -646,7 +645,8 @@ async def cmd_status(update, context):
         f"映射微信用户: {wx_user_id}\n"
         f"模型: {config.MODEL}\n"
         f"语音模式: {'🔊 开启' if voice else '🔇 关闭'}\n"
-        f"TTS 语音: {TTS_VOICE}\n"
+        f"TTS 引擎: {getattr(config, 'TTS_ENGINE', 'edge')}\n"
+        f"TTS 音色: {getattr(config, 'TTS_MINIMAX_VOICE_ID', '?') if getattr(config, 'TTS_ENGINE', '') == 'minimax' else getattr(config, 'TTS_EDGE_VOICE', '?')}\n"
         f"━━━━━━━━━━\n"
         f"共享上下文: {len(ctx_list)} 条消息 (~{total_rounds} 轮)\n"
         f"记忆系统: {'✅' if getattr(config, 'ENABLE_MEMORY', False) else '❌'}\n"
@@ -897,7 +897,7 @@ async def _send_voice_reply(update, text: str):
         if not voice_text:
             return
 
-        ogg_path = text_to_ogg(voice_text, voice=TTS_VOICE)
+        ogg_path = text_to_ogg(voice_text)
 
         with open(ogg_path, "rb") as audio:
             await update.message.reply_voice(audio)
@@ -981,7 +981,7 @@ def main():
 
     logger.info(f"Bot Token: {TG_BOT_TOKEN[:20]}...")
     logger.info(f"模型: {config.MODEL}")
-    logger.info(f"默认语音: {TTS_VOICE}")
+    logger.info(f"TTS 引擎: {getattr(config, 'TTS_ENGINE', 'edge')}")
     logger.info("Bot 已启动，等待消息...")
 
     # 启动（带自动重连）
