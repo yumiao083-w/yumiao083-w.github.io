@@ -256,9 +256,8 @@ def get_ai_response(message: str, tg_user_id: str) -> str:
 
     messages.extend(history)
 
-    # 添加当前消息，标记来自 TG
-    tagged_message = f"[TG] {message}"
-    messages.append({"role": "user", "content": tagged_message})
+    # 添加当前消息（不加 [TG] 标签，避免 AI 模仿）
+    messages.append({"role": "user", "content": message})
 
     # 调用 AI（支持多中转站故障转移）
     providers = getattr(config, 'CHAT_API_PROVIDERS', [])
@@ -314,6 +313,7 @@ def get_ai_response(message: str, tg_user_id: str) -> str:
 
             if full_content:
                 reply = full_content.strip()
+                logger.info(f"[TG] 中转站 [{p_name}] 成功，回复 {len(reply)} chars")
                 break  # 成功，不再试下一个
 
             logger.warning(f"[TG] 中转站 [{p_name}] 返回空内容，尝试下一个")
@@ -337,10 +337,15 @@ def get_ai_response(message: str, tg_user_id: str) -> str:
     reply = re.sub(r'<save_memory>.*?</save_memory>', '', reply, flags=re.DOTALL).strip()
     reply = re.sub(r'<core_memory>.*?</core_memory>', '', reply, flags=re.DOTALL).strip()
 
-    # 保存到共享上下文（微信端也能看到）
-    # 用户消息和袁朗回复都打 [TG] 标签
-    all_contexts[wx_user_id][role_name].append({"role": "user", "content": tagged_message})
-    all_contexts[wx_user_id][role_name].append({"role": "assistant", "content": f"[TG] {reply}"})
+    # 去掉 AI 自己加的 [TG] 标签（防止残留）
+    if reply.startswith("[TG]"):
+        reply = reply[4:].strip()
+
+    logger.info(f"[TG] AI 回复 ({len(reply)} chars): {reply[:200]}")
+
+    # 保存到共享上下文（微信端也能看到，不加 [TG] 标签）
+    all_contexts[wx_user_id][role_name].append({"role": "user", "content": message})
+    all_contexts[wx_user_id][role_name].append({"role": "assistant", "content": reply})
     
     # 裁剪
     if len(all_contexts[wx_user_id][role_name]) > context_limit:
@@ -610,9 +615,8 @@ async def cmd_status(update, context):
     if wx_user_id in all_contexts and isinstance(all_contexts[wx_user_id], dict):
         ctx_list = all_contexts[wx_user_id].get(role_name, [])
 
-    # 统计微信和TG的消息数
-    wx_count = sum(1 for m in ctx_list if not m.get("content", "").startswith("[TG]"))
-    tg_count = sum(1 for m in ctx_list if m.get("content", "").startswith("[TG]"))
+    # 统计消息数
+    total_rounds = len(ctx_list) // 2
 
     status_text = (
         f"📊 状态\n"
@@ -623,9 +627,7 @@ async def cmd_status(update, context):
         f"语音模式: {'🔊 开启' if voice else '🔇 关闭'}\n"
         f"TTS 语音: {TTS_VOICE}\n"
         f"━━━━━━━━━━\n"
-        f"共享上下文: {len(ctx_list)} 条消息\n"
-        f"  微信端: ~{wx_count // 2} 轮\n"
-        f"  TG端: ~{tg_count // 2} 轮\n"
+        f"共享上下文: {len(ctx_list)} 条消息 (~{total_rounds} 轮)\n"
         f"记忆系统: {'✅' if getattr(config, 'ENABLE_MEMORY', False) else '❌'}\n"
         f"━━━━━━━━━━"
     )
