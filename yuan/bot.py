@@ -541,10 +541,29 @@ _BROWSER_HEADERS = {
     "X-Stainless-Runtime-Version": "",
 }
 
-# 初始化OpenAI客户端
+# 构建聊天模型中转站列表（兼容旧配置）
+def _build_chat_providers():
+    """构建聊天中转站列表，优先用 CHAT_API_PROVIDERS，否则用旧字段"""
+    try:
+        providers = CHAT_API_PROVIDERS
+        if providers and isinstance(providers, list) and len(providers) > 0:
+            return providers
+    except NameError:
+        pass
+    # 兼容：没有 CHAT_API_PROVIDERS 时用旧字段
+    return [{
+        'name': '主中转站',
+        'base_url': DEEPSEEK_BASE_URL,
+        'api_key': DEEPSEEK_API_KEY,
+        'model': MODEL,
+    }]
+
+_chat_providers = _build_chat_providers()
+
+# 初始化OpenAI客户端（用第一个中转站）
 client = OpenAI(
-    api_key=DEEPSEEK_API_KEY,
-    base_url=DEEPSEEK_BASE_URL,
+    api_key=_chat_providers[0]['api_key'],
+    base_url=_chat_providers[0]['base_url'],
     default_headers=_BROWSER_HEADERS
 )
 
@@ -1315,112 +1334,148 @@ def async_update_core_memory(user_id, tag_description, user_message, ai_reply):
 
 def call_chat_api_with_retry(messages_to_send, user_id, max_retries=2, is_summary=False):
     """
-    调用 Chat API 并在第一次失败或返回空结果时重试, 包含200秒全局超时. 
+    调用 Chat API，支持多中转站故障转移。
+    按 CHAT_API_PROVIDERS 顺序依次尝试，每个中转站失败后自动切换下一个。
+    所有中转站都失败后再整体重试。
 
     参数:
         messages_to_send (list): 要发送给 API 的消息列表.
         user_id (str): 用户或系统组件的标识符.
-        max_retries (int): 最大重试次数.
+        max_retries (int): 所有中转站都失败后的整体重试次数.
+        is_summary (bool): 标记是否为总结任务.
 
     返回:
         str: API 返回的文本回复.
     
     异常:
-        TimeoutError: 如果总处理时间超过200秒.
+        TimeoutError: 如果总处理时间超过240秒.
     """
-    attempt = 0
-    
+    providers = _chat_providers
+    if not providers:
+        raise RuntimeError("没有配置任何聊天模型中转站")
+
     # --- 全局超时控制 ---
     TOTAL_TIMEOUT = 240  # 秒
     start_time = time.time()
+    last_error = None
+    # 不可重试的致命错误关键字
+    fatal_keywords = [
+        "real name verification", "payment required",
+        "user quota", "is not enough", "UnlimitedQuota",
+    ]
 
-    while attempt <= max_retries:
-        # --- 检查总时间是否已超时 ---
-        elapsed_time = time.time() - start_time
-        if elapsed_time >= TOTAL_TIMEOUT:
-            logger.error(f"API调用总时间超过 {TOTAL_TIMEOUT} 秒, 已超时.用户: {user_id}")
-            # 抛出标准的TimeoutError, 以便上层捕获
-            raise TimeoutError(f"API call timed out after {TOTAL_TIMEOUT} seconds.")
-        
-        # 计算本次请求的剩余超时时间
-        request_timeout = TOTAL_TIMEOUT - elapsed_time
+    for attempt in range(max_retries + 1):
+        for pi, provider in enumerate(providers):
+            # --- 检查总时间是否已超时 ---
+            elapsed_time = time.time() - start_time
+            if elapsed_time >= TOTAL_TIMEOUT:
+                logger.error(f"API调用总时间超过 {TOTAL_TIMEOUT} 秒, 已超时. 用户: {user_id}")
+                raise TimeoutError(f"API call timed out after {TOTAL_TIMEOUT} seconds.")
 
-        try:
-            logger.debug(f"发送给 API 的消息 (ID: {user_id}): {messages_to_send}")
+            p_name = provider.get('name', f'中转站#{pi+1}')
+            p_url = provider.get('base_url', '')
+            p_key = provider.get('api_key', '')
+            p_model = provider.get('model', MODEL)
 
-            # --- 开始替换 ---
-            response = client.chat.completions.create(
-                model=MODEL,
-                messages=messages_to_send,
-                temperature=TEMPERATURE,
-                max_tokens=MAX_TOKEN,
-                stream=True,  # <--- 改成 True！开启流式传输，防止 524 断线
-                timeout=request_timeout
-            )
+            if not p_url or not p_key:
+                logger.warning(f"中转站 [{p_name}] 缺少 URL 或 Key，跳过")
+                continue
 
-            full_content = ""
-            # 循环接收每一个字，保持连接活跃
-            for chunk in response:
-                if chunk.choices and len(chunk.choices) > 0:
-                    delta = chunk.choices[0].delta
-                    # 兼容不同模型的返回格式
-                    if hasattr(delta, 'content') and delta.content:
-                        full_content += delta.content
-                    # 如果有 reasoning_content (如深度思考模型)，也可以接在这里，目前先拼装普通 content
+            request_timeout = TOTAL_TIMEOUT - (time.time() - start_time)
+            if request_timeout <= 0:
+                raise TimeoutError(f"API call timed out after {TOTAL_TIMEOUT} seconds.")
 
-            if full_content:
-                content = full_content.strip()
-                if content and "[image]" not in content:
-                    filtered_content = strip_before_thought_tags(content)
-                    if filtered_content:
-                        return filtered_content
-            # --- 替换结束 ---
+            try:
+                logger.info(f"调用中转站 [{p_name}] 模型: {p_model} (尝试 {attempt+1}/{max_retries+1})")
+                logger.debug(f"发送给 API 的消息 (ID: {user_id}): {messages_to_send}")
 
-            logger.error(f"错误请求消息体: {MODEL}")
-            logger.error(json.dumps(messages_to_send, ensure_ascii=False, indent=2))
-            logger.error(f"\033[31m错误:API 返回了空的选择项或内容为空.模型名:{MODEL}\033[0m")
-            logger.error(f"完整响应对象: {response}")
+                # 每次创建新 client 防止连接池污染
+                api_client = OpenAI(
+                    api_key=p_key,
+                    base_url=p_url,
+                    default_headers=_BROWSER_HEADERS
+                )
 
-        except APITimeoutError:
-            # 捕获单次请求超时, 并记录日志.外层循环会控制总时间.
-            logger.warning(f"单次 API 请求超时 (总已用时: {elapsed_time:.1f}s).正在准备下一次尝试...")
-            # 这里不需要做任何特殊操作, 外层循环会继续或因总时间超时而终止
+                response = api_client.chat.completions.create(
+                    model=p_model,
+                    messages=messages_to_send,
+                    temperature=TEMPERATURE,
+                    max_tokens=MAX_TOKEN,
+                    stream=True,
+                    timeout=request_timeout
+                )
 
-        except Exception as e:
-            logger.error(f"错误请求消息体: {MODEL}")
-            logger.error(json.dumps(messages_to_send, ensure_ascii=False, indent=2))
-            error_info = str(e)
-            logger.error(f"自动重试:第 {attempt + 1} 次调用 {MODEL}失败 (ID: {user_id}) 原因: {error_info}", exc_info=False)
+                full_content = ""
+                for chunk in response:
+                    if chunk.choices and len(chunk.choices) > 0:
+                        delta = chunk.choices[0].delta
+                        if hasattr(delta, 'content') and delta.content:
+                            full_content += delta.content
 
-            if "real name verification" in error_info:
-                logger.error("\033[31m错误:API 服务商反馈请完成实名认证后再使用！\033[0m")
-                break
-            elif "rate limit" in error_info:
-                logger.error("\033[31m错误:API 服务商反馈当前访问 API 服务频次达到上限, 请稍后再试！\033[0m")
-            elif "payment required" in error_info:
-                logger.error("\033[31m错误:API 服务商反馈您正在使用付费模型, 请先充值再使用或使用免费额度模型！\033[0m")
-                break
-            elif "user quota" in error_info or "is not enough" in error_info or "UnlimitedQuota" in error_info:
-                logger.error("\033[31m错误:API 服务商反馈, 你的余额不足, 请先充值再使用! 如有余额, 请检查令牌是否为无限额度.\033[0m")
-                break
-            elif "Api key is invalid" in error_info:
-                logger.error("\033[31m错误:API 服务商反馈 API KEY 不可用, 请检查配置选项！\033[0m")
-            elif "service unavailable" in error_info:
-                logger.error("\033[31m错误:API 服务商反馈服务器繁忙, 请稍后再试！\033[0m")
-            elif "sensitive words detected" in error_info:
-                logger.error("\033[31m错误:Prompt或消息中含有敏感词, 无法生成回复, 请联系API服务商！\033[0m")
-                if ENABLE_SENSITIVE_CONTENT_CLEARING:
-                    logger.warning(f"已开启敏感词自动清除上下文功能, 开始清除用户 {user_id} 的聊天上下文")
-                    clear_chat_context(user_id)
-                    if is_summary:
-                        clear_memory_temp_files(user_id)
-                break
-            else:
-                logger.error("\033[31m未知错误:" + error_info + "\033[0m")
+                if full_content:
+                    content = full_content.strip()
+                    if content and "[image]" not in content:
+                        filtered_content = strip_before_thought_tags(content)
+                        if filtered_content:
+                            return filtered_content
 
-        attempt += 1
+                # 空回复，记录后尝试下一个中转站
+                logger.warning(f"中转站 [{p_name}] 返回空内容，尝试下一个")
+                last_error = RuntimeError(f"中转站 [{p_name}] 返回空内容")
+                continue
 
-    raise RuntimeError("宝宝窝被妖怪抓走惹qwqq")
+            except APITimeoutError:
+                elapsed = time.time() - start_time
+                logger.warning(f"中转站 [{p_name}] 请求超时 (总已用时: {elapsed:.1f}s)，切换下一个")
+                last_error = TimeoutError(f"中转站 [{p_name}] 超时")
+                continue
+
+            except Exception as e:
+                error_info = str(e).lower()
+                logger.error(f"中转站 [{p_name}] 调用 {p_model} 失败 (ID: {user_id}): {e}")
+
+                # 致命错误直接终止，不再尝试其他中转站
+                for kw in fatal_keywords:
+                    if kw in error_info:
+                        logger.error(f"致命错误 ({kw})，停止重试")
+                        if "sensitive words detected" in error_info:
+                            if ENABLE_SENSITIVE_CONTENT_CLEARING:
+                                clear_chat_context(user_id)
+                                if is_summary:
+                                    clear_memory_temp_files(user_id)
+                        raise RuntimeError(f"API 致命错误: {e}")
+
+                if "sensitive words detected" in error_info:
+                    if ENABLE_SENSITIVE_CONTENT_CLEARING:
+                        logger.warning(f"检测到敏感词，清除用户 {user_id} 的上下文")
+                        clear_chat_context(user_id)
+                        if is_summary:
+                            clear_memory_temp_files(user_id)
+                    raise RuntimeError(f"敏感词错误: {e}")
+
+                # 非致命错误，切换下一个中转站
+                last_error = e
+                logger.warning(f"非致命错误，切换下一个中转站: {e}")
+                continue
+
+        # 一轮所有中转站都失败了
+        if attempt < max_retries:
+            logger.warning(f"所有中转站都失败，等待 3 秒后进行第 {attempt+2} 轮重试...")
+            time.sleep(3)
+
+    # 所有重试都失败
+    # 尝试读取用户自定义错误消息
+    error_msg = "宝宝窝被妖怪抓走惹qwqq"
+    try:
+        error_file = os.path.join(root_dir, 'User_Error_Messages', f'{user_id}_api_failure_error.txt')
+        if os.path.exists(error_file):
+            with open(error_file, 'r', encoding='utf-8') as f:
+                custom_msg = f.read().strip()
+                if custom_msg:
+                    error_msg = custom_msg
+    except Exception:
+        pass
+    raise RuntimeError(error_msg)
 
 
 def get_assistant_response(message, user_id, is_summary=False, system_prompt=None):

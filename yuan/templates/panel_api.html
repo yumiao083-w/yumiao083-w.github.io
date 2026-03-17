@@ -455,18 +455,45 @@ function toggleLlmOnly() {
 
 // ===== 保存函数 =====
 function saveChat() {
-    // 聊天模型当前只有一个中转站时仍走旧字段（兼容 bot.py）
-    // 有多个时第一个写入主字段，其余存储待后端支持
+    // 保存聊天模型配置：中转站列表 + 温度/Token
     const providers = providerData.chat;
-    const first = providers[0] || {};
-    saveFields({
-        DEEPSEEK_BASE_URL: first.base_url || '',
-        DEEPSEEK_API_KEY: first.api_key || '',
-        MODEL: first.model || '',
-        TEMPERATURE: document.getElementById('chat-temp').value,
-        MAX_TOKEN: document.getElementById('chat-max-token').value,
-    }, 'chat-status');
-    // TODO: 后端支持多中转站后，额外保存 providers 列表
+    if (providers.length === 0) {
+        document.getElementById('chat-status').textContent = '❌ 至少需要一个中转站';
+        document.getElementById('chat-status').style.color = '#ff3b30';
+        return;
+    }
+    const s = document.getElementById('chat-status');
+    s.textContent = '保存中...'; s.style.color = '#999';
+
+    // 1. 保存中转站列表到后端
+    const p1 = fetch('/api/chat_providers', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ providers: providers })
+    }).then(r => r.json());
+
+    // 2. 保存温度和 Token 到 config.py
+    const p2 = fetch('/api/save_section', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ fields: {
+            TEMPERATURE: document.getElementById('chat-temp').value,
+            MAX_TOKEN: document.getElementById('chat-max-token').value,
+        }})
+    }).then(r => r.json());
+
+    Promise.all([p1, p2])
+        .then(([r1, r2]) => {
+            if (r1.error || r2.error) {
+                s.textContent = '❌ ' + (r1.error || r2.error);
+                s.style.color = '#ff3b30';
+            } else {
+                s.textContent = '✅ 已保存';
+                s.style.color = '#34c759';
+                setTimeout(() => s.textContent = '', 3000);
+            }
+        })
+        .catch(e => { s.textContent = '❌ ' + e.message; s.style.color = '#ff3b30'; });
 }
 
 function saveMr() {
@@ -537,14 +564,32 @@ function mrResetPrompt() {
 
 // ===== 初始化 =====
 function init() {
-    // 聊天模型：从 config 初始化第一个中转站
-    providerData.chat = [{
-        name: '主中转站',
-        base_url: '{{ config.DEEPSEEK_BASE_URL }}',
-        api_key: '{{ config.DEEPSEEK_API_KEY }}',
-        model: '{{ config.MODEL }}'
-    }];
-    renderProviders('chat');
+    // 聊天模型：从后端 API 加载中转站列表
+    fetch('/api/chat_providers')
+        .then(r => r.json())
+        .then(d => {
+            providerData.chat = d.providers || [];
+            // 兼容：如果后端返回空列表，用旧字段填充一个
+            if (providerData.chat.length === 0) {
+                providerData.chat = [{
+                    name: '主中转站',
+                    base_url: '{{ config.DEEPSEEK_BASE_URL }}',
+                    api_key: '{{ config.DEEPSEEK_API_KEY }}',
+                    model: '{{ config.MODEL }}'
+                }];
+            }
+            renderProviders('chat');
+        })
+        .catch(() => {
+            // API 失败时用旧字段兜底
+            providerData.chat = [{
+                name: '主中转站',
+                base_url: '{{ config.DEEPSEEK_BASE_URL }}',
+                api_key: '{{ config.DEEPSEEK_API_KEY }}',
+                model: '{{ config.MODEL }}'
+            }];
+            renderProviders('chat');
+        });
 
     // 记忆筛选
     fetch('/api/memory_retrieval_config')

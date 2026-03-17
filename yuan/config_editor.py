@@ -1776,6 +1776,7 @@ def get_default_config():
         "DEEPSEEK_API_KEY": '',
         "DEEPSEEK_BASE_URL": 'https://vg.v1api.cc/v1',
         "MODEL": 'deepseek-v3-0324',
+        "CHAT_API_PROVIDERS": [],
         "MAX_GROUPS": 5,
         "MAX_TOKEN": 2000,
         "TEMPERATURE": 1.1,
@@ -3291,6 +3292,127 @@ def _format_providers_list(providers):
         lines.append('    },')
     lines.append(']')
     return '\n'.join(lines)
+
+
+# =========================================================================
+# 聊天模型多中转站管理 API
+# =========================================================================
+
+def _read_chat_providers():
+    """从 config.py 读取聊天模型中转站列表"""
+    try:
+        import config as cfg
+        import importlib
+        importlib.reload(cfg)
+        providers = getattr(cfg, 'CHAT_API_PROVIDERS', [])
+        if not providers:
+            # 兼容旧配置：用旧字段构造一个默认 provider
+            providers = [{
+                'name': '主中转站',
+                'base_url': getattr(cfg, 'DEEPSEEK_BASE_URL', ''),
+                'api_key': getattr(cfg, 'DEEPSEEK_API_KEY', ''),
+                'model': getattr(cfg, 'MODEL', ''),
+            }]
+        return providers
+    except Exception as e:
+        app.logger.error(f"读取聊天中转站配置失败: {e}")
+        return []
+
+
+def _write_chat_providers(providers):
+    """将聊天模型中转站列表写回 config.py"""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(script_dir, 'config.py')
+
+    with open(config_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    import re as _re
+
+    # 替换 CHAT_API_PROVIDERS 整块
+    providers_repr = _format_chat_providers_list(providers)
+    pattern = r"CHAT_API_PROVIDERS\s*=\s*\[.*?\n\]"
+    replacement = f"CHAT_API_PROVIDERS = {providers_repr}"
+    new_content = _re.sub(pattern, replacement, content, flags=_re.DOTALL)
+
+    # 同步更新旧字段（兼容其他使用旧字段的代码）
+    if providers:
+        first = providers[0]
+        # 更新 DEEPSEEK_BASE_URL
+        new_content = _re.sub(
+            r"DEEPSEEK_BASE_URL\s*=\s*['\"].*?['\"]",
+            f"DEEPSEEK_BASE_URL = {repr(first.get('base_url', ''))}",
+            new_content
+        )
+        # 更新 DEEPSEEK_API_KEY
+        new_content = _re.sub(
+            r"DEEPSEEK_API_KEY\s*=\s*['\"].*?['\"]",
+            f"DEEPSEEK_API_KEY = {repr(first.get('api_key', ''))}",
+            new_content
+        )
+        # 更新 MODEL
+        new_content = _re.sub(
+            r"^MODEL\s*=\s*['\"].*?['\"]",
+            f"MODEL = {repr(first.get('model', ''))}",
+            new_content,
+            flags=_re.MULTILINE
+        )
+
+    with open(config_path, 'w', encoding='utf-8') as f:
+        f.write(new_content)
+
+
+def _format_chat_providers_list(providers):
+    """把聊天中转站列表格式化为 Python 代码字符串"""
+    if not providers:
+        return '[]'
+    lines = ['[']
+    for p in providers:
+        lines.append('    {')
+        lines.append(f"        'name': {repr(p.get('name', ''))},")
+        lines.append(f"        'base_url': {repr(p.get('base_url', ''))},")
+        lines.append(f"        'api_key': {repr(p.get('api_key', ''))},")
+        lines.append(f"        'model': {repr(p.get('model', ''))},")
+        lines.append('    },')
+    lines.append(']')
+    return '\n'.join(lines)
+
+
+@app.route('/api/chat_providers', methods=['GET'])
+@login_required
+def get_chat_providers():
+    """获取聊天模型中转站列表"""
+    providers = _read_chat_providers()
+    return jsonify({'providers': providers})
+
+
+@app.route('/api/chat_providers', methods=['POST'])
+@login_required
+def save_chat_providers():
+    """保存聊天模型中转站列表"""
+    try:
+        req = request.get_json()
+        if not req:
+            return jsonify({'error': '请求数据为空'}), 400
+
+        providers = req.get('providers', [])
+        if not isinstance(providers, list):
+            return jsonify({'error': '数据格式错误'}), 400
+
+        _write_chat_providers(providers)
+
+        # 热重载 config 模块
+        try:
+            import config as cfg
+            import importlib
+            importlib.reload(cfg)
+        except Exception:
+            pass
+
+        return jsonify({'status': 'success', 'message': f'已保存 {len(providers)} 个中转站'})
+    except Exception as e:
+        app.logger.error(f"保存聊天中转站配置失败: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/memory_retrieval_config', methods=['GET'])

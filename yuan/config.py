@@ -29,6 +29,18 @@ MAX_GROUPS = 110
 # 官方API的V3模型
 # MODEL = 'deepseek-chat'
 
+# 聊天模型多中转站列表（按顺序故障转移，第一个成功就用）
+# 每项: name(名称), base_url, api_key, model
+# 如果为空列表，则使用上面的 DEEPSEEK_BASE_URL / DEEPSEEK_API_KEY / MODEL 作为唯一中转站
+CHAT_API_PROVIDERS = [
+    {
+        'name': '主中转站',
+        'base_url': 'http://api.wasdxx.xyz/v1',
+        'api_key': 'sk-tujpMKTbaMm3OLvDhP87Tp8q1xKyvH63BWyLrqqNvX3Her8r',
+        'model': '[特价]claude-opus-4-6',
+    },
+]
+
 # 回复最大token
 MAX_TOKEN = 64000
 # DeepSeek温度
