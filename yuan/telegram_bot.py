@@ -804,7 +804,6 @@ async def _transcribe_voice(ogg_path: str) -> str:
 def main():
     """启动 Telegram Bot"""
     from telegram.ext import Application, CommandHandler, MessageHandler, filters
-    import httpx as _httpx
 
     logger.info("=" * 50)
     logger.info("袁朗 Telegram Bot 启动中...")
@@ -814,16 +813,12 @@ def main():
     _ensure_yuan()
 
     # 代理配置（国内访问 Telegram API 需要代理）
-    # 自动检测系统代理，或手动指定
-    proxy_url = None
-    import os as _os
-    for env_key in ['https_proxy', 'HTTPS_PROXY', 'http_proxy', 'HTTP_PROXY', 'all_proxy', 'ALL_PROXY']:
-        val = _os.environ.get(env_key)
-        if val:
-            proxy_url = val
-            break
+    # httpx 会自动读取 https_proxy / http_proxy 环境变量
+    # 如果用户没设环境变量，我们自动探测本地代理并设上
+    proxy_url = os.environ.get('https_proxy') or os.environ.get('HTTPS_PROXY') \
+                or os.environ.get('http_proxy') or os.environ.get('HTTP_PROXY') \
+                or os.environ.get('all_proxy') or os.environ.get('ALL_PROXY')
 
-    # 如果环境变量没代理，尝试常见本地代理端口
     if not proxy_url:
         import socket
         for port in [7890, 7891, 1080, 10808, 10809, 2080]:
@@ -833,45 +828,21 @@ def main():
                 s.connect(('127.0.0.1', port))
                 s.close()
                 proxy_url = f"http://127.0.0.1:{port}"
+                # 设到环境变量，httpx 会自动读取
+                os.environ['https_proxy'] = proxy_url
+                os.environ['http_proxy'] = proxy_url
+                logger.info(f"自动检测到代理端口 {port}，已设置环境变量")
                 break
             except (socket.error, OSError):
                 continue
 
     if proxy_url:
-        logger.info(f"使用代理: {proxy_url}")
+        logger.info(f"代理: {proxy_url}")
     else:
         logger.warning("未检测到代理，将直连 Telegram API（国内可能超时）")
 
-    # 创建 bot（带代理和更长超时）
-    builder = Application.builder().token(TG_BOT_TOKEN)
-
-    if proxy_url:
-        # 配置 httpx 代理
-        builder = builder.proxy(proxy_url)
-
-    # 增加连接超时时间
-    from telegram.request import HTTPXRequest
-    custom_request = HTTPXRequest(
-        connection_pool_size=8,
-        connect_timeout=30.0,
-        read_timeout=30.0,
-        write_timeout=30.0,
-        pool_timeout=30.0,
-        proxy=proxy_url,
-    )
-    builder = builder.request(custom_request)
-    # get_updates 请求也需要代理
-    custom_get_updates_request = HTTPXRequest(
-        connection_pool_size=8,
-        connect_timeout=30.0,
-        read_timeout=30.0,
-        write_timeout=30.0,
-        pool_timeout=30.0,
-        proxy=proxy_url,
-    )
-    builder = builder.get_updates_request(custom_get_updates_request)
-
-    app = builder.build()
+    # 创建 bot（简单构建，代理通过环境变量自动生效）
+    app = Application.builder().token(TG_BOT_TOKEN).build()
 
     # 注册命令
     app.add_handler(CommandHandler("start", cmd_start))
@@ -907,19 +878,8 @@ def main():
                 wait = min(30, 5 * restart_count)
                 logger.info(f"{wait} 秒后自动重启...")
                 _time.sleep(wait)
-                # 重新创建 app 实例（带代理）
-                _builder = Application.builder().token(TG_BOT_TOKEN)
-                _req = HTTPXRequest(
-                    connection_pool_size=8, connect_timeout=30.0,
-                    read_timeout=30.0, write_timeout=30.0, pool_timeout=30.0,
-                    proxy=proxy_url,
-                )
-                _get_req = HTTPXRequest(
-                    connection_pool_size=8, connect_timeout=30.0,
-                    read_timeout=30.0, write_timeout=30.0, pool_timeout=30.0,
-                    proxy=proxy_url,
-                )
-                app = _builder.request(_req).get_updates_request(_get_req).build()
+                # 重新创建 app 实例
+                app = Application.builder().token(TG_BOT_TOKEN).build()
                 app.add_handler(CommandHandler("start", cmd_start))
                 app.add_handler(CommandHandler("voice", cmd_voice))
                 app.add_handler(CommandHandler("new", cmd_new))
