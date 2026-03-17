@@ -323,120 +323,127 @@ def get_ai_response(message: str, tg_user_id: str) -> str:
 
 def _build_system_prompt(user_id: str) -> str:
     """
-    构建系统提示词：角色设定 + 核心记忆 + 短期记忆
-    复用 yuan 的文件结构
+    构建系统提示词，严格对标 bot.py 的六板块架构：
+      1. 人设卡 (characters/{角色}.md)
+      2. 预设 (presets/{预设}.md 或 presets/preset.md)
+      3. 核心记忆 (Memory_Core/{user}_{role}_unified_memory.json)
+      4. 记忆索引 (memory_entries.json 的 summary 列表)
+      5. 检索命中的详细记忆（按需）
+      6. 短期记忆 (Memory_Daily/{user}_{role}/short_term/)
     """
     _ensure_yuan()
 
     parts = []
 
-    # 1. 角色设定文件
-    prompt_mapping = {entry[0]: entry[1] for entry in config.LISTEN_LIST}
-    # TG 端默认使用第一个角色
-    if config.LISTEN_LIST:
-        default_role = config.LISTEN_LIST[0][1]  # '袁朗'
-    else:
-        default_role = "assistant"
+    # 基础映射
+    if not config.LISTEN_LIST:
+        return "你是一个AI助手。"
 
-    role_name = default_role
+    entry = config.LISTEN_LIST[0]
+    wx_user_id = entry[0]       # '郁邈'
+    role_name = entry[1]        # '袁朗'
+    preset_name = entry[3] if len(entry) >= 4 and entry[3] else ''
+    memory_key = f"{wx_user_id}_{role_name}"
 
-    # 查找角色文件
+    # ========== 板块1: 人设卡 ==========
+    # 搜索优先级: characters/ 子目录 → prompts/ 根目录 → 默认 character.md
+    character_loaded = False
     for candidate in [
         os.path.join(YUAN_ROOT, 'prompts', 'characters', f'{role_name}.md'),
         os.path.join(YUAN_ROOT, 'prompts', f'{role_name}.md'),
+        os.path.join(YUAN_ROOT, 'prompts', 'characters', 'character.md'),
         os.path.join(YUAN_ROOT, 'prompts', 'character.md'),
     ]:
         if os.path.exists(candidate):
             try:
                 with open(candidate, 'r', encoding='utf-8') as f:
                     content = f.read()
-                # 角色设定文件过大时截断，避免 prompt 爆炸
-                if len(content) > 30000:
-                    logger.warning(f"角色文件过大 ({len(content)} chars)，截断到 30000")
-                    content = content[:30000] + "\n\n[角色设定已截断]"
                 parts.append(content)
-                logger.info(f"加载角色设定: {candidate} ({len(content)} chars)")
+                character_loaded = True
+                logger.info(f"[板块1] 人设卡: {candidate} ({len(content)} chars)")
             except Exception as e:
-                logger.error(f"读取角色文件失败: {e}")
+                logger.error(f"读取人设卡失败: {e}")
             break
 
-    # 2. 预设文件（如果有）
-    if config.LISTEN_LIST and len(config.LISTEN_LIST[0]) >= 4 and config.LISTEN_LIST[0][3]:
-        preset_name = config.LISTEN_LIST[0][3]
-        for preset_candidate in [
-            os.path.join(YUAN_ROOT, 'prompts', 'presets', f'{preset_name}.md'),
-            os.path.join(YUAN_ROOT, 'prompts', f'{preset_name}.md'),
-        ]:
-            if os.path.exists(preset_candidate):
+    if not character_loaded:
+        logger.warning(f"未找到人设卡文件: {role_name}.md")
+
+    # ========== 板块2: 预设 ==========
+    preset_search = []
+    if preset_name:
+        preset_search.append(os.path.join(YUAN_ROOT, 'prompts', 'presets', f'{preset_name}.md'))
+        preset_search.append(os.path.join(YUAN_ROOT, 'prompts', f'{preset_name}.md'))
+    # 无论有没有自定义预设名，都回退到默认 preset.md
+    preset_search.append(os.path.join(YUAN_ROOT, 'prompts', 'presets', 'preset.md'))
+    preset_search.append(os.path.join(YUAN_ROOT, 'prompts', 'preset.md'))
+
+    for p in preset_search:
+        if os.path.exists(p):
+            try:
+                with open(p, 'r', encoding='utf-8') as f:
+                    preset_content = f.read()
+                if preset_content.strip():
+                    parts.append(f"\n\n{preset_content}")
+                    logger.info(f"[板块2] 预设: {p} ({len(preset_content)} chars)")
+            except Exception as e:
+                logger.error(f"读取预设文件失败: {e}")
+            break
+
+    # ========== 板块3: 核心记忆 ==========
+    if getattr(config, 'UPLOAD_CORE_MEMORY_TO_AI', True):
+        core_memory_dir = getattr(config, 'MEMORY_CORE_DIR', 'Memory_Core')
+        core_memory_content = ""
+
+        # 主路径: {user}_{role}_unified_memory.json
+        unified_path = os.path.join(YUAN_ROOT, core_memory_dir, f'{memory_key}_unified_memory.json')
+        if os.path.exists(unified_path):
+            try:
+                with open(unified_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                core_memory_content = data.get('content', '').strip()
+            except Exception as e:
+                logger.error(f"读取核心记忆失败: {e}")
+
+        # 兼容旧版: _core_memory.json
+        if not core_memory_content:
+            old_path = os.path.join(YUAN_ROOT, core_memory_dir, f'{memory_key}_core_memory.json')
+            if os.path.exists(old_path):
                 try:
-                    with open(preset_candidate, 'r', encoding='utf-8') as f:
-                        preset_content = f.read()
-                    if preset_content.strip():
-                        parts.append(preset_content)
-                        logger.info(f"加载预设: {preset_candidate}")
+                    with open(old_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    core_memory_content = data.get('content', '').strip()
                 except Exception as e:
-                    logger.error(f"读取预设文件失败: {e}")
-                break
+                    logger.error(f"读取旧版核心记忆失败: {e}")
 
-    # 3. 核心记忆（统一记忆格式）
-    core_memory_dir = getattr(config, 'MEMORY_CORE_DIR', 'Memory_Core')
-    # 新格式文件名: {user_id}_{role_name}_unified_memory.json
-    wx_user_id = config.LISTEN_LIST[0][0] if config.LISTEN_LIST else "unknown"
-    core_memory_path = os.path.join(YUAN_ROOT, core_memory_dir, f"{wx_user_id}_{role_name}_unified_memory.json")
-    
-    if not os.path.exists(core_memory_path):
-        # fallback: 搜索包含角色名的 unified_memory 文件
-        core_full_dir = os.path.join(YUAN_ROOT, core_memory_dir)
-        if os.path.isdir(core_full_dir):
-            for fname in os.listdir(core_full_dir):
-                if fname.endswith("_unified_memory.json") and role_name in fname:
-                    core_memory_path = os.path.join(core_full_dir, fname)
-                    break
+        if core_memory_content:
+            parts.append(f"\n\n# 核心记忆\n{core_memory_content}")
+            logger.info(f"[板块3] 核心记忆: {len(core_memory_content)} chars")
 
-    if os.path.exists(core_memory_path):
-        try:
-            with open(core_memory_path, 'r', encoding='utf-8') as f:
-                core_data = json.load(f)
-            if core_data:
-                # unified_memory 格式: {"timestamp": "...", "content": "..."}
-                if isinstance(core_data, dict) and 'content' in core_data:
-                    memory_content = core_data['content']
-                elif isinstance(core_data, dict) and 'core_memory' in core_data:
-                    memory_content = core_data['core_memory']
-                elif isinstance(core_data, list):
-                    # 旧格式: [{"summary": "..."}]
-                    memory_content = "\n".join(item.get("summary", "") for item in core_data if item.get("summary"))
-                else:
-                    memory_content = json.dumps(core_data, ensure_ascii=False, indent=2)
-                
-                if memory_content and memory_content.strip():
-                    parts.append("\n\n## 核心记忆\n" + memory_content)
-                    logger.info(f"加载核心记忆: {core_memory_path}")
-        except Exception as e:
-            logger.error(f"读取核心记忆失败: {e}")
+    # ========== 板块4: 记忆索引 (memory_entries.json) ==========
+    try:
+        from memory_retrieval import build_memory_index
+        memory_index = build_memory_index()
+        if memory_index:
+            parts.append(f"\n\n{memory_index}")
+            logger.info(f"[板块4] 记忆索引: {len(memory_index)} chars")
+    except Exception as e:
+        logger.debug(f"记忆索引跳过: {e}")
 
-    # 4. 记忆索引（碎片记忆摘要）
-    if getattr(config, 'UPLOAD_MEMORY_TO_AI', False):
-        memory_dir = getattr(config, 'MEMORY_SUMMARIES_DIR', 'Memory_Summaries')
-        # 尝试加载记忆检索
-        try:
-            from memory_retrieval import retrieve_memories, format_retrieved_memories
-            retrieved = retrieve_memories("", recent_context="")
-            if retrieved:
-                parts.append("\n\n## 相关记忆\n" + format_retrieved_memories(retrieved))
-        except Exception as e:
-            logger.debug(f"记忆检索跳过: {e}")
+    # ========== 板块5: 检索命中的详细记忆（TG 端简化，不做实时检索） ==========
+    # bot.py 中这部分是在 message_listener 里根据用户消息实时检索的
+    # TG 端暂时不做，依赖板块4的索引即可
 
-    # 5. 短期记忆
+    # ========== 板块6: 短期记忆 ==========
     try:
         from short_term_memory import get_short_term_prompt
-        short_term = get_short_term_prompt(user_id)
+        short_term = get_short_term_prompt(wx_user_id)
         if short_term:
-            parts.append("\n\n" + short_term)
+            parts.append(f"\n\n{short_term}")
+            logger.info(f"[板块6] 短期记忆: {len(short_term)} chars")
     except Exception as e:
         logger.debug(f"短期记忆跳过: {e}")
 
-    # 5. TG 专属提示
+    # ========== TG 专属提示 ==========
     parts.append("""
 
 ## 当前对话平台
