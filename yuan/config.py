@@ -280,7 +280,7 @@ TTS_ENGINE = 'minimax'
 # --- MiniMax 配置 ---
 TTS_MINIMAX_API_KEY = 'sk-api-3tSxXYsPDn0nOHEtvZSgLSKPiPGuyR39ntu-7LtfwXlet3-LCvnUN7SiA-FUFEXaCp7pXq00NTst0X0p42aOukELFA-r_AtEJcL-C30UCmPcbqISrPAQYXs'
 TTS_MINIMAX_GROUP_ID = '1977563833656418958'
-TTS_MINIMAX_VOICE_ID = 'yuanlang'          # 克隆的声音 ID
+TTS_MINIMAX_VOICE_ID = 'yuanlangYL'        # 克隆的声音 ID
 TTS_MINIMAX_MODEL = 'speech-02-hd'         # 模型: speech-02-hd / speech-02
 TTS_MINIMAX_SPEED = 1.0                    # 语速 0.5~2.0
 TTS_MINIMAX_VOL = 1.0                      # 音量 0.1~10.0
