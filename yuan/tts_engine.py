@@ -119,11 +119,16 @@ def _minimax_generate(text: str, output_path: str, fmt: str = "mp3"):
     if status_code != 0:
         raise RuntimeError(f"MiniMax TTS 错误 [{status_code}]: {status_msg}")
 
-    audio_b64 = data.get("data", {}).get("audio", "")
-    if not audio_b64:
+    audio_hex = data.get("data", {}).get("audio", "")
+    if not audio_hex:
         raise RuntimeError("MiniMax TTS 返回空音频")
 
-    audio_bytes = base64.b64decode(audio_b64)
+    # MiniMax T2A V2 返回的 audio 字段是 hex 编码（不是 base64）
+    try:
+        audio_bytes = bytes.fromhex(audio_hex)
+    except ValueError:
+        # 兼容：如果哪天改成 base64 了
+        audio_bytes = base64.b64decode(audio_hex)
     with open(output_path, "wb") as f:
         f.write(audio_bytes)
 
@@ -211,21 +216,51 @@ def text_to_mp3(text: str, output_path: str = None, voice: str = None) -> str:
 def text_to_ogg(text: str, output_path: str = None, voice: str = None) -> str:
     """
     文本 → ogg 文件（Telegram 语音条格式）
-    先生成 mp3 → ffmpeg 转 ogg (opus 编码)
+    MiniMax 引擎：API 输出 wav → ffmpeg 转 ogg (opus)
+    edge-tts 引擎：输出 mp3 → ffmpeg 转 ogg (opus)
     返回 ogg 文件路径。
     """
     if output_path is None:
         fd, output_path = tempfile.mkstemp(suffix=".ogg", prefix="tts_")
         os.close(fd)
 
-    # 先生成 mp3
-    mp3_path = output_path.replace(".ogg", ".mp3")
-    text_to_mp3(text, mp3_path, voice)
+    engine = get_engine()
 
-    # mp3 → ogg (opus)，Telegram 要求 ogg opus 格式
+    # MiniMax 用 wav 作中间格式（标准 PCM 头，ffmpeg 100% 兼容）
+    # edge-tts 用 mp3（它原生输出就是标准 mp3）
+    if engine == "minimax":
+        intermediate_ext = ".wav"
+        intermediate_path = output_path.replace(".ogg", ".wav")
+        try:
+            _minimax_generate(text, intermediate_path, fmt="wav")
+        except Exception as e:
+            logger.error(f"[TTS] MiniMax 失败，回退到 edge-tts: {e}")
+            intermediate_ext = ".mp3"
+            intermediate_path = output_path.replace(".ogg", ".mp3")
+            _edge_generate(text, intermediate_path)
+    else:
+        intermediate_ext = ".mp3"
+        intermediate_path = output_path.replace(".ogg", ".mp3")
+        if voice:
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+            if loop and loop.is_running():
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as pool:
+                    pool.submit(lambda: asyncio.run(
+                        _edge_tts_generate(text, intermediate_path, voice)
+                    )).result()
+            else:
+                asyncio.run(_edge_tts_generate(text, intermediate_path, voice))
+        else:
+            _edge_generate(text, intermediate_path)
+
+    # 中间文件 → ogg (opus)，Telegram 要求 ogg opus 格式
     cmd = [
         "ffmpeg", "-y",
-        "-i", mp3_path,
+        "-i", intermediate_path,
         "-c:a", "libopus",
         "-b:a", "64k",
         "-vbr", "on",
@@ -235,14 +270,22 @@ def text_to_ogg(text: str, output_path: str = None, voice: str = None) -> str:
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
-        logger.error(f"ffmpeg 转换 ogg 失败: {result.stderr}")
-        # fallback: 直接用 mp3
-        os.rename(mp3_path, output_path)
+        logger.error(f"ffmpeg 转换 ogg 失败: {result.stderr[-500:]}")
+        # fallback: 直接用中间文件（Windows 下 rename 需要先删目标）
+        try:
+            if os.path.exists(output_path):
+                os.remove(output_path)
+            os.rename(intermediate_path, output_path)
+        except OSError as e:
+            logger.error(f"fallback rename 也失败: {e}")
+            # 最后手段：直接复制
+            import shutil
+            shutil.copy2(intermediate_path, output_path)
         return output_path
 
-    # 清理 mp3
+    # 清理中间文件
     try:
-        os.remove(mp3_path)
+        os.remove(intermediate_path)
     except OSError:
         pass
 
