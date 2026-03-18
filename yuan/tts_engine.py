@@ -42,9 +42,13 @@ if YUAN_ROOT not in sys.path:
 # =====================================================================
 
 def _get_config(key, default=None):
-    """从 config.py 读取配置，支持热加载后的变化"""
+    """从 config.py 读取配置，跟随 telegram_bot 的热加载"""
     try:
-        import config as cfg
+        # 优先使用 sys.modules 中已加载（可能已被 telegram_bot reload 过）的 config
+        import sys
+        cfg = sys.modules.get('config')
+        if cfg is None:
+            import config as cfg
         return getattr(cfg, key, default)
     except Exception:
         return default

@@ -882,6 +882,9 @@ def _split_text(text: str, max_len: int = 4096) -> list:
 async def _send_voice_reply(update, text: str):
     """生成语音并发送"""
     try:
+        # 刷新配置，确保 TTS 引擎/模型/音色改动立刻生效
+        _reload_config()
+
         await update.message.chat.send_action("record_voice")
 
         from tts_engine import text_to_ogg
