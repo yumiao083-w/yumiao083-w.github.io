@@ -105,11 +105,14 @@ def _minimax_generate(text: str, output_path: str, fmt: str = "mp3"):
     logger.info(f"[TTS] MiniMax 请求: model={model}, voice={voice_id}, text={text[:80]}...")
 
     try:
-        resp = requests.post(url, headers=headers, json=payload, timeout=30)
+        # MiniMax 是国内服务，绕过代理直连（避免代理断连导致长文本失败）
+        session = requests.Session()
+        session.trust_env = False  # 忽略环境变量中的代理设置
+        resp = session.post(url, headers=headers, json=payload, timeout=60)
         resp.raise_for_status()
         data = resp.json()
     except requests.exceptions.Timeout:
-        raise RuntimeError("MiniMax TTS API 超时（30秒）")
+        raise RuntimeError("MiniMax TTS API 超时（60秒）")
     except requests.exceptions.RequestException as e:
         raise RuntimeError(f"MiniMax TTS API 请求失败: {e}")
 
