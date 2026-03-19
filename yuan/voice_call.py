@@ -639,6 +639,49 @@ def register_voice_routes(app):
             'VOICE_ENABLE_MEMORY_RETRIEVAL': _cfg('VOICE_ENABLE_MEMORY_RETRIEVAL', True),
         })
 
+    @app.route('/api/voice/logs')
+    def voice_logs():
+        """获取通话记录列表"""
+        from flask import jsonify
+        log_dir = os.path.join(YUAN_ROOT, _cfg('VOICE_CALL_LOG_DIR', 'Voice_Logs'))
+        if not os.path.exists(log_dir):
+            return jsonify({'logs': []})
+
+        logs = []
+        for f in sorted(os.listdir(log_dir), reverse=True):
+            if f.endswith('.json'):
+                filepath = os.path.join(log_dir, f)
+                try:
+                    with open(filepath, 'r', encoding='utf-8') as fh:
+                        data = json.load(fh)
+                    logs.append({
+                        'filename': f,
+                        'start_time': data.get('start_time', ''),
+                        'duration_seconds': data.get('duration_seconds', 0),
+                        'rounds': data.get('rounds', 0),
+                    })
+                except Exception:
+                    pass
+        return jsonify({'logs': logs})
+
+    @app.route('/api/voice/log/<filename>')
+    def voice_log_detail(filename):
+        """获取单条通话记录详情"""
+        from flask import jsonify
+        # 安全检查：防止路径遍历
+        if '/' in filename or '\\' in filename or '..' in filename:
+            return jsonify({'error': '非法文件名'}), 400
+        log_dir = os.path.join(YUAN_ROOT, _cfg('VOICE_CALL_LOG_DIR', 'Voice_Logs'))
+        filepath = os.path.join(log_dir, filename)
+        if not os.path.exists(filepath):
+            return jsonify({'error': '记录不存在'}), 404
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            return jsonify(data)
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
     if HAS_FLASK_SOCK:
         # ── WebSocket 模式 ──
         @sock.route('/ws/voice')
