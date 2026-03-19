@@ -463,6 +463,7 @@ let isInCall = false;
 let isMuted = false;
 let audioQueue = [];           // 待播放音频队列
 let isPlaying = false;
+let isAiSpeaking = false;      // AI 正在回复中（从收到第一个 text_delta 到所有音频播完）
 let callStartTime = null;
 let timerInterval = null;
 let currentAiText = "";        // 当前 AI 回复累积文本
@@ -594,6 +595,9 @@ function handleMessage(msg) {
         case 'user_confirmed':
             document.getElementById('userSubtitle').textContent = '你: ' + msg.text;
             document.getElementById('statusLine').textContent = '已收到，正在处理...';
+            // AI 开始处理，立刻停止录音
+            isAiSpeaking = true;
+            pauseListening();
             break;
 
         case 'status':
@@ -622,6 +626,11 @@ function handleMessage(msg) {
                 if (s.first_token_time) info += ` | 首token ${s.first_token_time}s`;
                 info += ` | LLM ${s.llm_time}s | ${s.sentences}句TTS`;
                 document.getElementById('statsLine').textContent = info;
+            }
+            // 如果没有音频在播放，恢复录音
+            if (!isPlaying && audioQueue.length === 0) {
+                isAiSpeaking = false;
+                resumeListening();
             }
             break;
 
@@ -663,6 +672,7 @@ function playNext() {
             playNext();
         } else {
             // 所有音频播完，恢复语音识别
+            isAiSpeaking = false;
             resumeListening();
         }
     };
@@ -670,10 +680,15 @@ function playNext() {
     audio.onerror = () => {
         URL.revokeObjectURL(url);
         isPlaying = false;
-        playNext();
+        if (audioQueue.length > 0) {
+            playNext();
+        } else {
+            isAiSpeaking = false;
+            resumeListening();
+        }
     };
 
-    // 播放时暂停识别（防止识别到 AI 的声音）
+    // AI 说话期间始终暂停录音
     pauseListening();
     audio.play().catch(e => {
         console.error('播放失败:', e);
@@ -729,7 +744,7 @@ function initRecognition() {
 }
 
 function startRecording() {
-    if (!mediaStream || !isInCall || isMuted) return;
+    if (!mediaStream || !isInCall || isMuted || isAiSpeaking) return;
 
     audioChunks = [];
     recordStartTime = Date.now();
@@ -885,7 +900,7 @@ function stopRecording() {
 }
 
 function startListening() {
-    if (isListening || isMuted || !isInCall) return;
+    if (isListening || isMuted || !isInCall || isAiSpeaking) return;
     if (mediaStream) {
         startRecording();
     }
@@ -896,7 +911,7 @@ function pauseListening() {
 }
 
 function resumeListening() {
-    if (!isInCall || isMuted) return;
+    if (!isInCall || isMuted || isAiSpeaking) return;
     // 延迟一点再开始，避免录到 TTS 尾音
     setTimeout(() => startListening(), 800);
 }
