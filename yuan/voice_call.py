@@ -486,7 +486,7 @@ def register_voice_routes(app):
 
             logger.info("[VoiceCall] WebSocket 连接关闭")
 
-    # ── 语音识别 API（Whisper / 中转站）──
+    # ── 语音识别 API（Groq Whisper 优先，降级中转站）──
     @app.route('/api/voice/recognize', methods=['POST'])
     def voice_recognize():
         """接收浏览器录音，调 Whisper API 转文字"""
@@ -516,25 +516,36 @@ def register_voice_routes(app):
                 logger.warning(f"[VoiceCall] [STT] 录音太短 ({file_size} bytes)，跳过")
                 return jsonify({'text': '', 'message': '录音太短'})
 
-            # 调 Whisper API（OpenAI 兼容格式）
-            providers = _get_chat_providers()
+            # Whisper 引擎列表：Groq 优先，降级到中转站
+            whisper_engines = [
+                {
+                    'name': 'Groq',
+                    'url': 'https://api.groq.com/openai/v1/audio/transcriptions',
+                    'api_key': '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',
+                    'model': 'whisper-large-v3',
+                },
+            ]
+            # 追加中转站作为降级
+            for p in _get_chat_providers():
+                whisper_engines.append({
+                    'name': f"中转站({p.get('name', '')})",
+                    'url': f"{p.get('base_url', '').rstrip('/')}/audio/transcriptions",
+                    'api_key': p.get('api_key', ''),
+                    'model': 'whisper-1',
+                })
+
             last_error = None
-
-            for provider in providers:
-                base_url = provider.get('base_url', '').rstrip('/')
-                api_key = provider.get('api_key', '')
-                p_name = provider.get('name', '未命名')
-
-                whisper_url = f"{base_url}/audio/transcriptions"
-                logger.info(f"[VoiceCall] [STT] 尝试 [{p_name}] {whisper_url}")
+            for engine in whisper_engines:
+                e_name = engine['name']
+                logger.info(f"[VoiceCall] [STT] 尝试 [{e_name}] {engine['url']}")
 
                 try:
                     with open(tmp_path, 'rb') as f:
                         resp = http_requests.post(
-                            whisper_url,
-                            headers={"Authorization": f"Bearer {api_key}"},
+                            engine['url'],
+                            headers={"Authorization": f"Bearer {engine['api_key']}"},
                             files={"file": ("audio.webm", f, "audio/webm")},
-                            data={"model": "whisper-1", "language": "zh"},
+                            data={"model": engine['model'], "language": "zh"},
                             timeout=30,
                         )
 
@@ -542,20 +553,20 @@ def register_voice_routes(app):
                         result = resp.json()
                         text = result.get('text', '').strip()
                         stt_time = time.time() - t_start
-                        logger.info(f"[VoiceCall] [STT] 识别成功: 「{text}」 ({stt_time:.2f}s)")
-                        return jsonify({'text': text, 'time': round(stt_time, 2)})
+                        logger.info(f"[VoiceCall] [STT] [{e_name}] 识别成功: 「{text}」 ({stt_time:.2f}s)")
+                        return jsonify({'text': text, 'time': round(stt_time, 2), 'engine': e_name})
                     else:
                         last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
-                        logger.warning(f"[VoiceCall] [STT] [{p_name}] 失败: {last_error}")
+                        logger.warning(f"[VoiceCall] [STT] [{e_name}] 失败: {last_error}")
                         continue
 
                 except Exception as e:
                     last_error = str(e)
-                    logger.error(f"[VoiceCall] [STT] [{p_name}] 异常: {e}")
+                    logger.error(f"[VoiceCall] [STT] [{e_name}] 异常: {e}")
                     continue
 
             error_msg = f"语音识别失败: {last_error}"
-            logger.error(f"[VoiceCall] [STT] 所有中转站均失败")
+            logger.error(f"[VoiceCall] [STT] 所有引擎均失败")
             return jsonify({'error': error_msg}), 500
 
         finally:
