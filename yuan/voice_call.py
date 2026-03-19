@@ -93,6 +93,50 @@ class SentenceSplitter:
 
 
 # =====================================================================
+#  Whisper 幻觉过滤
+# =====================================================================
+
+# Whisper 在静音/噪声输入时常见的幻觉文本关键词
+_HALLUCINATION_KEYWORDS = [
+    '请不吝点赞', '订阅', '转发', '打赏', '支持明镜', '点点栏目',
+    '感谢收看', '感谢观看', '感谢聆听', '谢谢收看', '谢谢观看',
+    '字幕制作', '字幕提供', '字幕由', 'Amara.org',
+    '下期再见', '我们下期', '下次再见', '下集再见',
+    '请订阅', '别忘了订阅', '记得订阅', '点击订阅',
+    '喜欢的话', '喜欢就点', '一键三连',
+    'Thank you for watching', 'Please subscribe',
+    'thanks for watching', 'like and subscribe',
+    'Subtitles by', 'Translation by',
+    '小铃铛', '开启小铃铛', '通知铃铛',
+]
+
+# 纯重复字符的模式（如 "啊啊啊啊啊"）
+_REPEAT_RE = re.compile(r'^(.)\1{4,}$')
+
+def _is_whisper_hallucination(text: str) -> bool:
+    """检测 Whisper 幻觉文本"""
+    if not text:
+        return True
+
+    # 检查关键词
+    for kw in _HALLUCINATION_KEYWORDS:
+        if kw in text:
+            return True
+
+    # 纯重复字符
+    clean = text.replace(' ', '').replace('，', '').replace('。', '')
+    if _REPEAT_RE.match(clean):
+        return True
+
+    # 文本太短且只有标点/空格
+    stripped = re.sub(r'[^\w]', '', text)
+    if len(stripped) < 2:
+        return True
+
+    return False
+
+
+# =====================================================================
 #  TTS 合成
 # =====================================================================
 
@@ -552,6 +596,12 @@ def register_voice_routes(app):
                     if resp.status_code == 200:
                         result = resp.json()
                         text = result.get('text', '').strip()
+
+                        # 过滤 Whisper 幻觉（静音时模型脑补的垃圾文本）
+                        if _is_whisper_hallucination(text):
+                            logger.info(f"[VoiceCall] [STT] [{e_name}] 过滤幻觉文本: 「{text}」")
+                            return jsonify({'text': '', 'message': '静音或噪声'})
+
                         stt_time = time.time() - t_start
                         logger.info(f"[VoiceCall] [STT] [{e_name}] 识别成功: 「{text}」 ({stt_time:.2f}s)")
                         return jsonify({'text': text, 'time': round(stt_time, 2), 'engine': e_name})
