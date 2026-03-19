@@ -486,6 +486,84 @@ def register_voice_routes(app):
 
             logger.info("[VoiceCall] WebSocket 连接关闭")
 
+    # ── 语音识别 API（Whisper / 中转站）──
+    @app.route('/api/voice/recognize', methods=['POST'])
+    def voice_recognize():
+        """接收浏览器录音，调 Whisper API 转文字"""
+        from flask import request, jsonify
+        import requests as http_requests
+
+        if 'audio' not in request.files:
+            return jsonify({'error': '没有音频文件'}), 400
+
+        audio_file = request.files['audio']
+        if not audio_file.filename:
+            return jsonify({'error': '空文件'}), 400
+
+        t_start = time.time()
+        logger.info(f"[VoiceCall] [STT] 收到录音: {audio_file.filename}, "
+                     f"content_type={audio_file.content_type}")
+
+        # 保存临时文件
+        fd, tmp_path = tempfile.mkstemp(suffix=".webm", prefix="vc_stt_")
+        os.close(fd)
+        try:
+            audio_file.save(tmp_path)
+            file_size = os.path.getsize(tmp_path)
+            logger.info(f"[VoiceCall] [STT] 录音保存: {tmp_path}, {file_size} bytes")
+
+            if file_size < 1000:
+                logger.warning(f"[VoiceCall] [STT] 录音太短 ({file_size} bytes)，跳过")
+                return jsonify({'text': '', 'message': '录音太短'})
+
+            # 调 Whisper API（OpenAI 兼容格式）
+            providers = _get_chat_providers()
+            last_error = None
+
+            for provider in providers:
+                base_url = provider.get('base_url', '').rstrip('/')
+                api_key = provider.get('api_key', '')
+                p_name = provider.get('name', '未命名')
+
+                whisper_url = f"{base_url}/audio/transcriptions"
+                logger.info(f"[VoiceCall] [STT] 尝试 [{p_name}] {whisper_url}")
+
+                try:
+                    with open(tmp_path, 'rb') as f:
+                        resp = http_requests.post(
+                            whisper_url,
+                            headers={"Authorization": f"Bearer {api_key}"},
+                            files={"file": ("audio.webm", f, "audio/webm")},
+                            data={"model": "whisper-1", "language": "zh"},
+                            timeout=30,
+                        )
+
+                    if resp.status_code == 200:
+                        result = resp.json()
+                        text = result.get('text', '').strip()
+                        stt_time = time.time() - t_start
+                        logger.info(f"[VoiceCall] [STT] 识别成功: 「{text}」 ({stt_time:.2f}s)")
+                        return jsonify({'text': text, 'time': round(stt_time, 2)})
+                    else:
+                        last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
+                        logger.warning(f"[VoiceCall] [STT] [{p_name}] 失败: {last_error}")
+                        continue
+
+                except Exception as e:
+                    last_error = str(e)
+                    logger.error(f"[VoiceCall] [STT] [{p_name}] 异常: {e}")
+                    continue
+
+            error_msg = f"语音识别失败: {last_error}"
+            logger.error(f"[VoiceCall] [STT] 所有中转站均失败")
+            return jsonify({'error': error_msg}), 500
+
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+
     # ── HTTP SSE 模式（始终注册，作为 WebSocket 的降级方案）──
     from flask import Response
     import queue
