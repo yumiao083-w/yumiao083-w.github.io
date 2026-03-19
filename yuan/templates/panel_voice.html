@@ -989,6 +989,19 @@ function toggleCall() {
         // 结束通话
         isInCall = false;
         
+        // 保存通话记录
+        if (useSSE) {
+            fetch('/api/voice/end', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ session_id: sessionId })
+            }).then(r => r.json()).then(result => {
+                if (result.status === 'saved') {
+                    console.log('通话记录已保存:', result.file);
+                }
+            }).catch(e => console.warn('保存通话记录失败:', e));
+        }
+
         // 样式切换：变回绿色接听状态
         document.getElementById('btnCall').classList.remove('active');
         document.getElementById('hint').textContent = '通话已结束';
@@ -1002,7 +1015,11 @@ function toggleCall() {
         disconnect();
         audioQueue = [];
         isPlaying = false;
+        isAiSpeaking = false;
         updateStatus('disconnected', '未连接');
+        
+        // 重置 session（下次通话用新 session）
+        sessionId = 'vc_' + Date.now();
     }
 }
 

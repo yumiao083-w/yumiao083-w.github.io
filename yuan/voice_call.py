@@ -188,11 +188,20 @@ def stream_chat_and_tts(user_text: str, history: list, ws_send):
     # 构建 messages
     logger.info(f"[VoiceCall] [1/4] 构建 system prompt...")
     t_prompt = time.time()
-    system_prompt = _build_voice_system_prompt()
+    system_prompt = _build_voice_system_prompt(user_text)
     logger.info(f"[VoiceCall] [1/4] system prompt 构建完成，长度: {len(system_prompt)} 字符 ({time.time()-t_prompt:.1f}s)")
 
     messages = [{"role": "system", "content": system_prompt}]
-    messages.extend(history[-20:])  # 最近 20 轮
+
+    # 如果开启了共享微信上下文，注入微信聊天历史
+    if _cfg('VOICE_SHARE_WECHAT_CONTEXT', False):
+        wechat_context = _get_wechat_context()
+        if wechat_context:
+            messages.extend(wechat_context)
+            logger.info(f"[VoiceCall] 注入微信上下文: {len(wechat_context)} 条")
+
+    # 通话历史（无限制）
+    messages.extend(history)
     messages.append({"role": "user", "content": user_text})
 
     # 通知前端：开始调用 LLM
@@ -339,7 +348,7 @@ def _send_sentence_audio(sentence: str, idx: int, ws_send):
         }))
 
 
-def _build_voice_system_prompt():
+def _build_voice_system_prompt(current_message=""):
     """构建语音通话专用的系统提示词（复用 bot.py 五板块架构 + 语音通话指令）"""
 
     # 从 config 读取用户和角色信息
@@ -383,6 +392,20 @@ def _build_voice_system_prompt():
     short_term = _read_short_term_memory(user_id)
     if short_term:
         prompt_parts.append(f"\n\n{short_term}")
+
+    # ========== 板块6: 世界书（可选） ==========
+    if _cfg('VOICE_ENABLE_WORLD_INFO', False):
+        world_info = _read_world_info(user_id, role_name, current_message)
+        if world_info:
+            prompt_parts.append(f"\n\n{world_info}")
+            logger.debug(f"[VoiceCall] 世界书已注入，长度: {len(world_info)}")
+
+    # ========== 板块7: 检索记忆（可选） ==========
+    if _cfg('VOICE_ENABLE_MEMORY_RETRIEVAL', True):
+        retrieved = _retrieve_memories(current_message)
+        if retrieved:
+            prompt_parts.append(f"\n\n{retrieved}")
+            logger.debug(f"[VoiceCall] 检索记忆已注入，长度: {len(retrieved)}")
 
     # ========== 语音通话专用指令 ==========
     voice_instruction = """
@@ -480,6 +503,98 @@ def _read_short_term_memory(user_id):
     return None
 
 
+def _read_world_info(user_id, role_name, current_message=""):
+    """读取世界书"""
+    try:
+        sys.path.insert(0, YUAN_ROOT)
+        from world_info import get_world_info_prompt
+        text = get_world_info_prompt(
+            user_id=user_id,
+            chat_history=[],
+            current_message=current_message,
+            user_name=user_id,
+            char_name=role_name,
+        )
+        return text if text else None
+    except Exception as e:
+        logger.debug(f"[VoiceCall] 世界书不可用: {e}")
+    return None
+
+
+def _retrieve_memories(current_message):
+    """检索记忆（LLM 精筛）"""
+    if not current_message:
+        return None
+    try:
+        sys.path.insert(0, YUAN_ROOT)
+        from memory_retrieval import retrieve_relevant_memories, format_retrieved_memories
+        memories = retrieve_relevant_memories(current_message)
+        if memories:
+            return format_retrieved_memories(memories)
+    except Exception as e:
+        logger.debug(f"[VoiceCall] 检索记忆不可用: {e}")
+    return None
+
+
+def _get_wechat_context():
+    """获取微信聊天上下文"""
+    try:
+        listen_list = _cfg('LISTEN_LIST', [])
+        if not listen_list:
+            return []
+        user_id = listen_list[0][0]
+        role_name = listen_list[0][1]
+
+        ctx_file = os.path.join(YUAN_ROOT, 'chat_contexts.json')
+        if not os.path.exists(ctx_file):
+            return []
+
+        with open(ctx_file, 'r', encoding='utf-8') as f:
+            all_ctx = json.load(f)
+
+        user_data = all_ctx.get(user_id, {})
+        if isinstance(user_data, dict):
+            messages = user_data.get(role_name, [])
+        elif isinstance(user_data, list):
+            messages = user_data
+        else:
+            return []
+
+        # 取最近 10 轮微信上下文（避免太长）
+        return messages[-20:] if messages else []
+    except Exception as e:
+        logger.debug(f"[VoiceCall] 微信上下文不可用: {e}")
+    return []
+
+
+def save_call_log(history, call_start_time, call_duration):
+    """保存通话记录"""
+    try:
+        log_dir = os.path.join(YUAN_ROOT, _cfg('VOICE_CALL_LOG_DIR', 'Voice_Logs'))
+        os.makedirs(log_dir, exist_ok=True)
+
+        from datetime import datetime
+        dt = datetime.fromtimestamp(call_start_time)
+        filename = dt.strftime('%Y-%m-%d_%H-%M-%S') + '.json'
+        filepath = os.path.join(log_dir, filename)
+
+        log_data = {
+            'start_time': dt.isoformat(),
+            'duration_seconds': call_duration,
+            'rounds': len([m for m in history if m['role'] == 'user']),
+            'messages': history,
+        }
+
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(log_data, f, ensure_ascii=False, indent=2)
+
+        logger.info(f"[VoiceCall] 通话记录已保存: {filepath}")
+        return filepath
+    except Exception as e:
+        logger.error(f"[VoiceCall] 保存通话记录失败: {e}")
+        return None
+
+
 # =====================================================================
 #  Flask 路由注册
 # =====================================================================
@@ -507,6 +622,7 @@ def register_voice_routes(app):
         def voice_ws(ws):
             """WebSocket 语音通话"""
             history = []
+            call_start = time.time()
             logger.info("[VoiceCall] WebSocket 连接建立")
 
             while True:
@@ -540,6 +656,10 @@ def register_voice_routes(app):
                 elif msg_type == "end":
                     break
 
+            # 通话结束，保存记录
+            if history:
+                duration = time.time() - call_start
+                save_call_log(history, call_start, round(duration))
             logger.info("[VoiceCall] WebSocket 连接关闭")
 
     # ── 语音识别 API（Groq Whisper 优先，降级中转站）──
@@ -663,7 +783,7 @@ def register_voice_routes(app):
 
         with _sessions_lock:
             if session_id not in _sessions:
-                _sessions[session_id] = {'history': [], 'queue': queue.Queue()}
+                _sessions[session_id] = {'history': [], 'queue': queue.Queue(), 'start_time': time.time()}
             sess = _sessions[session_id]
 
         sess['history'].append({"role": "user", "content": user_text})
@@ -689,3 +809,21 @@ def register_voice_routes(app):
                 yield f"data: {item}\n\n"
 
         return Response(generate(), mimetype='text/event-stream')
+
+    @app.route('/api/voice/end', methods=['POST'])
+    def voice_end():
+        """结束通话，保存记录"""
+        from flask import request, jsonify
+        req = request.get_json() or {}
+        session_id = req.get('session_id', 'default')
+
+        with _sessions_lock:
+            sess = _sessions.pop(session_id, None)
+
+        if sess and sess.get('history'):
+            start_time = sess.get('start_time', time.time())
+            duration = time.time() - start_time
+            filepath = save_call_log(sess['history'], start_time, round(duration))
+            return jsonify({'status': 'saved', 'file': filepath, 'rounds': len(sess['history']) // 2})
+
+        return jsonify({'status': 'no_history'})

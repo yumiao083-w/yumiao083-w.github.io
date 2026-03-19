@@ -13,19 +13,19 @@
 # 用户列表(请配置要和bot说话的账号的微信昵称！)
 # 格式：LISTEN_LIST = [['微信名1', '角色1', True],['微信名2', '角色2', False]]
 # 第三个参数为True时启用该角色的主动消息，False时禁用
-LISTEN_LIST = [['郁邈', '袁朗', True]]
+LISTEN_LIST = [['郁邈', '袁朗', True, 'preset']]
 
 # DeepSeek API 配置
 DEEPSEEK_API_KEY = 'sk-tujpMKTbaMm3OLvDhP87Tp8q1xKyvH63BWyLrqqNvX3Her8r'
 # 硅基流动API注册地址，免费15元额度 https://cloud.siliconflow.cn/
 DEEPSEEK_BASE_URL = 'http://api.wasdxx.xyz/v1'
 # 硅基流动API的模型
-MODEL = '[特价]claude-opus-4-6'
+MODEL = '[特价]claude-opus-4-6-thinking'
 # 用户和AI对话轮数
 MAX_GROUPS = 110
 
 # 如果要使用官方的API
-# DEEPSEEK_BASE_URL = 'https://api.deepseek.com'
+# DEEPSEEK_BASE_URL = 'http://api.wasdxx.xyz/v1'
 # 官方API的V3模型
 # MODEL = 'deepseek-chat'
 
@@ -34,10 +34,16 @@ MAX_GROUPS = 110
 # 如果为空列表，则使用上面的 DEEPSEEK_BASE_URL / DEEPSEEK_API_KEY / MODEL 作为唯一中转站
 CHAT_API_PROVIDERS = [
     {
-        'name': '主中转站',
+        'name': '蓝天',
         'base_url': 'http://api.wasdxx.xyz/v1',
         'api_key': 'sk-tujpMKTbaMm3OLvDhP87Tp8q1xKyvH63BWyLrqqNvX3Her8r',
-        'model': '[特价]claude-opus-4-6',
+        'model': '[特价]claude-opus-4-6-thinking',
+    },
+    {
+        'name': 'kocode',
+        'base_url': 'https://kocodex.link/v1',
+        'api_key': 'sk-c1da6ccd86da85a7c927d6c7e85690d471a6661f0dfd3f8e32896f1de4ce82a0',
+        'model': 'claude-opus-4-5-20251101',
     },
 ]
 
@@ -220,7 +226,7 @@ ENABLE_SENSITIVE_CONTENT_CLEARING = False
 
 # === 记忆检索管道配置 ===
 # 检索模式: 'llm' (LLM精筛) / 'keyword' (关键词匹配) / 'off' (关闭)
-MEMORY_RETRIEVAL_MODE = 'llm'
+MEMORY_RETRIEVAL_MODE = 'off'
 
 # LLM 精筛中转站列表（按顺序故障转移，第一个成功就用）
 # 每项: name(名称), base_url, api_key, model, timeout(秒)
@@ -229,8 +235,8 @@ MEMORY_LLM_PROVIDERS = [
         'name': '默认中转站',
         'base_url': 'http://api.wasdxx.xyz/v1',
         'api_key': 'sk-tujpMKTbaMm3OLvDhP87Tp8q1xKyvH63BWyLrqqNvX3Her8r',
-        'model': 'gemini-2.0-flash',
-        'timeout': 8,
+        'model': '[特价]claude-opus-4-6',
+        'timeout': 60,
         'temperature': 0.3,
     },
 ]
@@ -289,3 +295,13 @@ TTS_MINIMAX_API_URL = 'https://api.minimax.chat'  # 国内用 minimax.chat，海
 
 # --- Edge TTS 配置（备用/免费方案）---
 TTS_EDGE_VOICE = 'zh-CN-YunxiNeural'      # edge-tts 默认音色（云希 - 年轻男声）
+
+# === 语音通话配置 ===
+# 通话上下文是否接入微信聊天上下文（共享对话历史）
+VOICE_SHARE_WECHAT_CONTEXT = False
+# 通话时是否启用世界书
+VOICE_ENABLE_WORLD_INFO = False
+# 通话时是否启用检索记忆（LLM 精筛）
+VOICE_ENABLE_MEMORY_RETRIEVAL = True
+# 通话记录保存目录
+VOICE_CALL_LOG_DIR = 'Voice_Logs'
