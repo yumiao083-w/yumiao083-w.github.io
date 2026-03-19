@@ -28,6 +28,17 @@ YUAN_ROOT = os.path.dirname(os.path.abspath(__file__))
 if YUAN_ROOT not in sys.path:
     sys.path.insert(0, YUAN_ROOT)
 
+# 伪装浏览器请求头（公益站防滥用检测）
+_BROWSER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "X-Stainless-Lang": "",
+    "X-Stainless-Package-Version": "",
+    "X-Stainless-OS": "",
+    "X-Stainless-Arch": "",
+    "X-Stainless-Runtime": "",
+    "X-Stainless-Runtime-Version": "",
+}
+
 # ===== 日志 =====
 logging.basicConfig(
     level=logging.INFO,
@@ -313,6 +324,7 @@ def get_ai_response(message: str, tg_user_id: str) -> str:
                 api_key=p_key,
                 base_url=p_url,
                 http_client=http_client,
+                default_headers=_BROWSER_HEADERS,
             )
 
             logger.info(f"[TG] 调用中转站 [{p_name}] 模型: {p_model}")
@@ -519,7 +531,18 @@ def _build_system_prompt(user_id: str) -> str:
 - 语音标签内的文字不会再以文字形式发送，只会发语音
 - 不是每条消息都要发语音，只在你觉得语音更有表现力的时候用
 - 短句、感叹、撒娇、关心的话适合语音；长段文字、列表、代码不适合语音
-- 语音内容不要太长，控制在1-3句话以内""")
+- 语音内容不要太长，控制在1-3句话以内
+
+### 语音消息中的语气词与停顿
+在 [[语音]] 标签内，你可以插入语气词和停顿来让语音更自然、更有活人感：
+- 停顿标签：用 <#x#> 标记停顿时长（x是秒数），如：你好 <#0.5#> 世界
+- 可用的语气词标签（用逗号分割，禁止使用未列出的）：
+  (laughs),(chuckle),(coughs),(clear-throat),(groans),(breath),(pant),(inhale),(exhale),(gasps),(sniffs),(sighs),(snorts),(burps),(lip-smacking),(humming),(hissing),(emm),(sneezes)
+- 语气词和停顿要自然地融入说话内容，不要每句都加
+- 示例：
+  [[语音]](chuckle)今天玩得开心吗？[[/语音]]
+  [[语音]]记得要多穿衣服，(sneezes) <#0.5#> 连我都感冒了。[[/语音]]
+  [[语音]](sighs)算了 <#0.3#> 不说了。[[/语音]]""")
 
     return "\n".join(parts)
 
@@ -880,7 +903,7 @@ def _split_text(text: str, max_len: int = 4096) -> list:
 
 
 async def _send_voice_reply(update, text: str):
-    """生成语音并发送"""
+    """生成语音并发送（支持语气词和自然停顿）"""
     try:
         # 刷新配置，确保 TTS 引擎/模型/音色改动立刻生效
         _reload_config()
@@ -894,8 +917,38 @@ async def _send_voice_reply(update, text: str):
         # 去掉不适合朗读的内容
         import re
         voice_text = re.sub(r'```.*?```', '', voice_text, flags=re.DOTALL)  # 去掉代码块
-        voice_text = re.sub(r'[#*_`\[\]()]', '', voice_text)  # 去掉 markdown 标记
+
+        # 语气词标签 (laughs)/(sighs) 等 MiniMax speech-2.8 原生支持，保留原样
+        # 先提取并保护语气词标签，避免被 markdown 清理误删
+        _voice_tags = [
+            'laughs', 'chuckle', 'coughs', 'clear-throat', 'groans', 'breath',
+            'pant', 'inhale', 'exhale', 'gasps', 'sniffs', 'sighs', 'snorts',
+            'burps', 'lip-smacking', 'humming', 'hissing', 'emm', 'sneezes'
+        ]
+        _tag_map = {}
+        for i, tag in enumerate(_voice_tags):
+            ph = f'\x00VTAG{i}\x00'  # 用不可见字符做占位符，不会被 markdown 正则匹配
+            if f'({tag})' in voice_text:
+                voice_text = voice_text.replace(f'({tag})', ph)
+                _tag_map[ph] = f'({tag})'
+
+        # 停顿标签 <#0.5#> 直接转成中文停顿符号（不用占位符，避免残留）
+        import re as _re
+        def _pause_to_comma(m):
+            seconds = float(m.group(1))
+            if seconds >= 0.5:
+                return '……'
+            else:
+                return '，'
+        voice_text = _re.sub(r'<#([\d.]+)#>', _pause_to_comma, voice_text)
+
+        # 清理 markdown 标记
+        voice_text = re.sub(r'[#*_`\[\]()]', '', voice_text)
         voice_text = voice_text.strip()
+
+        # 恢复语气词标签
+        for ph, original in _tag_map.items():
+            voice_text = voice_text.replace(ph, original)
 
         if not voice_text:
             return
@@ -919,15 +972,36 @@ async def _send_voice_reply(update, text: str):
 async def _transcribe_voice(ogg_path: str) -> str:
     """
     语音转文字。
-    优先用 OpenAI Whisper API（走中转站），
-    失败则返回 None。
+    优先用 Groq Whisper API（免费、快），
+    失败则降级到中转站 Whisper，
+    都失败返回 None。
     """
     _ensure_yuan()
 
-    try:
-        from openai import OpenAI
-        import httpx
+    from openai import OpenAI
+    import httpx
 
+    # ===== 1. Groq Whisper（首选） =====
+    groq_key = getattr(config, 'GROQ_API_KEY', '') or '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'
+    if groq_key:
+        try:
+            client = OpenAI(
+                api_key=groq_key,
+                base_url="https://api.groq.com/openai/v1",
+            )
+            with open(ogg_path, "rb") as audio_file:
+                transcript = client.audio.transcriptions.create(
+                    model="whisper-large-v3",
+                    file=audio_file,
+                    language="zh",
+                )
+            logger.info(f"[STT] Groq Whisper 转写成功: {transcript.text[:80]}")
+            return transcript.text
+        except Exception as e:
+            logger.warning(f"[STT] Groq Whisper 失败: {e}")
+
+    # ===== 2. 中转站 Whisper（降级） =====
+    try:
         try:
             http_client = httpx.Client(verify=False)
         except Exception:
@@ -937,17 +1011,17 @@ async def _transcribe_voice(ogg_path: str) -> str:
             api_key=config.DEEPSEEK_API_KEY,
             base_url=config.DEEPSEEK_BASE_URL,
             http_client=http_client,
+            default_headers=_BROWSER_HEADERS,
         )
-
         with open(ogg_path, "rb") as audio_file:
             transcript = client.audio.transcriptions.create(
                 model="whisper-1",
                 file=audio_file,
             )
+        logger.info(f"[STT] 中转站 Whisper 转写成功: {transcript.text[:80]}")
         return transcript.text
     except Exception as e:
-        logger.warning(f"Whisper API 转写失败: {e}")
-        # 如果中转站不支持 Whisper，可以后续接其他 STT 服务
+        logger.warning(f"[STT] 中转站 Whisper 也失败: {e}")
         return None
 
 

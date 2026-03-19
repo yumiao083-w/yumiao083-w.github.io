@@ -1347,7 +1347,11 @@ def generate_prompt():
         
         client = openai.OpenAI(
             base_url=DEEPSEEK_BASE_URL,
-            api_key=DEEPSEEK_API_KEY
+            api_key=DEEPSEEK_API_KEY,
+            default_headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                "X-Stainless-Lang": "", "X-Stainless-Package-Version": "", "X-Stainless-OS": "", "X-Stainless-Arch": "", "X-Stainless-Runtime": "", "X-Stainless-Runtime-Version": "",
+            }
         )
         
         data = request.get_json()

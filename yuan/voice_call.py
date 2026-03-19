@@ -92,6 +92,18 @@ class SentenceSplitter:
             yield rest
 
 
+# 伪装浏览器请求头（公益站防滥用检测）
+_BROWSER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "X-Stainless-Lang": "",
+    "X-Stainless-Package-Version": "",
+    "X-Stainless-OS": "",
+    "X-Stainless-Arch": "",
+    "X-Stainless-Runtime": "",
+    "X-Stainless-Runtime-Version": "",
+}
+
+
 # =====================================================================
 #  Whisper 幻觉过滤
 # =====================================================================
@@ -221,6 +233,7 @@ def stream_chat_and_tts(user_text: str, history: list, ws_send):
             client = OpenAI(
                 api_key=provider.get('api_key', ''),
                 base_url=provider.get('base_url', ''),
+                default_headers=_BROWSER_HEADERS,
             )
             model = provider.get('model', '')
             p_name = provider.get('name', '未命名')
@@ -719,7 +732,10 @@ def register_voice_routes(app):
                     with open(tmp_path, 'rb') as f:
                         resp = http_requests.post(
                             engine['url'],
-                            headers={"Authorization": f"Bearer {engine['api_key']}"},
+                            headers={
+                                "Authorization": f"Bearer {engine['api_key']}",
+                                "User-Agent": _BROWSER_HEADERS["User-Agent"],
+                            },
                             files={"file": ("audio.webm", f, "audio/webm")},
                             data={
                                 "model": engine['model'],
