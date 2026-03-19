@@ -305,3 +305,8 @@ VOICE_ENABLE_WORLD_INFO = False
 VOICE_ENABLE_MEMORY_RETRIEVAL = True
 # 通话记录保存目录
 VOICE_CALL_LOG_DIR = 'Voice_Logs'
+
+# === Ngrok 隧道配置（手机 HTTPS 访问）===
+# 启用后自动创建 ngrok 隧道，手机通过 HTTPS 域名访问可使用麦克风
+ENABLE_NGROK = True
+NGROK_AUTH_TOKEN = '3BB5w1uMKhEayzqOna4BUTorenT_7mgQT5PBoK5HBWacwrfv5'

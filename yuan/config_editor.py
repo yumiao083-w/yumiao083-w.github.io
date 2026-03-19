@@ -4074,6 +4074,74 @@ if __name__ == '__main__':
     # 在启动服务器前检查端口是否被占用，若占用则结束该进程
     kill_process_using_port(PORT)
 
+    # Ngrok 隧道（手机通过 HTTPS 访问，解决麦克风权限问题）
+    if config.get('ENABLE_NGROK', False):
+        ngrok_token = config.get('NGROK_AUTH_TOKEN', '')
+        if ngrok_token:
+            def start_ngrok():
+                try:
+                    import subprocess as _sp
+                    # 检查 ngrok 是否已安装
+                    ngrok_cmd = 'ngrok'
+                    try:
+                        _sp.run([ngrok_cmd, 'version'], capture_output=True, timeout=5)
+                    except FileNotFoundError:
+                        # 尝试常见路径
+                        for p in [os.path.expanduser('~/ngrok'), os.path.expanduser('~/ngrok.exe'),
+                                  'C:\\ngrok\\ngrok.exe', 'C:\\Users\\' + os.environ.get('USERNAME', '') + '\\ngrok.exe',
+                                  'C:\\Users\\' + os.environ.get('USERNAME', '') + '\\Desktop\\ngrok.exe',
+                                  'C:\\Users\\' + os.environ.get('USERNAME', '') + '\\Downloads\\ngrok.exe']:
+                            if os.path.exists(p):
+                                ngrok_cmd = p
+                                break
+                        else:
+                            # 尝试用 pyngrok
+                            try:
+                                from pyngrok import ngrok as pyngrok, conf as pyngrok_conf
+                                pyngrok_conf.get_default().auth_token = ngrok_token
+                                tunnel = pyngrok.connect(PORT, "http")
+                                print(f"\033[32m📱 手机访问（ngrok）: {tunnel.public_url}/ \033[0m")
+                                print(f"\033[32m   语音通话: {tunnel.public_url}/voice \033[0m")
+                                return
+                            except ImportError:
+                                print(f"[Ngrok] ⚠️ ngrok 未安装。请下载: https://ngrok.com/download")
+                                print(f"[Ngrok]    或运行: pip install pyngrok")
+                                return
+
+                    # 设置 token
+                    _sp.run([ngrok_cmd, 'config', 'add-authtoken', ngrok_token], capture_output=True, timeout=10)
+
+                    # 启动隧道（后台进程）
+                    proc = _sp.Popen(
+                        [ngrok_cmd, 'http', str(PORT), '--log', 'stdout'],
+                        stdout=_sp.PIPE, stderr=_sp.PIPE,
+                        creationflags=_sp.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0
+                    )
+
+                    # 等待隧道建立，读取公开 URL
+                    import time as _time
+                    for _ in range(30):  # 最多等 15 秒
+                        _time.sleep(0.5)
+                        try:
+                            import urllib.request, json as _json
+                            resp = urllib.request.urlopen('http://127.0.0.1:4040/api/tunnels', timeout=2)
+                            data = _json.loads(resp.read())
+                            tunnels = data.get('tunnels', [])
+                            for t in tunnels:
+                                if t.get('proto') == 'https':
+                                    url = t['public_url']
+                                    print(f"\033[32m📱 手机访问（ngrok）: {url}/ \033[0m")
+                                    print(f"\033[32m   语音通话: {url}/voice \033[0m")
+                                    return
+                        except Exception:
+                            pass
+                    print("[Ngrok] ⚠️ 隧道启动超时，请手动运行: ngrok http " + str(PORT))
+                except Exception as e:
+                    print(f"[Ngrok] ⚠️ 启动失败: {e}")
+
+            # 在后台线程启动 ngrok，不阻塞主服务器
+            threading.Thread(target=start_ngrok, daemon=True).start()
+
     # 生成自签 HTTPS 证书（手机麦克风权限需要 HTTPS）
     # 在 config.py 中设置 ENABLE_HTTPS = True 开启
     ssl_context = None
