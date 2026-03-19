@@ -43,6 +43,13 @@ from datetime import datetime
 
 app = Flask(__name__)
 
+# 注册语音通话路由
+try:
+    from voice_call import register_voice_routes
+    register_voice_routes(app)
+except Exception as _vc_err:
+    print(f"[VoiceCall] 语音通话模块加载跳过: {_vc_err}")
+
 def safe_type_convert(value, target_type, default_value=None, field_name=""):
     """
     安全的类型转换函数，防止整数转换为字符串

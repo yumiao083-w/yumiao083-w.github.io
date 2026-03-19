@@ -229,7 +229,7 @@
                     </a>
                 </div>
             </div>
-            <!-- 第二页：备忘录 -->
+            <!-- 第二页：备忘录 + 世界书 -->
             <div class="page">
                 <div class="app-grid">
                     <a class="app-icon" href="/panel/notes">
@@ -238,6 +238,20 @@
                             <div class="edit-hint">更换</div>
                         </div>
                         <span class="icon-label">备忘录</span>
+                    </a>
+                    <a class="app-icon" href="/panel/worldbook">
+                        <div class="icon-box" id="icon-worldbook" oncontextmenu="return editIcon(event,'worldbook')" ontouchstart="startLongPress('worldbook')" ontouchend="cancelLongPress()">
+                            <svg class="icon-svg" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                            <div class="edit-hint">更换</div>
+                        </div>
+                        <span class="icon-label">世界书</span>
+                    </a>
+                    <a class="app-icon" href="/voice">
+                        <div class="icon-box" id="icon-voice" oncontextmenu="return editIcon(event,'voice')" ontouchstart="startLongPress('voice')" ontouchend="cancelLongPress()">
+                            <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                            <div class="edit-hint">更换</div>
+                        </div>
+                        <span class="icon-label">语音通话</span>
                     </a>
                 </div>
             </div>
@@ -467,7 +481,7 @@ function saveSettings() {
     if (fileInput.files.length === 0) closeSettingsModal();
 }
 
-function resetAll() {['home-bg-url','home-bg-data','home-text-color','home-font-url','home-font-name'].forEach(k => localStorage.removeItem(k));['api','reply','chat','memory','settings','legacy','notes'].forEach(id => { localStorage.removeItem('home-icon-' + id); });
+function resetAll() {['home-bg-url','home-bg-data','home-text-color','home-font-url','home-font-name'].forEach(k => localStorage.removeItem(k));['api','reply','chat','memory','settings','legacy','notes','worldbook'].forEach(id => { localStorage.removeItem('home-icon-' + id); });
     resetPhoto(); applyAll(); applyAllIcons(); closeSettingsModal();
 }
 
@@ -506,7 +520,7 @@ function applyIcon(id) {
     if (saved) { el.style.backgroundImage = `url(${saved})`; el.classList.add('has-custom-img'); } 
     else { el.style.backgroundImage = ''; el.classList.remove('has-custom-img'); }
 }
-function applyAllIcons() {['api','reply','chat','memory','settings','legacy','notes'].forEach(applyIcon); }
+function applyAllIcons() {['api','reply','chat','memory','settings','legacy','notes','worldbook'].forEach(applyIcon); }
 
 // ===== 全局应用 =====
 function applyAll() {

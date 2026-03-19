@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>语音通话</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #000; color: #fff; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* 顶部栏 */
+        .top-bar { padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; }
+        .back-btn { color: #007aff; font-size: 16px; text-decoration: none; }
+        .call-status { font-size: 14px; color: #8e8e93; text-align: center; }
+        .top-right { width: 40px; }
+
+        /* 头像区 */
+        .avatar-area { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
+        .avatar { width: 120px; height: 120px; border-radius: 60px; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; font-size: 48px; }
+        .caller-name { font-size: 24px; font-weight: 600; }
+        .call-timer { font-size: 16px; color: #8e8e93; }
+
+        /* 波纹动画 */
+        .ripple-container { position: relative; width: 120px; height: 120px; }
+        .ripple { position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(102,126,234,0.3); animation: none; }
+        .listening .ripple { animation: ripple 1.5s ease-out infinite; }
+        .listening .ripple:nth-child(2) { animation-delay: 0.5s; }
+        .listening .ripple:nth-child(3) { animation-delay: 1s; }
+        @keyframes ripple { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(2); opacity: 0; } }
+
+        /* 字幕区 */
+        .subtitle-area { min-height: 80px; padding: 0 24px 16px; text-align: center; }
+        .subtitle-text { font-size: 16px; line-height: 1.6; color: #ccc; max-height: 80px; overflow-y: auto; }
+        .subtitle-text.user-text { color: #8e8e93; font-size: 14px; }
+
+        /* 控制栏 */
+        .controls { padding: 20px 40px 50px; display: flex; justify-content: space-around; align-items: center; }
+        .ctrl-btn { width: 64px; height: 64px; border-radius: 32px; border: none; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .ctrl-btn:active { transform: scale(0.9); }
+        .btn-mute { background: #333; color: #fff; }
+        .btn-mute.active { background: #fff; color: #000; }
+        .btn-call { width: 72px; height: 72px; border-radius: 36px; background: #34c759; }
+        .btn-call.active { background: #ff3b30; }
+        .btn-speaker { background: #333; color: #fff; }
+        .btn-speaker.active { background: #fff; color: #000; }
+
+        /* 提示 */
+        .hint { position: absolute; bottom: 140px; left: 0; right: 0; text-align: center; font-size: 13px; color: #666; }
+
+        /* 连接状态指示 */
+        .conn-dot { width: 8px; height: 8px; border-radius: 4px; display: inline-block; margin-right: 6px; }
+        .conn-dot.connected { background: #34c759; }
+        .conn-dot.disconnected { background: #ff3b30; }
+        .conn-dot.connecting { background: #ff9f0a; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.3; } }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <a href="/home" class="back-btn">← 返回</a>
+        <div class="call-status" id="callStatus"><span class="conn-dot disconnected" id="connDot"></span>未连接</div>
+        <div class="top-right"></div>
+    </div>
+
+    <div class="avatar-area">
+        <div class="ripple-container" id="rippleContainer">
+            <div class="ripple"></div>
+            <div class="ripple"></div>
+            <div class="ripple"></div>
+            <div class="avatar">袁</div>
+        </div>
+        <div class="caller-name">袁朗</div>
+        <div class="call-timer" id="callTimer"></div>
+    </div>
+
+    <div class="subtitle-area">
+        <div class="subtitle-text user-text" id="userSubtitle"></div>
+        <div class="subtitle-text" id="aiSubtitle"></div>
+    </div>
+
+    <div class="controls">
+        <button class="ctrl-btn btn-mute" id="btnMute" onclick="toggleMute()" title="静音">🎤</button>
+        <button class="ctrl-btn btn-call" id="btnCall" onclick="toggleCall()" title="通话">📞</button>
+        <button class="ctrl-btn btn-speaker" id="btnSpeaker" onclick="toggleSpeaker()" title="免提">🔊</button>
+    </div>
+
+    <div class="hint" id="hint">点击绿色按钮开始通话</div>
+
+<script>
+// =====================================================================
+//  状态
+// =====================================================================
+let ws = null;
+let isInCall = false;
+let isMuted = false;
+let recognition = null;       // Web Speech API
+let audioQueue = [];           // 待播放音频队列
+let isPlaying = false;
+let callStartTime = null;
+let timerInterval = null;
+let currentAiText = "";        // 当前 AI 回复累积文本
+let isListening = false;       // 正在识别中
+let pendingUserText = "";      // 用户正在说的文字（中间结果）
+let useSSE = false;            // 降级到 SSE 模式
+let sessionId = 'vc_' + Date.now();
+
+// =====================================================================
+//  WebSocket / SSE 连接
+// =====================================================================
+function connect() {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const url = `${proto}//${location.host}/ws/voice`;
+
+    updateStatus('connecting', '连接中...');
+
+    ws = new WebSocket(url);
+
+    ws.onopen = () => {
+        updateStatus('connected', '已连接');
+        startListening();
+    };
+
+    ws.onmessage = (e) => {
+        handleMessage(JSON.parse(e.data));
+    };
+
+    ws.onerror = (err) => {
+        console.error('WebSocket error:', err);
+        // 降级到 SSE
+        useSSE = true;
+        updateStatus('connected', '已连接 (HTTP)');
+        startListening();
+    };
+
+    ws.onclose = () => {
+        if (isInCall && !useSSE) {
+            updateStatus('disconnected', '连接断开，重连中...');
+            setTimeout(connect, 2000);
+        }
+    };
+}
+
+function disconnect() {
+    if (ws) {
+        try { ws.send(JSON.stringify({type: 'end'})); } catch(e) {}
+        ws.close();
+        ws = null;
+    }
+}
+
+function sendText(text) {
+    if (useSSE) {
+        sendTextSSE(text);
+        return;
+    }
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'chat', text }));
+    }
+}
+
+// ── SSE 降级模式 ──
+function sendTextSSE(text) {
+    fetch('/api/voice/chat', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ text, session_id: sessionId })
+    }).then(resp => {
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+
+        function pump() {
+            reader.read().then(({done, value}) => {
+                if (done) return;
+                buf += decoder.decode(value, {stream: true});
+                const lines = buf.split('\n');
+                buf = lines.pop();
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = line.slice(6);
+                        if (data === '[DONE]') return;
+                        try { handleMessage(JSON.parse(data)); } catch(e) {}
+                    }
+                }
+                pump();
+            });
+        }
+        pump();
+    }).catch(err => {
+        console.error('SSE error:', err);
+    });
+}
+
+// =====================================================================
+//  消息处理
+// =====================================================================
+function handleMessage(msg) {
+    switch (msg.type) {
+        case 'text_delta':
+            currentAiText += msg.text;
+            document.getElementById('aiSubtitle').textContent = currentAiText;
+            break;
+
+        case 'audio':
+            audioQueue.push({
+                audio: msg.audio,
+                text: msg.text,
+                index: msg.index,
+            });
+            playNext();
+            break;
+
+        case 'done':
+            // AI 回复完毕，等音频播完再恢复识别
+            break;
+
+        case 'tts_error':
+            console.warn('TTS error:', msg.message);
+            break;
+
+        case 'error':
+            document.getElementById('aiSubtitle').textContent = '⚠️ ' + msg.message;
+            resumeListening();
+            break;
+
+        case 'pong':
+            break;
+    }
+}
+
+// =====================================================================
+//  音频播放队列
+// =====================================================================
+function playNext() {
+    if (isPlaying || audioQueue.length === 0) return;
+    isPlaying = true;
+
+    const item = audioQueue.shift();
+    const audioData = Uint8Array.from(atob(item.audio), c => c.charCodeAt(0));
+    const blob = new Blob([audioData], { type: 'audio/mpeg' });
+    const url = URL.createObjectURL(blob);
+
+    const audio = new Audio(url);
+    audio.volume = 1.0;
+
+    audio.onended = () => {
+        URL.revokeObjectURL(url);
+        isPlaying = false;
+        if (audioQueue.length > 0) {
+            playNext();
+        } else {
+            // 所有音频播完，恢复语音识别
+            resumeListening();
+        }
+    };
+
+    audio.onerror = () => {
+        URL.revokeObjectURL(url);
+        isPlaying = false;
+        playNext();
+    };
+
+    // 播放时暂停识别（防止识别到 AI 的声音）
+    pauseListening();
+    audio.play().catch(e => {
+        console.error('播放失败:', e);
+        isPlaying = false;
+        playNext();
+    });
+}
+
+// =====================================================================
+//  Web Speech API 语音识别
+// =====================================================================
+function initRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        document.getElementById('hint').textContent = '⚠️ 浏览器不支持语音识别，请使用 Chrome';
+        return false;
+    }
+
+    recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'zh-CN';
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = (e) => {
+        let interim = '';
+        let final_text = '';
+
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+            const transcript = e.results[i][0].transcript;
+            if (e.results[i].isFinal) {
+                final_text += transcript;
+            } else {
+                interim += transcript;
+            }
+        }
+
+        // 显示中间结果
+        if (interim) {
+            document.getElementById('userSubtitle').textContent = '🎤 ' + interim;
+        }
+
+        // 最终结果 → 发送
+        if (final_text.trim()) {
+            document.getElementById('userSubtitle').textContent = '你: ' + final_text.trim();
+            currentAiText = "";
+            document.getElementById('aiSubtitle').textContent = "";
+            sendText(final_text.trim());
+        }
+    };
+
+    recognition.onerror = (e) => {
+        console.warn('识别错误:', e.error);
+        if (e.error === 'not-allowed') {
+            document.getElementById('hint').textContent = '⚠️ 请允许麦克风权限';
+        }
+        // 自动恢复
+        if (isInCall && !isMuted && e.error !== 'not-allowed') {
+            setTimeout(() => startListening(), 500);
+        }
+    };
+
+    recognition.onend = () => {
+        isListening = false;
+        document.getElementById('rippleContainer').classList.remove('listening');
+        // 自动重启（如果还在通话中且没有静音且没在播音频）
+        if (isInCall && !isMuted && !isPlaying) {
+            setTimeout(() => startListening(), 200);
+        }
+    };
+
+    return true;
+}
+
+function startListening() {
+    if (!recognition || isListening || isMuted || !isInCall) return;
+    try {
+        recognition.start();
+        isListening = true;
+        document.getElementById('rippleContainer').classList.add('listening');
+        document.getElementById('hint').textContent = '正在聆听...';
+    } catch(e) {
+        // 可能已经在运行
+        console.warn('start listening:', e);
+    }
+}
+
+function pauseListening() {
+    if (!recognition || !isListening) return;
+    try {
+        recognition.stop();
+        isListening = false;
+        document.getElementById('rippleContainer').classList.remove('listening');
+    } catch(e) {}
+}
+
+function resumeListening() {
+    if (!isInCall || isMuted) return;
+    // 延迟一点再开始，避免识别到 TTS 尾音
+    setTimeout(() => startListening(), 500);
+}
+
+// =====================================================================
+//  控制按钮
+// =====================================================================
+function toggleCall() {
+    if (!isInCall) {
+        // 开始通话
+        if (!recognition && !initRecognition()) return;
+
+        isInCall = true;
+        document.getElementById('btnCall').classList.add('active');
+        document.getElementById('btnCall').innerHTML = '📕';
+        document.getElementById('hint').textContent = '连接中...';
+
+        // 开始计时
+        callStartTime = Date.now();
+        timerInterval = setInterval(updateTimer, 1000);
+
+        connect();
+    } else {
+        // 结束通话
+        isInCall = false;
+        document.getElementById('btnCall').classList.remove('active');
+        document.getElementById('btnCall').innerHTML = '📞';
+        document.getElementById('hint').textContent = '通话已结束';
+        document.getElementById('callTimer').textContent = '';
+
+        clearInterval(timerInterval);
+        pauseListening();
+        disconnect();
+        audioQueue = [];
+        isPlaying = false;
+        updateStatus('disconnected', '未连接');
+    }
+}
+
+function toggleMute() {
+    isMuted = !isMuted;
+    const btn = document.getElementById('btnMute');
+    btn.classList.toggle('active', isMuted);
+    btn.innerHTML = isMuted ? '🔇' : '🎤';
+
+    if (isMuted) {
+        pauseListening();
+        document.getElementById('hint').textContent = '已静音';
+    } else if (isInCall) {
+        startListening();
+    }
+}
+
+function toggleSpeaker() {
+    const btn = document.getElementById('btnSpeaker');
+    btn.classList.toggle('active');
+    // 视觉反馈，实际扬声器由系统控制
+}
+
+// =====================================================================
+//  UI 辅助
+// =====================================================================
+function updateStatus(state, text) {
+    const dot = document.getElementById('connDot');
+    dot.className = 'conn-dot ' + state;
+    document.getElementById('callStatus').innerHTML = '';
+    document.getElementById('callStatus').appendChild(dot);
+    document.getElementById('callStatus').append(' ' + text);
+}
+
+function updateTimer() {
+    if (!callStartTime) return;
+    const elapsed = Math.floor((Date.now() - callStartTime) / 1000);
+    const min = Math.floor(elapsed / 60);
+    const sec = elapsed % 60;
+    document.getElementById('callTimer').textContent =
+        `${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
+}
+</script>
+</body>
+</html>
