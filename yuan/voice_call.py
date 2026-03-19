@@ -449,6 +449,8 @@ def _build_voice_system_prompt(current_message=""):
     # ========== 语音通话专用指令 ==========
     prompt_parts.append(_voice_instruction())
 
+    return "".join(prompt_parts)
+
 
 def _voice_instruction():
     """语音通话模式的固定指令"""
@@ -473,8 +475,6 @@ def _voice_instruction():
   (chuckle)今天玩得开心吗？
   记得要多穿衣服，(sniffs) <#0.3#> 连我都感冒了。
   (sighs)算了 <#0.3#> 不说了。"""
-
-    return "".join(prompt_parts)
 
 
 def _read_prompt_file(name, subdir):
