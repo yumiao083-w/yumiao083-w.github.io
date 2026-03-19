@@ -29,9 +29,11 @@
         @keyframes ripple { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(2); opacity: 0; } }
 
         /* 字幕区 */
-        .subtitle-area { min-height: 80px; padding: 0 24px 16px; text-align: center; }
-        .subtitle-text { font-size: 16px; line-height: 1.6; color: #ccc; max-height: 80px; overflow-y: auto; }
+        .subtitle-area { min-height: 120px; padding: 0 24px 16px; text-align: center; }
+        .subtitle-text { font-size: 16px; line-height: 1.6; color: #ccc; max-height: 60px; overflow-y: auto; }
         .subtitle-text.user-text { color: #8e8e93; font-size: 14px; }
+        .status-line { font-size: 12px; color: #666; margin-top: 8px; transition: opacity 0.3s; }
+        .stats-line { font-size: 11px; color: #555; margin-top: 4px; }
 
         /* 控制栏 */
         .controls { padding: 20px 40px 50px; display: flex; justify-content: space-around; align-items: center; }
@@ -76,6 +78,8 @@
     <div class="subtitle-area">
         <div class="subtitle-text user-text" id="userSubtitle"></div>
         <div class="subtitle-text" id="aiSubtitle"></div>
+        <div class="status-line" id="statusLine"></div>
+        <div class="stats-line" id="statsLine"></div>
     </div>
 
     <div class="controls">
@@ -196,6 +200,15 @@ function sendTextSSE(text) {
 // =====================================================================
 function handleMessage(msg) {
     switch (msg.type) {
+        case 'user_confirmed':
+            document.getElementById('userSubtitle').textContent = '你: ' + msg.text;
+            document.getElementById('statusLine').textContent = '✅ 已收到，正在处理...';
+            break;
+
+        case 'status':
+            document.getElementById('statusLine').textContent = msg.message || '';
+            break;
+
         case 'text_delta':
             currentAiText += msg.text;
             document.getElementById('aiSubtitle').textContent = currentAiText;
@@ -211,15 +224,24 @@ function handleMessage(msg) {
             break;
 
         case 'done':
-            // AI 回复完毕，等音频播完再恢复识别
+            document.getElementById('statusLine').textContent = '';
+            if (msg.stats) {
+                let s = msg.stats;
+                let info = `总耗时 ${s.total_time}s`;
+                if (s.first_token_time) info += ` | 首token ${s.first_token_time}s`;
+                info += ` | LLM ${s.llm_time}s | ${s.sentences}句TTS`;
+                document.getElementById('statsLine').textContent = info;
+            }
             break;
 
         case 'tts_error':
             console.warn('TTS error:', msg.message);
+            document.getElementById('statusLine').textContent = '⚠️ 语音合成失败: ' + msg.text;
             break;
 
         case 'error':
             document.getElementById('aiSubtitle').textContent = '⚠️ ' + msg.message;
+            document.getElementById('statusLine').textContent = '';
             resumeListening();
             break;
 
@@ -306,6 +328,8 @@ function initRecognition() {
         // 最终结果 → 发送
         if (final_text.trim()) {
             document.getElementById('userSubtitle').textContent = '你: ' + final_text.trim();
+            document.getElementById('statusLine').textContent = '发送中...';
+            document.getElementById('statsLine').textContent = '';
             currentAiText = "";
             document.getElementById('aiSubtitle').textContent = "";
             sendText(final_text.trim());

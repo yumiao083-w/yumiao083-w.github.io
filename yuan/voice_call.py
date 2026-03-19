@@ -125,19 +125,42 @@ def stream_chat_and_tts(user_text: str, history: list, ws_send):
     """
     from openai import OpenAI
 
+    t_start = time.time()
     providers = _get_chat_providers()
     temperature = _cfg('TEMPERATURE', 1.0)
     max_token = _cfg('MAX_TOKEN', 4000)
 
+    logger.info(f"[VoiceCall] ====== 新一轮对话 ======")
+    logger.info(f"[VoiceCall] 用户输入: {user_text}")
+    logger.info(f"[VoiceCall] 历史轮数: {len(history)}")
+
+    # 通知前端：已收到用户文字
+    ws_send(json.dumps({
+        "type": "user_confirmed",
+        "text": user_text,
+    }))
+
     # 构建 messages
+    logger.info(f"[VoiceCall] [1/4] 构建 system prompt...")
+    t_prompt = time.time()
     system_prompt = _build_voice_system_prompt()
+    logger.info(f"[VoiceCall] [1/4] system prompt 构建完成，长度: {len(system_prompt)} 字符 ({time.time()-t_prompt:.1f}s)")
+
     messages = [{"role": "system", "content": system_prompt}]
     messages.extend(history[-20:])  # 最近 20 轮
     messages.append({"role": "user", "content": user_text})
 
+    # 通知前端：开始调用 LLM
+    ws_send(json.dumps({
+        "type": "status",
+        "step": "llm_start",
+        "message": "正在思考...",
+    }))
+
     splitter = SentenceSplitter()
     full_reply = ""
     sentence_idx = 0
+    first_token_time = None
 
     for provider in providers:
         try:
@@ -148,7 +171,8 @@ def stream_chat_and_tts(user_text: str, history: list, ws_send):
             model = provider.get('model', '')
             p_name = provider.get('name', '未命名')
 
-            logger.info(f"[VoiceCall] 调用 [{p_name}] model={model}")
+            logger.info(f"[VoiceCall] [2/4] 调用 LLM [{p_name}] model={model}")
+            t_llm = time.time()
 
             response = client.chat.completions.create(
                 model=model,
@@ -164,6 +188,16 @@ def stream_chat_and_tts(user_text: str, history: list, ws_send):
                     delta_text = chunk.choices[0].delta.content or ""
                     if not delta_text:
                         continue
+
+                    if first_token_time is None:
+                        first_token_time = time.time()
+                        logger.info(f"[VoiceCall] [2/4] 首 token 到达，延迟: {first_token_time-t_llm:.2f}s")
+                        ws_send(json.dumps({
+                            "type": "status",
+                            "step": "llm_streaming",
+                            "message": "正在回复...",
+                        }))
+
                     full_reply += delta_text
 
                     # 发送实时文字（前端显示打字效果）
@@ -177,23 +211,41 @@ def stream_chat_and_tts(user_text: str, history: list, ws_send):
                         _send_sentence_audio(sentence, sentence_idx, ws_send)
                         sentence_idx += 1
 
+            t_llm_done = time.time()
+            logger.info(f"[VoiceCall] [2/4] LLM 生成完毕，总耗时: {t_llm_done-t_llm:.2f}s，回复长度: {len(full_reply)}")
+            logger.info(f"[VoiceCall] [2/4] AI 回复全文: {full_reply[:200]}{'...' if len(full_reply)>200 else ''}")
+
             # 处理剩余文本
             for sentence in splitter.flush():
                 _send_sentence_audio(sentence, sentence_idx, ws_send)
                 sentence_idx += 1
 
             # 发送完成信号
+            t_total = time.time() - t_start
+            logger.info(f"[VoiceCall] [4/4] 本轮完成，共 {sentence_idx} 句 TTS，总耗时: {t_total:.2f}s")
             ws_send(json.dumps({
                 "type": "done",
                 "full_text": full_reply,
+                "stats": {
+                    "total_time": round(t_total, 2),
+                    "first_token_time": round(first_token_time - t_llm, 2) if first_token_time else None,
+                    "llm_time": round(t_llm_done - t_llm, 2),
+                    "sentences": sentence_idx,
+                },
             }))
             return full_reply
 
         except Exception as e:
-            logger.error(f"[VoiceCall] 中转站 [{p_name}] 失败: {e}")
+            logger.error(f"[VoiceCall] [2/4] 中转站 [{p_name}] 失败: {e}", exc_info=True)
+            ws_send(json.dumps({
+                "type": "status",
+                "step": "llm_retry",
+                "message": f"中转站 {p_name} 失败，尝试下一个...",
+            }))
             continue
 
     # 所有中转站都失败
+    logger.error(f"[VoiceCall] 所有中转站均失败！")
     ws_send(json.dumps({
         "type": "error",
         "message": "所有 API 中转站均不可用",
@@ -206,11 +258,23 @@ def _send_sentence_audio(sentence: str, idx: int, ws_send):
     # 过滤纯标点
     clean = re.sub(r'[^\w\s]', '', sentence).strip()
     if not clean:
+        logger.debug(f"[VoiceCall] [3/4] 跳过纯标点句: {sentence}")
         return
 
     try:
-        logger.info(f"[VoiceCall] TTS 第{idx}句: {sentence[:40]}...")
+        t_tts = time.time()
+        logger.info(f"[VoiceCall] [3/4] TTS 第{idx}句开始: 「{sentence[:50]}{'...' if len(sentence)>50 else ''}」")
+
+        ws_send(json.dumps({
+            "type": "status",
+            "step": "tts",
+            "message": f"语音合成中... ({idx+1})",
+        }))
+
         audio_bytes = _tts_to_mp3(sentence)
+        tts_time = time.time() - t_tts
+        logger.info(f"[VoiceCall] [3/4] TTS 第{idx}句完成: {len(audio_bytes)} bytes, 耗时: {tts_time:.2f}s")
+
         audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
 
         ws_send(json.dumps({
@@ -221,7 +285,7 @@ def _send_sentence_audio(sentence: str, idx: int, ws_send):
             "format": "mp3",
         }))
     except Exception as e:
-        logger.error(f"[VoiceCall] TTS 第{idx}句失败: {e}")
+        logger.error(f"[VoiceCall] [3/4] TTS 第{idx}句失败: {e}", exc_info=True)
         ws_send(json.dumps({
             "type": "tts_error",
             "index": idx,
