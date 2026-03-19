@@ -306,6 +306,16 @@ VOICE_ENABLE_MEMORY_RETRIEVAL = True
 # 通话记录保存目录
 VOICE_CALL_LOG_DIR = 'Voice_Logs'
 
+# === 语音通话独立 API（留空则使用主聊天 API）===
+# 可以设置单独的中转站/key，方便控制额度
+VOICE_API_BASE_URL = ''
+VOICE_API_KEY = ''
+VOICE_API_MODEL = ''
+
+# === 语音通话独立提示词（留空则使用主角色人设+预设）===
+# 填写文件路径（相对于 yuan 项目根目录），如 'prompts/voice_prompt.md'
+VOICE_CUSTOM_PROMPT_FILE = ''
+
 # === Ngrok 隧道配置（手机 HTTPS 访问）===
 # 启用后自动创建 ngrok 隧道，手机通过 HTTPS 域名访问可使用麦克风
 ENABLE_NGROK = True

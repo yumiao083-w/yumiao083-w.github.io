@@ -45,11 +45,23 @@ def _cfg(key, default=None):
 
 
 def _get_chat_providers():
-    """获取聊天中转站列表"""
+    """获取语音通话用的 API 中转站（优先独立配置，留空则用主聊天 API）"""
+    # 优先使用语音通话独立 API
+    voice_url = _cfg('VOICE_API_BASE_URL', '')
+    voice_key = _cfg('VOICE_API_KEY', '')
+    voice_model = _cfg('VOICE_API_MODEL', '')
+    if voice_url and voice_key and voice_model:
+        return [{
+            'name': '语音通话专用',
+            'base_url': voice_url,
+            'api_key': voice_key,
+            'model': voice_model,
+        }]
+
+    # 降级到主聊天 API
     providers = _cfg('CHAT_API_PROVIDERS', [])
     if providers:
         return providers
-    # 兼容旧版单中转站配置
     return [{
         'name': '默认',
         'base_url': _cfg('DEEPSEEK_BASE_URL', ''),
@@ -364,6 +376,20 @@ def _send_sentence_audio(sentence: str, idx: int, ws_send):
 def _build_voice_system_prompt(current_message=""):
     """构建语音通话专用的系统提示词（复用 bot.py 五板块架构 + 语音通话指令）"""
 
+    # 如果配置了自定义提示词文件，优先使用（给朋友体验用，不含私人记忆）
+    custom_file = _cfg('VOICE_CUSTOM_PROMPT_FILE', '')
+    if custom_file:
+        custom_path = os.path.join(YUAN_ROOT, custom_file)
+        if os.path.exists(custom_path):
+            try:
+                with open(custom_path, 'r', encoding='utf-8') as f:
+                    custom_prompt = f.read()
+                logger.info(f"[VoiceCall] 使用自定义提示词: {custom_file}")
+                return custom_prompt + _voice_instruction()
+            except Exception as e:
+                logger.error(f"[VoiceCall] 读取自定义提示词失败: {e}")
+
+    # 默认：完整五板块架构
     # 从 config 读取用户和角色信息
     listen_list = _cfg('LISTEN_LIST', [])
     if listen_list:
@@ -421,7 +447,12 @@ def _build_voice_system_prompt(current_message=""):
             logger.debug(f"[VoiceCall] 检索记忆已注入，长度: {len(retrieved)}")
 
     # ========== 语音通话专用指令 ==========
-    voice_instruction = """
+    prompt_parts.append(_voice_instruction())
+
+
+def _voice_instruction():
+    """语音通话模式的固定指令"""
+    return """
 
 # 语音通话模式
 你现在处于实时语音通话模式。请遵守以下规则：
@@ -442,7 +473,6 @@ def _build_voice_system_prompt(current_message=""):
   (chuckle)今天玩得开心吗？
   记得要多穿衣服，(sniffs) <#0.3#> 连我都感冒了。
   (sighs)算了 <#0.3#> 不说了。"""
-    prompt_parts.append(voice_instruction)
 
     return "".join(prompt_parts)
 
