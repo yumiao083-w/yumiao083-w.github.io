@@ -43,6 +43,38 @@ from datetime import datetime
 
 app = Flask(__name__)
 
+# =====================================================================
+#  Ngrok 安全中间件：外部访问只允许通话相关路由
+# =====================================================================
+NGROK_ALLOWED_PATHS = {
+    '/voice', '/api/voice/settings', '/api/voice/logs',
+    '/api/voice/recognize', '/api/voice/chat', '/api/voice/end',
+    '/ws/voice',
+}
+# 前缀匹配（通话记录详情）
+NGROK_ALLOWED_PREFIXES = ('/api/voice/log/',)
+
+@app.before_request
+def ngrok_security_check():
+    """如果是通过 ngrok 访问的，只允许通话相关路由"""
+    host = request.host.lower()
+    # 检测是否是 ngrok 域名
+    if '.ngrok' in host or '.ngrok-free.app' in host:
+        path = request.path
+        # 静态资源放行
+        if path.startswith('/static/'):
+            return
+        # 允许的精确路径
+        if path in NGROK_ALLOWED_PATHS:
+            return
+        # 允许的前缀路径
+        for prefix in NGROK_ALLOWED_PREFIXES:
+            if path.startswith(prefix):
+                return
+        # 其他路由全部拒绝
+        from flask import abort
+        abort(403)
+
 # 注册语音通话路由
 try:
     from voice_call import register_voice_routes
