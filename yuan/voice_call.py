@@ -108,6 +108,7 @@ _HALLUCINATION_KEYWORDS = [
     'thanks for watching', 'like and subscribe',
     'Subtitles by', 'Translation by',
     '小铃铛', '开启小铃铛', '通知铃铛',
+    '谢谢大家', '谢谢你们', '谢谢各位',
 ]
 
 # 纯重复字符的模式（如 "啊啊啊啊啊"）
@@ -566,7 +567,7 @@ def register_voice_routes(app):
                     'name': 'Groq',
                     'url': 'https://api.groq.com/openai/v1/audio/transcriptions',
                     'api_key': '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',
-                    'model': 'whisper-large-v3',
+                    'model': 'whisper-large-v3-turbo',
                 },
             ]
             # 追加中转站作为降级
@@ -589,7 +590,7 @@ def register_voice_routes(app):
                             engine['url'],
                             headers={"Authorization": f"Bearer {engine['api_key']}"},
                             files={"file": ("audio.webm", f, "audio/webm")},
-                            data={"model": engine['model'], "language": "zh"},
+                            data={"model": engine['model']},
                             timeout=30,
                         )
 
