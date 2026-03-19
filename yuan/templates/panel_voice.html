@@ -696,7 +696,7 @@ function showLogDetail(filename) {
             
             const msgs = document.getElementById('logMessages');
             msgs.innerHTML = (data.messages || []).map(m => 
-                `<div class="log-msg ${m.role === 'user' ? 'user' : 'ai'}">${m.content}</div>`
+                `<div class="log-msg ${m.role === 'user' ? 'user' : 'ai'}">${cleanVoiceTags(m.content)}</div>`
             ).join('');
             
             document.getElementById('logMeta').textContent = 
