@@ -47,8 +47,11 @@ app = Flask(__name__)
 try:
     from voice_call import register_voice_routes
     register_voice_routes(app)
+    print("[VoiceCall] ✅ 语音通话模块加载成功")
 except Exception as _vc_err:
-    print(f"[VoiceCall] 语音通话模块加载跳过: {_vc_err}")
+    import traceback
+    print(f"[VoiceCall] ❌ 语音通话模块加载失败: {_vc_err}")
+    traceback.print_exc()
 
 def safe_type_convert(value, target_type, default_value=None, field_name=""):
     """

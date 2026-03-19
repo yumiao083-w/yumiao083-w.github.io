@@ -436,10 +436,10 @@ def register_voice_routes(app):
         from flask_sock import Sock
         sock = Sock(app)
         HAS_FLASK_SOCK = True
-        logger.info("[VoiceCall] flask-sock 已加载，WebSocket 可用")
+        print("[VoiceCall] ✅ flask-sock 已加载，WebSocket 可用")
     except ImportError:
         HAS_FLASK_SOCK = False
-        logger.warning("[VoiceCall] flask-sock 未安装，将使用 HTTP 轮询模式")
+        print("[VoiceCall] ⚠️ flask-sock 未安装，将使用 HTTP SSE 模式")
 
     @app.route('/voice')
     def voice_page():
