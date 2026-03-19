@@ -63,7 +63,28 @@
         }
         .back-btn svg { width: 14px; height: 14px; fill: currentColor; }
 
-        .top-right { width: 60px; } /* 占位平衡布局 */
+        .top-right { width: 60px; display: flex; justify-content: flex-end; }
+        .settings-icon { width: 40px; height: 40px; border: none; background: transparent; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0.6; }
+        .settings-icon:hover { opacity: 1; }
+        .settings-icon svg { width: 22px; height: 22px; fill: currentColor; }
+
+        /* 设置弹窗 */
+        .settings-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); z-index: 1000; align-items: center; justify-content: center; }
+        .settings-modal.show { display: flex; }
+        .settings-panel { background: #1c1c1e; border-radius: 16px; padding: 24px; width: 90%; max-width: 380px; max-height: 80vh; overflow-y: auto; }
+        .settings-panel h3 { font-size: 18px; font-weight: 600; margin-bottom: 20px; text-align: center; }
+        .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
+        .setting-item:last-child { border-bottom: none; }
+        .setting-label { font-size: 15px; color: #fff; flex: 1; }
+        .setting-desc { font-size: 12px; color: #8e8e93; margin-top: 2px; }
+        .setting-toggle { position: relative; width: 44px; height: 26px; background: #39393d; border-radius: 13px; cursor: pointer; border: none; transition: background 0.2s; flex-shrink: 0; margin-left: 12px; }
+        .setting-toggle.on { background: #34c759; }
+        .setting-toggle .knob { position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; background: #fff; border-radius: 50%; transition: left 0.2s; }
+        .setting-toggle.on .knob { left: 20px; }
+        .settings-btn-row { display: flex; gap: 10px; margin-top: 20px; }
+        .settings-btn-row button { flex: 1; padding: 12px; border: none; border-radius: 10px; font-size: 15px; cursor: pointer; }
+        .btn-save-settings { background: #0a84ff; color: #fff; }
+        .btn-close-settings { background: #39393d; color: #fff; }
 
         /* 头像与来电信息区 */
         .caller-info { 
@@ -377,7 +398,44 @@
             <svg viewBox="0 0 24 24"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
             返回
         </a>
-        <div class="top-right"></div>
+        <div class="top-right">
+            <button class="settings-icon" onclick="openSettings()" title="设置">
+                <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- 设置弹窗 -->
+    <div class="settings-modal" id="settingsModal">
+        <div class="settings-panel">
+            <h3>语音通话设置</h3>
+            <div class="setting-item">
+                <div>
+                    <div class="setting-label">共享微信上下文</div>
+                    <div class="setting-desc">通话时读取微信聊天记录</div>
+                </div>
+                <button class="setting-toggle" id="tog-wechat-ctx" onclick="toggleSetting(this)"><div class="knob"></div></button>
+            </div>
+            <div class="setting-item">
+                <div>
+                    <div class="setting-label">世界书</div>
+                    <div class="setting-desc">通话时注入世界书设定</div>
+                </div>
+                <button class="setting-toggle" id="tog-world-info" onclick="toggleSetting(this)"><div class="knob"></div></button>
+            </div>
+            <div class="setting-item">
+                <div>
+                    <div class="setting-label">记忆检索</div>
+                    <div class="setting-desc">根据对话内容检索相关记忆</div>
+                </div>
+                <button class="setting-toggle" id="tog-memory-retrieval" onclick="toggleSetting(this)"><div class="knob"></div></button>
+            </div>
+            <div class="settings-btn-row">
+                <button class="btn-close-settings" onclick="closeSettings()">关闭</button>
+                <button class="btn-save-settings" onclick="saveSettings()">保存</button>
+            </div>
+            <div id="settingsStatus" style="text-align:center; font-size:13px; color:#8e8e93; margin-top:12px;"></div>
+        </div>
     </div>
 
     <div class="caller-info">
@@ -455,6 +513,58 @@
     </div>
 
 <script>
+// =====================================================================
+//  设置面板
+// =====================================================================
+function toggleSetting(btn) {
+    btn.classList.toggle('on');
+}
+
+function openSettings() {
+    // 从后端加载当前配置
+    fetch('/api/save_section', { method: 'GET' }).catch(() => {});
+    // 直接用 parse_config 的值（通过一个小 API）
+    fetch('/api/voice/settings')
+        .then(r => r.json())
+        .then(cfg => {
+            document.getElementById('tog-wechat-ctx').classList.toggle('on', cfg.VOICE_SHARE_WECHAT_CONTEXT || false);
+            document.getElementById('tog-world-info').classList.toggle('on', cfg.VOICE_ENABLE_WORLD_INFO || false);
+            document.getElementById('tog-memory-retrieval').classList.toggle('on', cfg.VOICE_ENABLE_MEMORY_RETRIEVAL !== false);
+        })
+        .catch(() => {});
+    document.getElementById('settingsModal').classList.add('show');
+}
+
+function closeSettings() {
+    document.getElementById('settingsModal').classList.remove('show');
+}
+
+function saveSettings() {
+    const fields = {
+        VOICE_SHARE_WECHAT_CONTEXT: document.getElementById('tog-wechat-ctx').classList.contains('on'),
+        VOICE_ENABLE_WORLD_INFO: document.getElementById('tog-world-info').classList.contains('on'),
+        VOICE_ENABLE_MEMORY_RETRIEVAL: document.getElementById('tog-memory-retrieval').classList.contains('on'),
+    };
+    const status = document.getElementById('settingsStatus');
+    status.textContent = '保存中...';
+
+    fetch('/api/save_section', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ fields })
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.error) {
+            status.textContent = '❌ ' + result.error;
+        } else {
+            status.textContent = '✅ 已保存';
+            setTimeout(() => { status.textContent = ''; closeSettings(); }, 1000);
+        }
+    })
+    .catch(e => { status.textContent = '❌ ' + e.message; });
+}
+
 // =====================================================================
 //  工具函数
 // =====================================================================

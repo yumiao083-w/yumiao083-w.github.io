@@ -629,6 +629,16 @@ def register_voice_routes(app):
     def voice_page():
         return render_template('panel_voice.html')
 
+    @app.route('/api/voice/settings')
+    def voice_settings():
+        """获取语音通话配置"""
+        from flask import jsonify
+        return jsonify({
+            'VOICE_SHARE_WECHAT_CONTEXT': _cfg('VOICE_SHARE_WECHAT_CONTEXT', False),
+            'VOICE_ENABLE_WORLD_INFO': _cfg('VOICE_ENABLE_WORLD_INFO', False),
+            'VOICE_ENABLE_MEMORY_RETRIEVAL': _cfg('VOICE_ENABLE_MEMORY_RETRIEVAL', True),
+        })
+
     if HAS_FLASK_SOCK:
         # ── WebSocket 模式 ──
         @sock.route('/ws/voice')
