@@ -273,6 +273,118 @@
     </div>
 </div>
 
+<!-- ===== 5. Telegram 语音 (TTS) ===== -->
+<div class="section-card">
+    <h2>Telegram 语音</h2>
+    <small style="color: #999; display: block; margin-bottom: 12px;">Telegram 机器人的语音回复（TTS）配置</small>
+
+    <!-- TTS 引擎选择 -->
+    <div class="field">
+        <label>TTS 引擎</label>
+        <select id="tts-engine" onchange="toggleTtsEngine()">
+            <option value="minimax" {% if config.TTS_ENGINE == 'minimax' %}selected{% endif %}>MiniMax（支持声音克隆）</option>
+            <option value="edge" {% if config.TTS_ENGINE == 'edge' %}selected{% endif %}>Edge TTS（免费微软音色）</option>
+        </select>
+    </div>
+
+    <!-- ===== MiniMax 配置区 ===== -->
+    <div class="cond-section" id="tts-minimax-section">
+        <div class="field">
+            <label>API Key</label>
+            <input type="password" id="tts-mm-key" value="{{ config.TTS_MINIMAX_API_KEY or '' }}">
+        </div>
+        <div class="field">
+            <label>Group ID</label>
+            <input type="text" id="tts-mm-group" value="{{ config.TTS_MINIMAX_GROUP_ID or '' }}">
+        </div>
+        <div class="field">
+            <label>Voice ID（克隆声音 ID）</label>
+            <input type="text" id="tts-mm-voice" value="{{ config.TTS_MINIMAX_VOICE_ID or 'yuanlang' }}">
+            <small>在 MiniMax 控制台创建的克隆声音标识</small>
+        </div>
+        <div class="field">
+            <label>模型</label>
+            <select id="tts-mm-model">
+                <option value="speech-2.8-hd" {% if config.TTS_MINIMAX_MODEL == 'speech-2.8-hd' %}selected{% endif %}>speech-2.8-hd（推荐）</option>
+                <option value="speech-2.8-turbo" {% if config.TTS_MINIMAX_MODEL == 'speech-2.8-turbo' %}selected{% endif %}>speech-2.8-turbo（快）</option>
+                <option value="speech-2.6-hd" {% if config.TTS_MINIMAX_MODEL == 'speech-2.6-hd' %}selected{% endif %}>speech-2.6-hd</option>
+                <option value="speech-02-hd" {% if config.TTS_MINIMAX_MODEL == 'speech-02-hd' %}selected{% endif %}>speech-02-hd</option>
+            </select>
+        </div>
+        <div class="field">
+            <label>API 地址</label>
+            <input type="text" id="tts-mm-url" value="{{ config.TTS_MINIMAX_API_URL or 'https://api.minimax.chat' }}">
+            <small>国内用 api.minimax.chat，海外用 api.minimaxi.com</small>
+        </div>
+        <div class="field">
+            <label>语速 <span style="font-weight:normal; color:#aaa;">（0.5 ~ 2.0）</span></label>
+            <div class="slider-combo">
+                <input type="range" id="tts-mm-speed-slider" min="0.5" max="2" step="0.05" value="{{ config.TTS_MINIMAX_SPEED or 1.0 }}" oninput="document.getElementById('tts-mm-speed').value=this.value">
+                <input type="number" id="tts-mm-speed" step="0.05" min="0.5" max="2" value="{{ config.TTS_MINIMAX_SPEED or 1.0 }}" oninput="document.getElementById('tts-mm-speed-slider').value=this.value">
+            </div>
+        </div>
+        <div class="field">
+            <label>音量 <span style="font-weight:normal; color:#aaa;">（0.1 ~ 10.0）</span></label>
+            <div class="slider-combo">
+                <input type="range" id="tts-mm-vol-slider" min="0.1" max="10" step="0.1" value="{{ config.TTS_MINIMAX_VOL or 1.0 }}" oninput="document.getElementById('tts-mm-vol').value=this.value">
+                <input type="number" id="tts-mm-vol" step="0.1" min="0.1" max="10" value="{{ config.TTS_MINIMAX_VOL or 1.0 }}" oninput="document.getElementById('tts-mm-vol-slider').value=this.value">
+            </div>
+        </div>
+        <div class="field">
+            <label>音调 <span style="font-weight:normal; color:#aaa;">（-12 ~ 12）</span></label>
+            <div class="slider-combo">
+                <input type="range" id="tts-mm-pitch-slider" min="-12" max="12" step="1" value="{{ config.TTS_MINIMAX_PITCH or 0 }}" oninput="document.getElementById('tts-mm-pitch').value=this.value">
+                <input type="number" id="tts-mm-pitch" step="1" min="-12" max="12" value="{{ config.TTS_MINIMAX_PITCH or 0 }}" oninput="document.getElementById('tts-mm-pitch-slider').value=this.value">
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Edge TTS 配置区 ===== -->
+    <div class="cond-section" id="tts-edge-section">
+        <div class="field">
+            <label>音色</label>
+            <select id="tts-edge-voice">
+                <optgroup label="女声">
+                    <option value="zh-CN-XiaoxiaoNeural" {% if config.TTS_EDGE_VOICE == 'zh-CN-XiaoxiaoNeural' %}selected{% endif %}>晓晓 - 温柔</option>
+                    <option value="zh-CN-XiaoyiNeural" {% if config.TTS_EDGE_VOICE == 'zh-CN-XiaoyiNeural' %}selected{% endif %}>晓伊 - 活泼</option>
+                    <option value="zh-CN-XiaoxuanNeural" {% if config.TTS_EDGE_VOICE == 'zh-CN-XiaoxuanNeural' %}selected{% endif %}>晓萱 - 可爱</option>
+                    <option value="zh-CN-XiaochenNeural" {% if config.TTS_EDGE_VOICE == 'zh-CN-XiaochenNeural' %}selected{% endif %}>晓辰 - 成熟</option>
+                    <option value="zh-CN-XiaohanNeural" {% if config.TTS_EDGE_VOICE == 'zh-CN-XiaohanNeural' %}selected{% endif %}>晓涵 - 感性</option>
+                    <option value="zh-CN-XiaomengNeural" {% if config.TTS_EDGE_VOICE == 'zh-CN-XiaomengNeural' %}selected{% endif %}>晓梦 - 甜美</option>
+                    <option value="zh-CN-XiaomoNeural" {% if config.TTS_EDGE_VOICE == 'zh-CN-XiaomoNeural' %}selected{% endif %}>晓墨 - 知性</option>
+                    <option value="zh-CN-XiaoruiNeural" {% if config.TTS_EDGE_VOICE == 'zh-CN-XiaoruiNeural' %}selected{% endif %}>晓睿</option>
+                    <option value="zh-CN-XiaoyanNeural" {% if config.TTS_EDGE_VOICE == 'zh-CN-XiaoyanNeural' %}selected{% endif %}>晓颜</option>
+                    <option value="zh-CN-XiaozhenNeural" {% if config.TTS_EDGE_VOICE == 'zh-CN-XiaozhenNeural' %}selected{% endif %}>晓甄</option>
+                    <option value="zh-CN-XiaoshuangNeural" {% if config.TTS_EDGE_VOICE == 'zh-CN-XiaoshuangNeural' %}selected{% endif %}>晓双 - 儿童</option>
+                    <option value="zh-CN-XiaoyouNeural" {% if config.TTS_EDGE_VOICE == 'zh-CN-XiaoyouNeural' %}selected{% endif %}>晓悠 - 儿童</option>
+                </optgroup>
+                <optgroup label="男声">
+                    <option value="zh-CN-YunyangNeural" {% if config.TTS_EDGE_VOICE == 'zh-CN-YunyangNeural' %}selected{% endif %}>云扬 - 新闻播报</option>
+                    <option value="zh-CN-YunxiNeural" {% if config.TTS_EDGE_VOICE == 'zh-CN-YunxiNeural' %}selected{% endif %}>云希 - 年轻</option>
+                    <option value="zh-CN-YunjianNeural" {% if config.TTS_EDGE_VOICE == 'zh-CN-YunjianNeural' %}selected{% endif %}>云健 - 沉稳</option>
+                    <option value="zh-CN-YunfengNeural" {% if config.TTS_EDGE_VOICE == 'zh-CN-YunfengNeural' %}selected{% endif %}>云枫</option>
+                    <option value="zh-CN-YunhaoNeural" {% if config.TTS_EDGE_VOICE == 'zh-CN-YunhaoNeural' %}selected{% endif %}>云皓</option>
+                    <option value="zh-CN-YunxiaNeural" {% if config.TTS_EDGE_VOICE == 'zh-CN-YunxiaNeural' %}selected{% endif %}>云夏 - 少年</option>
+                    <option value="zh-CN-YunyeNeural" {% if config.TTS_EDGE_VOICE == 'zh-CN-YunyeNeural' %}selected{% endif %}>云野</option>
+                    <option value="zh-CN-YunzeNeural" {% if config.TTS_EDGE_VOICE == 'zh-CN-YunzeNeural' %}selected{% endif %}>云泽</option>
+                </optgroup>
+            </select>
+        </div>
+    </div>
+
+    <!-- 试听按钮 -->
+    <div class="field" style="margin-top: 12px;">
+        <button class="fetch-btn" id="tts-test-btn" onclick="testTts()" style="width: 100%; padding: 12px;">🔊 试听当前配置</button>
+        <audio id="tts-test-audio" style="width: 100%; margin-top: 8px; display: none;" controls></audio>
+        <div id="tts-test-status" style="font-size: 13px; color: #999; margin-top: 4px;"></div>
+    </div>
+
+    <div class="save-bar">
+        <button class="save-btn" onclick="saveTts()">保存</button>
+        <span class="save-status" id="tts-status"></span>
+    </div>
+</div>
+
 <script>
 // ===== 通用工具 =====
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
@@ -493,7 +605,7 @@ function toggleLlmOnly() {
 
 // ===== 保存函数 =====
 function saveChat() {
-    // 保存聊天模型配置：中转站列表 + 温度/Token
+    // 保存聊天模型配置：中转站列表 + 温度/Token（串行保存，避免并发写 config.py）
     const providers = providerData.chat;
     if (providers.length === 0) {
         document.getElementById('chat-status').textContent = '❌ 至少需要一个中转站';
@@ -503,35 +615,40 @@ function saveChat() {
     const s = document.getElementById('chat-status');
     s.textContent = '保存中...'; s.style.color = '#999';
 
-    // 1. 保存中转站列表到后端
-    const p1 = fetch('/api/chat_providers', {
+    // 1. 先保存中转站列表
+    fetch('/api/chat_providers', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ providers: providers })
-    }).then(r => r.json());
-
-    // 2. 保存温度和 Token 到 config.py
-    const p2 = fetch('/api/save_section', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ fields: {
-            TEMPERATURE: document.getElementById('chat-temp').value,
-            MAX_TOKEN: document.getElementById('chat-max-token').value,
-        }})
-    }).then(r => r.json());
-
-    Promise.all([p1, p2])
-        .then(([r1, r2]) => {
-            if (r1.error || r2.error) {
-                s.textContent = '❌ ' + (r1.error || r2.error);
-                s.style.color = '#ff3b30';
-            } else {
-                s.textContent = '✅ 已保存';
-                s.style.color = '#34c759';
-                setTimeout(() => s.textContent = '', 3000);
-            }
-        })
-        .catch(e => { s.textContent = '❌ ' + e.message; s.style.color = '#ff3b30'; });
+    }).then(r => r.json())
+    .then(r1 => {
+        if (r1.error) {
+            s.textContent = '❌ ' + r1.error;
+            s.style.color = '#ff3b30';
+            return;
+        }
+        // 2. 中转站保存成功后，再保存温度和 Token
+        return fetch('/api/save_section', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ fields: {
+                TEMPERATURE: document.getElementById('chat-temp').value,
+                MAX_TOKEN: document.getElementById('chat-max-token').value,
+            }})
+        }).then(r => r.json());
+    })
+    .then(r2 => {
+        if (!r2) return; // 上一步已报错
+        if (r2.error) {
+            s.textContent = '❌ ' + r2.error;
+            s.style.color = '#ff3b30';
+        } else {
+            s.textContent = '✅ 已保存';
+            s.style.color = '#34c759';
+            setTimeout(() => s.textContent = '', 3000);
+        }
+    })
+    .catch(e => { s.textContent = '❌ ' + e.message; s.style.color = '#ff3b30'; });
 }
 
 function saveMr() {
@@ -600,6 +717,71 @@ function mrResetPrompt() {
         .catch(e => alert('重置失败: ' + e.message));
 }
 
+// ===== TTS 引擎条件显示 =====
+function toggleTtsEngine() {
+    const engine = document.getElementById('tts-engine').value;
+    const mmSection = document.getElementById('tts-minimax-section');
+    const edgeSection = document.getElementById('tts-edge-section');
+    if (engine === 'minimax') {
+        mmSection.classList.add('show');
+        edgeSection.classList.remove('show');
+    } else {
+        mmSection.classList.remove('show');
+        edgeSection.classList.add('show');
+    }
+}
+
+function saveTts() {
+    const engine = document.getElementById('tts-engine').value;
+    const fields = { TTS_ENGINE: engine };
+
+    if (engine === 'minimax') {
+        fields.TTS_MINIMAX_API_KEY = document.getElementById('tts-mm-key').value.trim();
+        fields.TTS_MINIMAX_GROUP_ID = document.getElementById('tts-mm-group').value.trim();
+        fields.TTS_MINIMAX_VOICE_ID = document.getElementById('tts-mm-voice').value.trim();
+        fields.TTS_MINIMAX_MODEL = document.getElementById('tts-mm-model').value;
+        fields.TTS_MINIMAX_SPEED = document.getElementById('tts-mm-speed').value;
+        fields.TTS_MINIMAX_VOL = document.getElementById('tts-mm-vol').value;
+        fields.TTS_MINIMAX_PITCH = document.getElementById('tts-mm-pitch').value;
+        fields.TTS_MINIMAX_API_URL = document.getElementById('tts-mm-url').value.trim();
+    } else {
+        fields.TTS_EDGE_VOICE = document.getElementById('tts-edge-voice').value;
+    }
+
+    saveFields(fields, 'tts-status');
+}
+
+function testTts() {
+    const btn = document.getElementById('tts-test-btn');
+    const audio = document.getElementById('tts-test-audio');
+    const status = document.getElementById('tts-test-status');
+    btn.disabled = true;
+    btn.textContent = '⏳ 合成中...';
+    status.textContent = '';
+    audio.style.display = 'none';
+
+    fetch('/api/tts_test', { method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ text: '你好，我是袁朗，很高兴认识你。' }) })
+    .then(r => {
+        if (!r.ok) return r.json().then(d => { throw new Error(d.error || '合成失败'); });
+        return r.blob();
+    })
+    .then(blob => {
+        const url = URL.createObjectURL(blob);
+        audio.src = url;
+        audio.style.display = 'block';
+        audio.play();
+        btn.textContent = '🔊 试听当前配置';
+        btn.disabled = false;
+    })
+    .catch(e => {
+        status.textContent = '❌ ' + e.message;
+        status.style.color = '#ff3b30';
+        btn.textContent = '🔊 试听当前配置';
+        btn.disabled = false;
+    });
+}
+
 // ===== 初始化 =====
 function init() {
     // 聊天模型：从后端 API 加载中转站列表
@@ -650,6 +832,9 @@ function init() {
 
     // LLM 条件显示
     toggleLlmOnly();
+
+    // TTS 引擎条件显示
+    toggleTtsEngine();
 }
 
 init();

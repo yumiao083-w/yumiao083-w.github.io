@@ -350,7 +350,7 @@ def delete_prompt_file(area, filename):
 @login_required
 def panel(name):
     """子页面路由"""
-    valid_panels = ['api', 'reply', 'chat', 'memory', 'settings', 'notes']
+    valid_panels = ['api', 'reply', 'chat', 'memory', 'settings', 'notes', 'worldbook']
     if name not in valid_panels:
         return redirect(url_for('home'))
     config = parse_config()
@@ -366,6 +366,11 @@ def panel(name):
         extra['preset_files'] = [f[:-3] for f in os.listdir(preset_dir) if f.endswith('.md')]
         # 兼容：也读老的 prompts/ 根目录
         extra['prompt_files'] = [f[:-3] for f in os.listdir('prompts') if f.endswith('.md') and os.path.isfile(os.path.join('prompts', f))]
+
+    if name == 'worldbook':
+        from world_info import list_worldbooks, load_global_config as load_wi_config
+        extra['worldbooks'] = list_worldbooks()
+        extra['wi_config'] = load_wi_config()
 
     return render_template(f'panel_{name}.html', config=config, **extra)
 
@@ -2479,10 +2484,13 @@ def memory_settings():
                 # 替换配置文件中的相应部分
                 config_lines[user_settings_start:user_settings_end + 1] = new_settings_lines
                 
-                # 写回配置文件
+                # 写回配置文件（原子写入）
                 try:
-                    with open('config.py', 'w', encoding='utf-8') as f:
-                        f.writelines(config_lines)
+                    _config_dir = os.path.dirname(os.path.abspath('config.py'))
+                    with tempfile.NamedTemporaryFile('w', delete=False, dir=_config_dir, encoding='utf-8') as _tf:
+                        _tf_name = _tf.name
+                        _tf.writelines(config_lines)
+                    shutil.move(_tf_name, 'config.py')
                     app.logger.info("配置文件写入成功")
                 except Exception as write_error:
                     app.logger.error(f"写入配置文件失败: {write_error}")
@@ -3215,65 +3223,70 @@ def _read_memory_retrieval_config():
 
 
 def _write_memory_retrieval_config(data):
-    """将记忆检索管道配置写回 config.py"""
+    """将记忆检索管道配置写回 config.py（加文件锁 + 原子写入）"""
     script_dir = os.path.dirname(os.path.abspath(__file__))
     config_path = os.path.join(script_dir, 'config.py')
+    lock_path = config_path + '.lock'
 
-    with open(config_path, 'r', encoding='utf-8') as f:
-        content = f.read()
+    with FileLock(lock_path):
+        with open(config_path, 'r', encoding='utf-8') as f:
+            content = f.read()
 
-    import re as _re
+        import re as _re
 
-    # 更新 MEMORY_RETRIEVAL_MODE
-    if 'mode' in data:
-        mode_val = repr(data['mode'])
-        if 'MEMORY_RETRIEVAL_MODE' in content:
-            content = _re.sub(
-                r"MEMORY_RETRIEVAL_MODE\s*=\s*['\"].*?['\"]",
-                f"MEMORY_RETRIEVAL_MODE = {mode_val}",
-                content
-            )
+        # 更新 MEMORY_RETRIEVAL_MODE
+        if 'mode' in data:
+            mode_val = repr(data['mode'])
+            if 'MEMORY_RETRIEVAL_MODE' in content:
+                content = _re.sub(
+                    r"MEMORY_RETRIEVAL_MODE\s*=\s*['\"].*?['\"]",
+                    f"MEMORY_RETRIEVAL_MODE = {mode_val}",
+                    content
+                )
 
-    # 更新 MEMORY_RETRIEVAL_TOP_K
-    if 'top_k' in data:
-        top_k_val = int(data['top_k'])
-        if 'MEMORY_RETRIEVAL_TOP_K' in content:
-            content = _re.sub(
-                r"MEMORY_RETRIEVAL_TOP_K\s*=\s*\d+",
-                f"MEMORY_RETRIEVAL_TOP_K = {top_k_val}",
-                content
-            )
+        # 更新 MEMORY_RETRIEVAL_TOP_K
+        if 'top_k' in data:
+            top_k_val = int(data['top_k'])
+            if 'MEMORY_RETRIEVAL_TOP_K' in content:
+                content = _re.sub(
+                    r"MEMORY_RETRIEVAL_TOP_K\s*=\s*\d+",
+                    f"MEMORY_RETRIEVAL_TOP_K = {top_k_val}",
+                    content
+                )
 
-    # 更新 MEMORY_RETRIEVAL_MAX_TOKENS
-    if 'max_tokens' in data:
-        max_tokens_val = int(data['max_tokens'])
-        if 'MEMORY_RETRIEVAL_MAX_TOKENS' in content:
-            content = _re.sub(
-                r"MEMORY_RETRIEVAL_MAX_TOKENS\s*=\s*\d+",
-                f"MEMORY_RETRIEVAL_MAX_TOKENS = {max_tokens_val}",
-                content
-            )
+        # 更新 MEMORY_RETRIEVAL_MAX_TOKENS
+        if 'max_tokens' in data:
+            max_tokens_val = int(data['max_tokens'])
+            if 'MEMORY_RETRIEVAL_MAX_TOKENS' in content:
+                content = _re.sub(
+                    r"MEMORY_RETRIEVAL_MAX_TOKENS\s*=\s*\d+",
+                    f"MEMORY_RETRIEVAL_MAX_TOKENS = {max_tokens_val}",
+                    content
+                )
 
-    # 更新 MEMORY_FALLBACK_TO_KEYWORD
-    if 'fallback' in data:
-        fallback_val = 'True' if data['fallback'] else 'False'
-        if 'MEMORY_FALLBACK_TO_KEYWORD' in content:
-            content = _re.sub(
-                r"MEMORY_FALLBACK_TO_KEYWORD\s*=\s*(True|False)",
-                f"MEMORY_FALLBACK_TO_KEYWORD = {fallback_val}",
-                content
-            )
+        # 更新 MEMORY_FALLBACK_TO_KEYWORD
+        if 'fallback' in data:
+            fallback_val = 'True' if data['fallback'] else 'False'
+            if 'MEMORY_FALLBACK_TO_KEYWORD' in content:
+                content = _re.sub(
+                    r"MEMORY_FALLBACK_TO_KEYWORD\s*=\s*(True|False)",
+                    f"MEMORY_FALLBACK_TO_KEYWORD = {fallback_val}",
+                    content
+                )
 
-    # 更新 MEMORY_LLM_PROVIDERS（整块替换）
-    if 'providers' in data:
-        providers_repr = _format_providers_list(data['providers'])
-        # 匹配从 MEMORY_LLM_PROVIDERS = [ 到对应的 ] 的整个块
-        pattern = r"MEMORY_LLM_PROVIDERS\s*=\s*\[.*?\n\]"
-        replacement = f"MEMORY_LLM_PROVIDERS = {providers_repr}"
-        content = _re.sub(pattern, replacement, content, flags=_re.DOTALL)
+        # 更新 MEMORY_LLM_PROVIDERS（整块替换）
+        if 'providers' in data:
+            providers_repr = _format_providers_list(data['providers'])
+            # 匹配从 MEMORY_LLM_PROVIDERS = [ 到对应的 ] 的整个块
+            pattern = r"MEMORY_LLM_PROVIDERS\s*=\s*\[.*?\n\]"
+            replacement = f"MEMORY_LLM_PROVIDERS = {providers_repr}"
+            content = _re.sub(pattern, replacement, content, flags=_re.DOTALL)
 
-    with open(config_path, 'w', encoding='utf-8') as f:
-        f.write(content)
+        # 原子写入：先写临时文件再替换
+        with tempfile.NamedTemporaryFile('w', delete=False, dir=script_dir, encoding='utf-8') as temp_file:
+            temp_file_name = temp_file.name
+            temp_file.write(content)
+        shutil.move(temp_file_name, config_path)
 
 
 def _format_providers_list(providers):
@@ -3320,46 +3333,51 @@ def _read_chat_providers():
 
 
 def _write_chat_providers(providers):
-    """将聊天模型中转站列表写回 config.py"""
+    """将聊天模型中转站列表写回 config.py（加文件锁 + 原子写入）"""
     script_dir = os.path.dirname(os.path.abspath(__file__))
     config_path = os.path.join(script_dir, 'config.py')
+    lock_path = config_path + '.lock'
 
-    with open(config_path, 'r', encoding='utf-8') as f:
-        content = f.read()
+    with FileLock(lock_path):
+        with open(config_path, 'r', encoding='utf-8') as f:
+            content = f.read()
 
-    import re as _re
+        import re as _re
 
-    # 替换 CHAT_API_PROVIDERS 整块
-    providers_repr = _format_chat_providers_list(providers)
-    pattern = r"CHAT_API_PROVIDERS\s*=\s*\[.*?\n\]"
-    replacement = f"CHAT_API_PROVIDERS = {providers_repr}"
-    new_content = _re.sub(pattern, replacement, content, flags=_re.DOTALL)
+        # 替换 CHAT_API_PROVIDERS 整块
+        providers_repr = _format_chat_providers_list(providers)
+        pattern = r"CHAT_API_PROVIDERS\s*=\s*\[.*?\n\]"
+        replacement = f"CHAT_API_PROVIDERS = {providers_repr}"
+        new_content = _re.sub(pattern, replacement, content, flags=_re.DOTALL)
 
-    # 同步更新旧字段（兼容其他使用旧字段的代码）
-    if providers:
-        first = providers[0]
-        # 更新 DEEPSEEK_BASE_URL
-        new_content = _re.sub(
-            r"DEEPSEEK_BASE_URL\s*=\s*['\"].*?['\"]",
-            f"DEEPSEEK_BASE_URL = {repr(first.get('base_url', ''))}",
-            new_content
-        )
-        # 更新 DEEPSEEK_API_KEY
-        new_content = _re.sub(
-            r"DEEPSEEK_API_KEY\s*=\s*['\"].*?['\"]",
-            f"DEEPSEEK_API_KEY = {repr(first.get('api_key', ''))}",
-            new_content
-        )
-        # 更新 MODEL
-        new_content = _re.sub(
-            r"^MODEL\s*=\s*['\"].*?['\"]",
-            f"MODEL = {repr(first.get('model', ''))}",
-            new_content,
-            flags=_re.MULTILINE
-        )
+        # 同步更新旧字段（兼容其他使用旧字段的代码）
+        if providers:
+            first = providers[0]
+            # 更新 DEEPSEEK_BASE_URL
+            new_content = _re.sub(
+                r"DEEPSEEK_BASE_URL\s*=\s*['\"].*?['\"]",
+                f"DEEPSEEK_BASE_URL = {repr(first.get('base_url', ''))}",
+                new_content
+            )
+            # 更新 DEEPSEEK_API_KEY
+            new_content = _re.sub(
+                r"DEEPSEEK_API_KEY\s*=\s*['\"].*?['\"]",
+                f"DEEPSEEK_API_KEY = {repr(first.get('api_key', ''))}",
+                new_content
+            )
+            # 更新 MODEL
+            new_content = _re.sub(
+                r"^MODEL\s*=\s*['\"].*?['\"]",
+                f"MODEL = {repr(first.get('model', ''))}",
+                new_content,
+                flags=_re.MULTILINE
+            )
 
-    with open(config_path, 'w', encoding='utf-8') as f:
-        f.write(new_content)
+        # 原子写入：先写临时文件再替换
+        with tempfile.NamedTemporaryFile('w', delete=False, dir=script_dir, encoding='utf-8') as temp_file:
+            temp_file_name = temp_file.name
+            temp_file.write(new_content)
+        shutil.move(temp_file_name, config_path)
 
 
 def _format_chat_providers_list(providers):
@@ -3547,6 +3565,28 @@ def reset_memory_retrieval_prompt():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/tts_test', methods=['POST'])
+@login_required
+def api_tts_test():
+    """试听 TTS：用当前 config.py 中的配置合成一段语音返回 mp3"""
+    try:
+        import importlib
+        import config as cfg
+        importlib.reload(cfg)
+
+        req = request.get_json() or {}
+        text = req.get('text', '你好，我是袁朗，很高兴认识你。')
+
+        from tts_engine import text_to_mp3
+        mp3_path = text_to_mp3(text)
+
+        from flask import send_file
+        return send_file(mp3_path, mimetype='audio/mpeg', as_attachment=False, download_name='tts_test.mp3')
+    except Exception as e:
+        app.logger.error(f"TTS 试听失败: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/memory_summary_users', methods=['GET'])
 @login_required
 def api_get_memory_summary_users():
@@ -3672,52 +3712,6 @@ def fetch_models():
     except Exception as e:
         app.logger.error(f"获取模型列表失败: {e}")
         return jsonify({'error': str(e)}), 500
-
-# =========================================================================
-
-if __name__ == '__main__':
-    class BotStatusFilter(logging.Filter):
-        def filter(self, record):
-            msg = record.getMessage()
-            # 如果日志消息中包含以下日志，则返回 False（不记录）
-            if '/bot_status' in msg or \
-               '/api/log' in msg or \
-               '/save_all_reminders' in msg or \
-               '/get_all_reminders' in msg or \
-               '/api/get_chat_context_users' in msg or \
-               '/bot_heartbeat' in msg:
-                return False
-            return True
-
-    # 获取 werkzeug 的日志记录器并添加过滤器
-    werkzeug_logger = logging.getLogger('werkzeug')
-    werkzeug_logger.addFilter(BotStatusFilter())
-
-    # 验证配置文件完整性
-    validate_config()
-
-    # 配置文件存在检查
-    config_path = os.path.join(os.path.dirname(__file__), 'config.py')
-    if not os.path.exists(config_path):
-        raise FileNotFoundError(f"核心配置文件缺失: {config_path}")
-    
-    config = parse_config()
-    PORT = config.get('PORT', '5000')
-
-    # 在启动服务器前检查端口是否被占用，若占用则结束该进程
-    kill_process_using_port(PORT)
-
-    print(f"\033[31m重要提示：\r\n若您的浏览器没有自动打开网页端，请手动访问http://localhost:{config.get('PORT', '5000')}/ \r\n \033[0m")
-    if config.get('ENABLE_LOGIN_PASSWORD', False):
-        print(f"\033[31m您已启用登录密码，密码为 {config.get('LOGIN_PASSWORD', '未设置')} 请勿泄露给其它人！\r\n \033[0m")
-    
-    # 在启动服务器前设置定时器打开浏览器
-    def open_browser():
-        webbrowser.open(f'http://localhost:{PORT}/')
-    
-    Timer(1, open_browser).start()  # 延迟1秒确保服务器已启动
-    
-    app.run(host="0.0.0.0", debug=False, port=PORT)
 
 
 # ===== 短期记忆 API =====
@@ -3857,3 +3851,225 @@ def api_short_term_generate():
     except Exception as e:
         app.logger.error(f"手动生成短期记忆失败: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+# ==================== 世界书 API ====================
+
+@app.route('/api/worldbook/list', methods=['GET'])
+@login_required
+def api_worldbook_list():
+    """列出所有世界书"""
+    from world_info import list_worldbooks
+    return jsonify(list_worldbooks())
+
+@app.route('/api/worldbook/config', methods=['GET'])
+@login_required
+def api_worldbook_config_get():
+    """获取世界书全局配置"""
+    from world_info import load_global_config as load_wi_config
+    return jsonify(load_wi_config())
+
+@app.route('/api/worldbook/config', methods=['POST'])
+@login_required
+def api_worldbook_config_save():
+    """保存世界书全局配置"""
+    from world_info import load_global_config as load_wi_config, save_global_config as save_wi_config
+    data = request.get_json()
+    config = load_wi_config()
+    if 'scan_depth' in data:
+        config['scan_depth'] = int(data['scan_depth'])
+    if 'token_budget' in data:
+        config['token_budget'] = int(data['token_budget'])
+    save_wi_config(config)
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/worldbook/toggle', methods=['POST'])
+@login_required
+def api_worldbook_toggle():
+    """启用/禁用世界书"""
+    from world_info import toggle_worldbook
+    data = request.get_json()
+    filename = data.get('filename')
+    enabled = data.get('enabled', True)
+    if not filename:
+        return jsonify({'error': '缺少 filename'}), 400
+    toggle_worldbook(filename, enabled)
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/worldbook/delete', methods=['POST'])
+@login_required
+def api_worldbook_delete():
+    """删除世界书"""
+    from world_info import delete_worldbook
+    data = request.get_json()
+    filename = data.get('filename')
+    if not filename:
+        return jsonify({'error': '缺少 filename'}), 400
+    delete_worldbook(filename)
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/worldbook/upload', methods=['POST'])
+@login_required
+def api_worldbook_upload():
+    """上传并导入世界书文件"""
+    from world_info import import_and_save
+    if 'file' not in request.files:
+        return jsonify({'error': '没有上传文件'}), 400
+    f = request.files['file']
+    if not f.filename:
+        return jsonify({'error': '文件名为空'}), 400
+
+    # 保存临时文件
+    import tempfile
+    ext = os.path.splitext(f.filename)[1].lower()
+    if ext not in ('.json', '.txt', '.docx'):
+        return jsonify({'error': f'不支持的格式: {ext}（支持 .json / .txt / .docx）'}), 400
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+        f.save(tmp.name)
+        tmp_path = tmp.name
+
+    try:
+        save_name = import_and_save(tmp_path, auto_enable=True, original_name=f.filename)
+        return jsonify({'status': 'ok', 'filename': save_name})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        os.unlink(tmp_path)
+
+@app.route('/api/worldbook/detail/<filename>', methods=['GET'])
+@login_required
+def api_worldbook_detail(filename):
+    """获取世界书详情（所有条目）"""
+    from world_info import load_worldbook
+    data = load_worldbook(filename)
+    if data is None:
+        return jsonify({'error': '世界书不存在'}), 404
+    return jsonify(data)
+
+@app.route('/api/worldbook/entry/toggle', methods=['POST'])
+@login_required
+def api_worldbook_entry_toggle():
+    """启用/禁用世界书单个条目"""
+    from world_info import toggle_entry
+    data = request.get_json()
+    filename = data.get('filename')
+    uid = str(data.get('uid', ''))
+    disabled = data.get('disabled', False)
+    if not filename or not uid:
+        return jsonify({'error': '缺少参数'}), 400
+    toggle_entry(filename, uid, disabled)
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/worldbook/entry/save', methods=['POST'])
+@login_required
+def api_worldbook_entry_save():
+    """保存世界书条目（编辑）"""
+    from world_info import load_worldbook, save_worldbook
+    data = request.get_json()
+    filename = data.get('filename')
+    uid = str(data.get('uid', ''))
+    entry_data = data.get('entry')
+    if not filename or uid == '' or not entry_data:
+        return jsonify({'error': '缺少参数'}), 400
+    book = load_worldbook(filename)
+    if not book:
+        return jsonify({'error': '世界书不存在'}), 404
+    if uid not in book.get('entries', {}):
+        return jsonify({'error': '条目不存在'}), 404
+    # 只更新允许的字段
+    allowed = ['key', 'keysecondary', 'comment', 'content', 'constant',
+               'selective', 'selectiveLogic', 'order', 'position', 'disable',
+               'probability', 'depth', 'group', 'groupWeight']
+    for field in allowed:
+        if field in entry_data:
+            book['entries'][uid][field] = entry_data[field]
+    save_worldbook(filename, book)
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/worldbook/entry/add', methods=['POST'])
+@login_required
+def api_worldbook_entry_add():
+    """新增世界书条目"""
+    from world_info import load_worldbook, save_worldbook, _new_entry
+    data = request.get_json()
+    filename = data.get('filename')
+    if not filename:
+        return jsonify({'error': '缺少 filename'}), 400
+    book = load_worldbook(filename)
+    if not book:
+        return jsonify({'error': '世界书不存在'}), 404
+    entries = book.get('entries', {})
+    # 找最大 uid + 1
+    max_uid = max((int(k) for k in entries.keys()), default=-1)
+    new_uid = max_uid + 1
+    book['entries'][str(new_uid)] = _new_entry(uid=new_uid, content="", comment="新条目")
+    save_worldbook(filename, book)
+    return jsonify({'status': 'ok', 'uid': new_uid})
+
+@app.route('/api/worldbook/entry/delete', methods=['POST'])
+@login_required
+def api_worldbook_entry_delete():
+    """删除世界书条目"""
+    from world_info import load_worldbook, save_worldbook
+    data = request.get_json()
+    filename = data.get('filename')
+    uid = str(data.get('uid', ''))
+    if not filename or uid == '':
+        return jsonify({'error': '缺少参数'}), 400
+    book = load_worldbook(filename)
+    if not book:
+        return jsonify({'error': '世界书不存在'}), 404
+    if uid in book.get('entries', {}):
+        del book['entries'][uid]
+        save_worldbook(filename, book)
+    return jsonify({'status': 'ok'})
+
+
+# =========================================================================
+
+if __name__ == '__main__':
+    class BotStatusFilter(logging.Filter):
+        def filter(self, record):
+            msg = record.getMessage()
+            # 如果日志消息中包含以下日志，则返回 False（不记录）
+            if '/bot_status' in msg or \
+               '/api/log' in msg or \
+               '/save_all_reminders' in msg or \
+               '/get_all_reminders' in msg or \
+               '/api/get_chat_context_users' in msg or \
+               '/bot_heartbeat' in msg:
+                return False
+            return True
+
+    # 获取 werkzeug 的日志记录器并添加过滤器
+    werkzeug_logger = logging.getLogger('werkzeug')
+    werkzeug_logger.addFilter(BotStatusFilter())
+
+    # 验证配置文件完整性
+    validate_config()
+
+    # 配置文件存在检查
+    config_path = os.path.join(os.path.dirname(__file__), 'config.py')
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(f"核心配置文件缺失: {config_path}")
+    
+    config = parse_config()
+    PORT = config.get('PORT', '5000')
+
+    # 在启动服务器前检查端口是否被占用，若占用则结束该进程
+    kill_process_using_port(PORT)
+
+    print(f"\033[31m重要提示：\r\n若您的浏览器没有自动打开网页端，请手动访问http://localhost:{config.get('PORT', '5000')}/ \r\n \033[0m")
+    if config.get('ENABLE_LOGIN_PASSWORD', False):
+        print(f"\033[31m您已启用登录密码，密码为 {config.get('LOGIN_PASSWORD', '未设置')} 请勿泄露给其它人！\r\n \033[0m")
+    
+    # 在启动服务器前设置定时器打开浏览器
+    def open_browser():
+        webbrowser.open(f'http://localhost:{PORT}/')
+    
+    Timer(1, open_browser).start()  # 延迟1秒确保服务器已启动
+    
+    app.run(host="0.0.0.0", debug=False, port=PORT)
+
+
