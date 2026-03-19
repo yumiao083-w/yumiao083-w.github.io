@@ -467,6 +467,8 @@ let isAiSpeaking = false;      // AI 正在回复中（从收到第一个 text_d
 let callStartTime = null;
 let timerInterval = null;
 let currentAiText = "";        // 当前 AI 回复累积文本
+let hasVoiceActivity = false;  // 本轮录音中是否检测到人声
+let voiceFrameCount = 0;       // 有声帧计数
 let isListening = false;       // 正在识别中
 let pendingUserText = "";      // 用户正在说的文字（中间结果）
 let useSSE = true;             // 默认使用 SSE 模式（Flask 内置服务器不支持 WebSocket）
@@ -748,6 +750,8 @@ function startRecording() {
 
     audioChunks = [];
     recordStartTime = Date.now();
+    hasVoiceActivity = false;
+    voiceFrameCount = 0;
 
     // 选择浏览器支持的格式
     let mimeType = 'audio/webm;codecs=opus';
@@ -778,7 +782,17 @@ function startRecording() {
         const recordDuration = Date.now() - recordStartTime;
         if (recordDuration < MIN_RECORD_TIME || audioChunks.length === 0) {
             // 录音太短，重新开始
-            if (isInCall && !isMuted && !isPlaying) {
+            if (isInCall && !isMuted && !isPlaying && !isAiSpeaking) {
+                setTimeout(() => startRecording(), 200);
+            }
+            return;
+        }
+
+        // VAD 检查：没检测到人声直接丢弃，不发后端
+        if (!hasVoiceActivity) {
+            console.log('VAD: 未检测到人声，跳过识别');
+            audioChunks = [];
+            if (isInCall && !isMuted && !isPlaying && !isAiSpeaking) {
                 setTimeout(() => startRecording(), 200);
             }
             return;
@@ -870,8 +884,13 @@ function startSilenceDetection() {
         const volume = data.reduce((a, b) => a + b, 0) / data.length;
 
         if (volume > SILENCE_THRESHOLD) {
-            // 有声音
+            // 有声音 → 记录有人声
             silenceStart = null;
+            voiceFrameCount++;
+            if (voiceFrameCount >= 3) {
+                // 连续 3 帧以上有声音才算有人声（过滤瞬间噪声）
+                hasVoiceActivity = true;
+            }
         } else {
             // 静音
             if (!silenceStart) {
