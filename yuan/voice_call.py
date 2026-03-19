@@ -231,32 +231,133 @@ def _send_sentence_audio(sentence: str, idx: int, ws_send):
 
 
 def _build_voice_system_prompt():
-    """构建语音通话专用的系统提示词（简短版）"""
-    # 读取角色人设
-    char_prompt = ""
-    try:
-        char_files = [
-            os.path.join(YUAN_ROOT, 'prompts', 'characters', '袁朗.md'),
-            os.path.join(YUAN_ROOT, 'prompts', '袁朗.md'),
-        ]
-        for fp in char_files:
-            if os.path.exists(fp):
-                with open(fp, 'r', encoding='utf-8') as f:
-                    char_prompt = f.read()
-                break
-    except Exception:
-        pass
+    """构建语音通话专用的系统提示词（复用 bot.py 五板块架构 + 语音通话指令）"""
 
-    voice_instruction = """你现在处于实时语音通话模式。请遵守以下规则：
+    # 从 config 读取用户和角色信息
+    listen_list = _cfg('LISTEN_LIST', [])
+    if listen_list:
+        user_id = listen_list[0][0]       # 默认第一个用户
+        role_name = listen_list[0][1]     # 角色名
+        preset_name = listen_list[0][3] if len(listen_list[0]) >= 4 else ''
+    else:
+        user_id = '郁邈'
+        role_name = '袁朗'
+        preset_name = ''
+
+    prompt_parts = []
+
+    # ========== 板块1: 人设卡 ==========
+    char_content = _read_prompt_file(role_name, 'characters')
+    if char_content:
+        prompt_parts.append(char_content)
+
+    # ========== 板块2: 预设 ==========
+    preset_content = None
+    if preset_name:
+        preset_content = _read_prompt_file(preset_name, 'presets')
+    if not preset_content:
+        preset_content = _read_prompt_file('preset', 'presets')
+    if preset_content:
+        prompt_parts.append(f"\n\n{preset_content}")
+
+    # ========== 板块3: 核心记忆 ==========
+    core_memory = _read_core_memory(user_id, role_name)
+    if core_memory:
+        prompt_parts.append(f"\n\n# 核心记忆\n{core_memory}")
+
+    # ========== 板块4: 记忆索引 ==========
+    memory_index = _read_memory_index()
+    if memory_index:
+        prompt_parts.append(f"\n\n{memory_index}")
+
+    # ========== 板块5: 短期记忆 ==========
+    short_term = _read_short_term_memory(user_id)
+    if short_term:
+        prompt_parts.append(f"\n\n{short_term}")
+
+    # ========== 语音通话专用指令 ==========
+    voice_instruction = """
+
+# 语音通话模式
+你现在处于实时语音通话模式。请遵守以下规则：
 1. 回复要简短自然，像真人打电话一样说话
 2. 每次回复控制在1-3句话，不要长篇大论
-3. 不要使用 markdown 格式、括号动作描写、emoji
-4. 用口语化的表达，可以有语气词（嗯、啊、哈）
-5. 不要说"作为AI"之类的话"""
+3. 不要使用 markdown 格式、括号动作描写、emoji、星号
+4. 用口语化的表达，可以有语气词（嗯、啊、哈、嘿）
+5. 不要说"作为AI"之类的话
+6. 如果对方只是简短回应（嗯、好、哦），不用每次都长篇回复"""
+    prompt_parts.append(voice_instruction)
 
-    if char_prompt:
-        return f"{char_prompt}\n\n{voice_instruction}"
-    return voice_instruction
+    return "".join(prompt_parts)
+
+
+def _read_prompt_file(name, subdir):
+    """读取 prompts/ 下的 md 文件"""
+    search_paths = [
+        os.path.join(YUAN_ROOT, 'prompts', subdir, f'{name}.md'),
+        os.path.join(YUAN_ROOT, 'prompts', f'{name}.md'),
+    ]
+    for fp in search_paths:
+        if os.path.exists(fp):
+            try:
+                with open(fp, 'r', encoding='utf-8') as f:
+                    return f.read()
+            except Exception:
+                pass
+    return None
+
+
+def _read_core_memory(user_id, role_name):
+    """读取核心记忆"""
+    upload = _cfg('UPLOAD_CORE_MEMORY_TO_AI', True)
+    if not upload:
+        return None
+
+    core_dir = _cfg('MEMORY_CORE_DIR', 'Memory_Core')
+    # 生成 memory_key（与 bot.py 一致）
+    memory_key = f"{user_id}_{role_name}"
+
+    try:
+        # 优先读 unified_memory
+        unified = os.path.join(YUAN_ROOT, core_dir, f'{memory_key}_unified_memory.json')
+        if os.path.exists(unified):
+            with open(unified, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                content = data.get("content", "").strip()
+                if content:
+                    return content
+
+        # 兼容旧版 core_memory
+        old_core = os.path.join(YUAN_ROOT, core_dir, f'{memory_key}_core_memory.json')
+        if os.path.exists(old_core):
+            with open(old_core, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return data.get("content", "").strip()
+    except Exception as e:
+        logger.error(f"[VoiceCall] 读取核心记忆失败: {e}")
+    return None
+
+
+def _read_memory_index():
+    """读取记忆索引"""
+    try:
+        sys.path.insert(0, YUAN_ROOT)
+        from memory_retrieval import build_memory_index
+        return build_memory_index()
+    except Exception as e:
+        logger.debug(f"[VoiceCall] 记忆索引不可用: {e}")
+    return None
+
+
+def _read_short_term_memory(user_id):
+    """读取短期记忆"""
+    try:
+        sys.path.insert(0, YUAN_ROOT)
+        from short_term_memory import get_short_term_prompt
+        return get_short_term_prompt(user_id)
+    except Exception as e:
+        logger.debug(f"[VoiceCall] 短期记忆不可用: {e}")
+    return None
 
 
 # =====================================================================
