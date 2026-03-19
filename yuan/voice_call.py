@@ -392,9 +392,20 @@ def _build_voice_system_prompt():
 1. 回复要简短自然，像真人打电话一样说话
 2. 每次回复控制在1-3句话，不要长篇大论
 3. 不要使用 markdown 格式、括号动作描写、emoji、星号
-4. 用口语化的表达，可以有语气词（嗯、啊、哈、嘿）
+4. 用口语化的表达，可以有语气词
 5. 不要说"作为AI"之类的话
-6. 如果对方只是简短回应（嗯、好、哦），不用每次都长篇回复"""
+6. 如果对方只是简短回应（嗯、好、哦），不用每次都长篇回复
+
+### 语气词与停顿
+你可以在回复中插入语气词和停顿，让语音更自然、更有活人感：
+- 停顿标签：用 <#x#> 标记停顿时长（x是秒数），如：你好 <#0.5#> 怎么样
+- 可用的语气词标签（用逗号分割，禁止使用未列出的）：
+  (laughs),(chuckle),(coughs),(clear-throat),(groans),(breath),(pant),(inhale),(exhale),(gasps),(sniffs),(sighs),(snorts),(burps),(lip-smacking),(humming),(hissing),(emm),(sneezes)
+- 语气词和停顿要自然地融入说话内容，不要每句都加
+- 示例：
+  (chuckle)今天玩得开心吗？
+  记得要多穿衣服，(sniffs) <#0.3#> 连我都感冒了。
+  (sighs)算了 <#0.3#> 不说了。"""
     prompt_parts.append(voice_instruction)
 
     return "".join(prompt_parts)

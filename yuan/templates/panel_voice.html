@@ -456,6 +456,19 @@
 
 <script>
 // =====================================================================
+//  工具函数
+// =====================================================================
+function cleanVoiceTags(text) {
+    // 去掉语气词标签 (laughs) (sighs) 等
+    let clean = text.replace(/\((laughs|chuckle|coughs|clear-throat|groans|breath|pant|inhale|exhale|gasps|sniffs|sighs|snorts|burps|lip-smacking|humming|hissing|emm|sneezes)\)/gi, '');
+    // 去掉停顿标签 <#0.5#>
+    clean = clean.replace(/<#[\d.]+#>/g, '');
+    // 合并多余空格
+    clean = clean.replace(/\s{2,}/g, ' ').trim();
+    return clean;
+}
+
+// =====================================================================
 //  状态
 // =====================================================================
 let ws = null;
@@ -608,7 +621,7 @@ function handleMessage(msg) {
 
         case 'text_delta':
             currentAiText += msg.text;
-            document.getElementById('aiSubtitle').textContent = currentAiText;
+            document.getElementById('aiSubtitle').textContent = cleanVoiceTags(currentAiText);
             break;
 
         case 'audio':
