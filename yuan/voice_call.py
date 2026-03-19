@@ -486,52 +486,51 @@ def register_voice_routes(app):
 
             logger.info("[VoiceCall] WebSocket 连接关闭")
 
-    else:
-        # ── HTTP 轮询模式（降级方案）──
-        from flask import Response
-        import queue
+    # ── HTTP SSE 模式（始终注册，作为 WebSocket 的降级方案）──
+    from flask import Response
+    import queue
 
-        _sessions = {}  # session_id → { history, queue }
-        _sessions_lock = threading.Lock()
+    _sessions = {}  # session_id → { history, queue }
+    _sessions_lock = threading.Lock()
 
-        @app.route('/api/voice/chat', methods=['POST'])
-        def voice_chat_http():
-            """HTTP SSE 模式：POST 文字，返回 SSE 流"""
-            from flask import request, jsonify
-            req = request.get_json()
-            if not req:
-                return jsonify({'error': '空请求'}), 400
+    @app.route('/api/voice/chat', methods=['POST'])
+    def voice_chat_http():
+        """HTTP SSE 模式：POST 文字，返回 SSE 流"""
+        from flask import request, jsonify
+        req = request.get_json()
+        if not req:
+            return jsonify({'error': '空请求'}), 400
 
-            user_text = req.get('text', '').strip()
-            session_id = req.get('session_id', 'default')
-            if not user_text:
-                return jsonify({'error': '空消息'}), 400
+        user_text = req.get('text', '').strip()
+        session_id = req.get('session_id', 'default')
+        if not user_text:
+            return jsonify({'error': '空消息'}), 400
 
-            with _sessions_lock:
-                if session_id not in _sessions:
-                    _sessions[session_id] = {'history': [], 'queue': queue.Queue()}
-                sess = _sessions[session_id]
+        with _sessions_lock:
+            if session_id not in _sessions:
+                _sessions[session_id] = {'history': [], 'queue': queue.Queue()}
+            sess = _sessions[session_id]
 
-            sess['history'].append({"role": "user", "content": user_text})
-            result_queue = queue.Queue()
+        sess['history'].append({"role": "user", "content": user_text})
+        result_queue = queue.Queue()
 
-            def do_chat():
-                reply = stream_chat_and_tts(
-                    user_text, sess['history'],
-                    ws_send=lambda data: result_queue.put(data)
-                )
-                if reply:
-                    sess['history'].append({"role": "assistant", "content": reply})
-                result_queue.put(None)  # 结束信号
+        def do_chat():
+            reply = stream_chat_and_tts(
+                user_text, sess['history'],
+                ws_send=lambda data: result_queue.put(data)
+            )
+            if reply:
+                sess['history'].append({"role": "assistant", "content": reply})
+            result_queue.put(None)  # 结束信号
 
-            threading.Thread(target=do_chat, daemon=True).start()
+        threading.Thread(target=do_chat, daemon=True).start()
 
-            def generate():
-                while True:
-                    item = result_queue.get()
-                    if item is None:
-                        yield "data: [DONE]\n\n"
-                        break
-                    yield f"data: {item}\n\n"
+        def generate():
+            while True:
+                item = result_queue.get()
+                if item is None:
+                    yield "data: [DONE]\n\n"
+                    break
+                yield f"data: {item}\n\n"
 
-            return Response(generate(), mimetype='text/event-stream')
+        return Response(generate(), mimetype='text/event-stream')
