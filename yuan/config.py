@@ -316,6 +316,14 @@ VOICE_API_MODEL = ''
 # 填写文件路径（相对于 yuan 项目根目录），如 'prompts/voice_prompt.md'
 VOICE_CUSTOM_PROMPT_FILE = ''
 
+# === 公开语音通话（给朋友体验）===
+# 一次性密钥列表，每个密钥只能用一次，刷新页面后失效
+# 用完可以手动添加新的
+VOICE_PUBLIC_KEYS = [
+    'yuanlang01', 'yuanlang02', 'yuanlang03', 'yuanlang04',
+    'yuanlang05', 'yuanlang06', 'yuanlang07', 'yuanlang08',
+]
+
 # === Ngrok 隧道配置（手机 HTTPS 访问）===
 # 启用后自动创建 ngrok 隧道，手机通过 HTTPS 域名访问可使用麦克风
 ENABLE_NGROK = True

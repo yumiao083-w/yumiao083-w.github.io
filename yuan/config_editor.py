@@ -47,8 +47,10 @@ app = Flask(__name__)
 #  Ngrok 安全中间件：外部访问只允许通话相关路由
 # =====================================================================
 NGROK_ALLOWED_PATHS = {
-    '/voice', '/api/voice/settings', '/api/voice/logs',
+    '/voice', '/voice/public',
+    '/api/voice/settings', '/api/voice/logs',
     '/api/voice/recognize', '/api/voice/chat', '/api/voice/end',
+    '/api/voice/public/auth', '/api/voice/public/chat',
     '/ws/voice',
 }
 # 前缀匹配（通话记录详情）

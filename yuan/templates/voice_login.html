@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>语音通话 — 密钥验证</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #000; color: #fff; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .login-card { width: 90%; max-width: 340px; text-align: center; }
+        .avatar { width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(180deg, #b0b0b5, #8e8e93); display: flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 16px; }
+        h1 { font-size: 24px; font-weight: 400; margin-bottom: 8px; }
+        .subtitle { font-size: 15px; color: #8e8e93; margin-bottom: 32px; }
+        .input-group { margin-bottom: 16px; }
+        .input-group input { width: 100%; padding: 14px 16px; background: #1c1c1e; border: 1px solid #333; border-radius: 12px; color: #fff; font-size: 16px; text-align: center; outline: none; letter-spacing: 2px; }
+        .input-group input:focus { border-color: #0a84ff; }
+        .input-group input::placeholder { color: #555; letter-spacing: normal; }
+        .login-btn { width: 100%; padding: 14px; background: #0a84ff; color: #fff; border: none; border-radius: 12px; font-size: 17px; font-weight: 500; cursor: pointer; transition: opacity 0.2s; }
+        .login-btn:active { opacity: 0.7; }
+        .login-btn:disabled { background: #333; color: #666; cursor: not-allowed; }
+        .error-msg { color: #ff453a; font-size: 14px; margin-top: 12px; min-height: 20px; }
+        .footer { position: fixed; bottom: 30px; font-size: 12px; color: #444; }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div class="avatar">袁</div>
+        <h1>袁朗 · 语音通话</h1>
+        <div class="subtitle">请输入体验密钥</div>
+        <div class="input-group">
+            <input type="text" id="keyInput" placeholder="输入密钥" autocomplete="off"
+                   onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <button class="login-btn" id="loginBtn" onclick="doLogin()">验证并进入</button>
+        <div class="error-msg" id="errorMsg"></div>
+    </div>
+    <div class="footer">一次性密钥 · 刷新后需重新验证</div>
+
+<script>
+function doLogin() {
+    const key = document.getElementById('keyInput').value.trim();
+    if (!key) return;
+
+    const btn = document.getElementById('loginBtn');
+    const err = document.getElementById('errorMsg');
+    btn.disabled = true;
+    btn.textContent = '验证中...';
+    err.textContent = '';
+
+    fetch('/api/voice/public/auth', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ key })
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.error) {
+            err.textContent = result.error;
+            btn.disabled = false;
+            btn.textContent = '验证并进入';
+        } else {
+            // 验证成功，跳转到通话页面
+            window.location.href = '/voice/public?token=' + result.token;
+        }
+    })
+    .catch(e => {
+        err.textContent = '网络错误';
+        btn.disabled = false;
+        btn.textContent = '验证并进入';
+    });
+}
+</script>
+</body>
+</html>
