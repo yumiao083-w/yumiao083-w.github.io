@@ -88,6 +88,17 @@
         <button class="ctrl-btn btn-speaker" id="btnSpeaker" onclick="toggleSpeaker()" title="免提">🔊</button>
     </div>
 
+    <!-- 文字输入区（麦克风不可用时） -->
+    <div class="text-input-area" id="textInputArea" style="display:none; padding: 0 24px 16px;">
+        <div style="display:flex; gap:8px;">
+            <input type="text" id="textInput" placeholder="打字输入..." 
+                   style="flex:1; padding:10px 14px; border:1px solid #333; border-radius:20px; background:#1c1c1e; color:#fff; font-size:15px; outline:none;"
+                   onkeydown="if(event.key==='Enter'){sendTextInput();event.preventDefault();}">
+            <button onclick="sendTextInput()" 
+                    style="padding:10px 16px; background:#007aff; color:#fff; border:none; border-radius:20px; font-size:15px; cursor:pointer;">发送</button>
+        </div>
+    </div>
+
     <div class="hint" id="hint">点击绿色按钮开始通话</div>
 
 <script>
@@ -421,12 +432,24 @@ function resumeListening() {
 function toggleCall() {
     if (!isInCall) {
         // 开始通话
-        if (!recognition && !initRecognition()) return;
-
         isInCall = true;
         document.getElementById('btnCall').classList.add('active');
         document.getElementById('btnCall').innerHTML = '📕';
         document.getElementById('hint').textContent = '连接中...';
+
+        // 始终显示文字输入框
+        document.getElementById('textInputArea').style.display = 'block';
+
+        // 尝试初始化语音识别（失败也不阻塞）
+        let hasVoice = false;
+        if (!recognition) {
+            hasVoice = initRecognition();
+        } else {
+            hasVoice = true;
+        }
+        if (!hasVoice) {
+            document.getElementById('hint').textContent = '麦克风不可用，请打字输入';
+        }
 
         // 开始计时
         callStartTime = Date.now();
@@ -440,6 +463,7 @@ function toggleCall() {
         document.getElementById('btnCall').innerHTML = '📞';
         document.getElementById('hint').textContent = '通话已结束';
         document.getElementById('callTimer').textContent = '';
+        document.getElementById('textInputArea').style.display = 'none';
 
         clearInterval(timerInterval);
         pauseListening();
@@ -448,6 +472,20 @@ function toggleCall() {
         isPlaying = false;
         updateStatus('disconnected', '未连接');
     }
+}
+
+function sendTextInput() {
+    const input = document.getElementById('textInput');
+    const text = input.value.trim();
+    if (!text || !isInCall) return;
+
+    input.value = '';
+    document.getElementById('userSubtitle').textContent = '你: ' + text;
+    document.getElementById('statusLine').textContent = '发送中...';
+    document.getElementById('statsLine').textContent = '';
+    currentAiText = "";
+    document.getElementById('aiSubtitle').textContent = "";
+    sendText(text);
 }
 
 function toggleMute() {
