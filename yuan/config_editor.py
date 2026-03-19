@@ -4070,16 +4070,94 @@ if __name__ == '__main__':
     # 在启动服务器前检查端口是否被占用，若占用则结束该进程
     kill_process_using_port(PORT)
 
-    print(f"\033[31m重要提示：\r\n若您的浏览器没有自动打开网页端，请手动访问http://localhost:{config.get('PORT', '5000')}/ \r\n \033[0m")
+    # 生成自签 HTTPS 证书（手机麦克风权限需要 HTTPS）
+    ssl_context = None
+    cert_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ssl_cert')
+    cert_file = os.path.join(cert_dir, 'cert.pem')
+    key_file = os.path.join(cert_dir, 'key.pem')
+    try:
+        if not os.path.exists(cert_file) or not os.path.exists(key_file):
+            os.makedirs(cert_dir, exist_ok=True)
+            # 用 Python 内置库生成自签证书
+            try:
+                from cryptography import x509
+                from cryptography.x509.oid import NameOID
+                from cryptography.hazmat.primitives import hashes, serialization
+                from cryptography.hazmat.primitives.asymmetric import rsa
+                import datetime
+                import ipaddress
+
+                key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+                name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'Yuan Bot')])
+
+                # 获取本机 IP 用于 SAN
+                import socket
+                local_ip = socket.gethostbyname(socket.gethostname())
+
+                san_list = [
+                    x509.DNSName('localhost'),
+                    x509.IPAddress(ipaddress.ip_address('127.0.0.1')),
+                ]
+                try:
+                    san_list.append(x509.IPAddress(ipaddress.ip_address(local_ip)))
+                except Exception:
+                    pass
+
+                cert = (
+                    x509.CertificateBuilder()
+                    .subject_name(name)
+                    .issuer_name(name)
+                    .public_key(key.public_key())
+                    .serial_number(x509.random_serial_number())
+                    .not_valid_before(datetime.datetime.utcnow())
+                    .not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=3650))
+                    .add_extension(x509.SubjectAlternativeName(san_list), critical=False)
+                    .sign(key, hashes.SHA256())
+                )
+                with open(key_file, 'wb') as f:
+                    f.write(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.TraditionalOpenSSL, serialization.NoEncryption()))
+                with open(cert_file, 'wb') as f:
+                    f.write(cert.public_bytes(serialization.Encoding.PEM))
+                print(f"[HTTPS] ✅ 自签证书已生成: {cert_dir}")
+                print(f"[HTTPS] 本机 IP: {local_ip}")
+            except ImportError:
+                # cryptography 没装，用 openssl 命令行
+                import subprocess
+                subprocess.run([
+                    'openssl', 'req', '-x509', '-newkey', 'rsa:2048',
+                    '-keyout', key_file, '-out', cert_file,
+                    '-days', '3650', '-nodes',
+                    '-subj', '/CN=Yuan Bot',
+                ], check=True, capture_output=True)
+                print(f"[HTTPS] ✅ 自签证书已生成 (openssl): {cert_dir}")
+
+        if os.path.exists(cert_file) and os.path.exists(key_file):
+            import ssl
+            ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            ssl_context.load_cert_chain(cert_file, key_file)
+            print(f"[HTTPS] ✅ HTTPS 已启用")
+    except Exception as e:
+        print(f"[HTTPS] ⚠️ HTTPS 初始化失败，降级 HTTP: {e}")
+        ssl_context = None
+
+    protocol = 'https' if ssl_context else 'http'
+    print(f"\033[31m重要提示：\r\n若您的浏览器没有自动打开网页端，请手动访问{protocol}://localhost:{config.get('PORT', '5000')}/ \r\n \033[0m")
+    if ssl_context:
+        import socket
+        try:
+            local_ip = socket.gethostbyname(socket.gethostname())
+            print(f"\033[32m📱 手机访问: https://{local_ip}:{PORT}/ （首次需要点「高级」→「继续访问」）\033[0m")
+        except Exception:
+            pass
     if config.get('ENABLE_LOGIN_PASSWORD', False):
         print(f"\033[31m您已启用登录密码，密码为 {config.get('LOGIN_PASSWORD', '未设置')} 请勿泄露给其它人！\r\n \033[0m")
     
     # 在启动服务器前设置定时器打开浏览器
     def open_browser():
-        webbrowser.open(f'http://localhost:{PORT}/')
+        webbrowser.open(f'{protocol}://localhost:{PORT}/')
     
     Timer(1, open_browser).start()  # 延迟1秒确保服务器已启动
     
-    app.run(host="0.0.0.0", debug=False, port=PORT)
+    app.run(host="0.0.0.0", debug=False, port=PORT, ssl_context=ssl_context)
 
 
