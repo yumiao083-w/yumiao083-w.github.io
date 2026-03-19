@@ -497,7 +497,7 @@ def register_voice_routes(app):
         @app.route('/api/voice/chat', methods=['POST'])
         def voice_chat_http():
             """HTTP SSE 模式：POST 文字，返回 SSE 流"""
-            from flask import request
+            from flask import request, jsonify
             req = request.get_json()
             if not req:
                 return jsonify({'error': '空请求'}), 400

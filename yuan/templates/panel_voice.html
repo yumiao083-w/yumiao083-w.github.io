@@ -105,22 +105,41 @@ let timerInterval = null;
 let currentAiText = "";        // 当前 AI 回复累积文本
 let isListening = false;       // 正在识别中
 let pendingUserText = "";      // 用户正在说的文字（中间结果）
-let useSSE = false;            // 降级到 SSE 模式
+let useSSE = true;             // 默认使用 SSE 模式（Flask 内置服务器不支持 WebSocket）
 let sessionId = 'vc_' + Date.now();
 
 // =====================================================================
 //  WebSocket / SSE 连接
 // =====================================================================
 function connect() {
+    // 先尝试 WebSocket，失败则降级 SSE
+    if (useSSE) {
+        // 已经降级过，直接用 SSE
+        updateStatus('connected', '已连接 (HTTP)');
+        startListening();
+        return;
+    }
+
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const url = `${proto}//${location.host}/ws/voice`;
 
     updateStatus('connecting', '连接中...');
 
-    ws = new WebSocket(url);
+    try {
+        ws = new WebSocket(url);
+    } catch(e) {
+        console.warn('WebSocket 创建失败，降级 SSE:', e);
+        useSSE = true;
+        updateStatus('connected', '已连接 (HTTP)');
+        startListening();
+        return;
+    }
+
+    let wsConnected = false;
 
     ws.onopen = () => {
-        updateStatus('connected', '已连接');
+        wsConnected = true;
+        updateStatus('connected', '已连接 (WebSocket)');
         startListening();
     };
 
@@ -129,17 +148,26 @@ function connect() {
     };
 
     ws.onerror = (err) => {
-        console.error('WebSocket error:', err);
-        // 降级到 SSE
-        useSSE = true;
-        updateStatus('connected', '已连接 (HTTP)');
-        startListening();
+        console.warn('WebSocket error, 降级到 SSE 模式');
+        if (!wsConnected) {
+            // 从未成功连接过，降级 SSE
+            useSSE = true;
+            ws = null;
+            updateStatus('connected', '已连接 (HTTP)');
+            startListening();
+        }
     };
 
     ws.onclose = () => {
-        if (isInCall && !useSSE) {
+        if (useSSE) return;
+        if (isInCall && wsConnected) {
             updateStatus('disconnected', '连接断开，重连中...');
             setTimeout(connect, 2000);
+        } else if (isInCall && !wsConnected) {
+            // WebSocket 连不上，降级
+            useSSE = true;
+            updateStatus('connected', '已连接 (HTTP)');
+            startListening();
         }
     };
 }
