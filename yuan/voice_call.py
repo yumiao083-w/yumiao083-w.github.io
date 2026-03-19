@@ -590,7 +590,11 @@ def register_voice_routes(app):
                             engine['url'],
                             headers={"Authorization": f"Bearer {engine['api_key']}"},
                             files={"file": ("audio.webm", f, "audio/webm")},
-                            data={"model": engine['model']},
+                            data={
+                                "model": engine['model'],
+                                "prompt": "以下是一段对话，请使用正确的标点符号。",
+                                "response_format": "json",
+                            },
                             timeout=30,
                         )
 
