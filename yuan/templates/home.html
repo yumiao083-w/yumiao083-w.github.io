@@ -481,7 +481,7 @@ function saveSettings() {
     if (fileInput.files.length === 0) closeSettingsModal();
 }
 
-function resetAll() {['home-bg-url','home-bg-data','home-text-color','home-font-url','home-font-name'].forEach(k => localStorage.removeItem(k));['api','reply','chat','memory','settings','legacy','notes','worldbook'].forEach(id => { localStorage.removeItem('home-icon-' + id); });
+function resetAll() {['home-bg-url','home-bg-data','home-text-color','home-font-url','home-font-name'].forEach(k => localStorage.removeItem(k));['api','reply','chat','memory','settings','legacy','notes','worldbook','voice'].forEach(id => { localStorage.removeItem('home-icon-' + id); });
     resetPhoto(); applyAll(); applyAllIcons(); closeSettingsModal();
 }
 
@@ -520,7 +520,7 @@ function applyIcon(id) {
     if (saved) { el.style.backgroundImage = `url(${saved})`; el.classList.add('has-custom-img'); } 
     else { el.style.backgroundImage = ''; el.classList.remove('has-custom-img'); }
 }
-function applyAllIcons() {['api','reply','chat','memory','settings','legacy','notes','worldbook'].forEach(applyIcon); }
+function applyAllIcons() {['api','reply','chat','memory','settings','legacy','notes','worldbook','voice'].forEach(applyIcon); }
 
 // ===== 全局应用 =====
 function applyAll() {

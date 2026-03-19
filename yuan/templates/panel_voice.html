@@ -586,11 +586,18 @@
     <div class="log-modal" id="logModal">
         <div class="log-panel">
             <div class="log-header">
+                <button onclick="closeLogModal()" style="color:#0a84ff">关闭</button>
                 <h3 id="logTitle">通话记录</h3>
-                <button onclick="closeLogModal()">关闭</button>
+                <button onclick="toggleLogEdit()" id="logEditBtn" style="color:#0a84ff">编辑</button>
             </div>
             <div class="log-messages" id="logMessages"></div>
             <div class="log-meta" id="logMeta"></div>
+            <div class="log-actions" id="logActions" style="display:none; padding:12px 20px; border-top:1px solid rgba(255,255,255,0.08);">
+                <div style="display:flex; gap:10px;">
+                    <button onclick="saveLogEdit()" style="flex:1; padding:12px; background:#0a84ff; color:#fff; border:none; border-radius:10px; font-size:15px; cursor:pointer;">保存修改</button>
+                    <button onclick="deleteLog()" style="flex:1; padding:12px; background:#ff3b30; color:#fff; border:none; border-radius:10px; font-size:15px; cursor:pointer;">删除记录</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -687,6 +694,7 @@ function loadCallLogs() {
 }
 
 function showLogDetail(filename) {
+    currentLogFilename = filename;
     fetch('/api/voice/log/' + filename)
         .then(r => r.json())
         .then(data => {
@@ -708,8 +716,75 @@ function showLogDetail(filename) {
         });
 }
 
+let currentLogFilename = null;
+let isLogEditing = false;
+
 function closeLogModal() {
     document.getElementById('logModal').classList.remove('show');
+    isLogEditing = false;
+    document.getElementById('logActions').style.display = 'none';
+    document.getElementById('logEditBtn').textContent = '编辑';
+}
+
+function toggleLogEdit() {
+    isLogEditing = !isLogEditing;
+    const msgs = document.getElementById('logMessages');
+    const actions = document.getElementById('logActions');
+    const btn = document.getElementById('logEditBtn');
+    
+    if (isLogEditing) {
+        btn.textContent = '取消';
+        actions.style.display = 'block';
+        // 把消息变成可编辑
+        msgs.querySelectorAll('.log-msg').forEach(el => {
+            el.contentEditable = 'true';
+            el.style.outline = '1px dashed rgba(255,255,255,0.2)';
+            el.style.cursor = 'text';
+        });
+    } else {
+        btn.textContent = '编辑';
+        actions.style.display = 'none';
+        msgs.querySelectorAll('.log-msg').forEach(el => {
+            el.contentEditable = 'false';
+            el.style.outline = 'none';
+            el.style.cursor = 'default';
+        });
+    }
+}
+
+function saveLogEdit() {
+    if (!currentLogFilename) return;
+    const msgs = document.getElementById('logMessages').querySelectorAll('.log-msg');
+    const messages = Array.from(msgs).map(el => ({
+        role: el.classList.contains('user') ? 'user' : 'assistant',
+        content: el.textContent.trim(),
+    })).filter(m => m.content);
+    
+    fetch('/api/voice/log/' + currentLogFilename, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ messages })
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.error) { alert('保存失败: ' + result.error); return; }
+        toggleLogEdit();
+        loadCallLogs();
+    })
+    .catch(e => alert('保存失败: ' + e.message));
+}
+
+function deleteLog() {
+    if (!currentLogFilename || !confirm('确定删除这条通话记录？')) return;
+    
+    fetch('/api/voice/log/' + currentLogFilename, { method: 'DELETE' })
+    .then(r => r.json())
+    .then(result => {
+        if (result.error) { alert('删除失败: ' + result.error); return; }
+        closeLogModal();
+        loadCallLogs();
+    })
+    .catch(e => alert('删除失败: ' + e.message));
 }
 
 // 页面加载时加载通话记录

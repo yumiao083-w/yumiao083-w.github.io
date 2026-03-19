@@ -668,7 +668,6 @@ def register_voice_routes(app):
     def voice_log_detail(filename):
         """获取单条通话记录详情"""
         from flask import jsonify
-        # 安全检查：防止路径遍历
         if '/' in filename or '\\' in filename or '..' in filename:
             return jsonify({'error': '非法文件名'}), 400
         log_dir = os.path.join(YUAN_ROOT, _cfg('VOICE_CALL_LOG_DIR', 'Voice_Logs'))
@@ -679,6 +678,45 @@ def register_voice_routes(app):
             with open(filepath, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             return jsonify(data)
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/voice/log/<filename>', methods=['PUT'])
+    def voice_log_update(filename):
+        """编辑通话记录"""
+        from flask import request, jsonify
+        if '/' in filename or '\\' in filename or '..' in filename:
+            return jsonify({'error': '非法文件名'}), 400
+        log_dir = os.path.join(YUAN_ROOT, _cfg('VOICE_CALL_LOG_DIR', 'Voice_Logs'))
+        filepath = os.path.join(log_dir, filename)
+        if not os.path.exists(filepath):
+            return jsonify({'error': '记录不存在'}), 404
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            req = request.get_json()
+            if req and 'messages' in req:
+                data['messages'] = req['messages']
+                data['rounds'] = len([m for m in req['messages'] if m.get('role') == 'user'])
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            return jsonify({'status': 'saved'})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/voice/log/<filename>', methods=['DELETE'])
+    def voice_log_delete(filename):
+        """删除通话记录"""
+        from flask import jsonify
+        if '/' in filename or '\\' in filename or '..' in filename:
+            return jsonify({'error': '非法文件名'}), 400
+        log_dir = os.path.join(YUAN_ROOT, _cfg('VOICE_CALL_LOG_DIR', 'Voice_Logs'))
+        filepath = os.path.join(log_dir, filename)
+        if not os.path.exists(filepath):
+            return jsonify({'error': '记录不存在'}), 404
+        try:
+            os.remove(filepath)
+            return jsonify({'status': 'deleted'})
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
