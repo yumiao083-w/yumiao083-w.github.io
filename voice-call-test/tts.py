@@ -10,6 +10,76 @@ logger = logging.getLogger(__name__)
 DEFAULT_VOICE_ID = "male-qn-qingse"
 DEFAULT_MODEL = "speech-02-hd"
 
+# MiniMax speech-02 原生支持的语气词标签
+_MINIMAX_SUPPORTED_TAGS = {
+    'laughs', 'chuckle', 'coughs', 'clear-throat', 'groans', 'breath',
+    'pant', 'inhale', 'exhale', 'gasps', 'sniffs', 'sighs', 'snorts',
+    'burps', 'lip-smacking', 'humming', 'hissing', 'emm', 'sneezes',
+}
+
+# AI 可能输出的变体标签 → MiniMax 格式映射
+_TAG_MAPPING = {
+    'chuckles': 'chuckle',
+    'chuckling': 'chuckle',
+    'laugh': 'laughs',
+    'laughing': 'laughs',
+    'sigh': 'sighs',
+    'sighing': 'sighs',
+    'gasp': 'gasps',
+    'gasping': 'gasps',
+    'cough': 'coughs',
+    'coughing': 'coughs',
+    'sniff': 'sniffs',
+    'sniffing': 'sniffs',
+    'snort': 'snorts',
+    'snorting': 'snorts',
+    'sneeze': 'sneezes',
+    'sneezing': 'sneezes',
+    'hmm': 'emm',
+    'hm': 'emm',
+    'um': 'emm',
+    'umm': 'emm',
+    'hums': 'humming',
+    'hum': 'humming',
+    'clears throat': 'clear-throat',
+    'clears-throat': 'clear-throat',
+    'throat clear': 'clear-throat',
+    'giggles': 'chuckle',
+    'giggle': 'chuckle',
+    'exhale': 'exhale',
+    'exhales': 'exhale',
+    'inhales': 'inhale',
+    'breathing': 'breath',
+    'panting': 'pant',
+    'pants': 'pant',
+    'groaning': 'groans',
+    'groan': 'groans',
+    'burp': 'burps',
+    'burping': 'burps',
+    'hissing sound': 'hissing',
+    'hiss': 'hissing',
+}
+
+
+def _normalize_voice_tags(text: str) -> str:
+    """将 AI 输出的语气标签转换为 MiniMax 支持的格式，不支持的删掉。"""
+    def _replace_tag(m):
+        tag = m.group(1).strip().lower()
+        # 已经是支持的标签
+        if tag in _MINIMAX_SUPPORTED_TAGS:
+            return f'({tag})'
+        # 尝试映射
+        mapped = _TAG_MAPPING.get(tag)
+        if mapped and mapped in _MINIMAX_SUPPORTED_TAGS:
+            return f'({mapped})'
+        # 不支持的标签，删掉
+        return ''
+
+    result = re.sub(r'\(([a-zA-Z\s\-]+)\)', _replace_tag, text)
+    # 合并多余空格
+    result = re.sub(r'\s{2,}', ' ', result)
+    return result.strip()
+
 
 def synthesize(text, api_key=None, voice_id=None, group_id=None, model=None):
     """
@@ -34,6 +104,9 @@ def synthesize(text, api_key=None, voice_id=None, group_id=None, model=None):
     # ── 参数处理 ──
     if not text or not isinstance(text, str):
         raise ValueError("text 参数不能为空")
+
+    # 将语气标签转为 MiniMax 支持的格式
+    text = _normalize_voice_tags(text)
 
     # 过滤纯标点/空白
     stripped = re.sub(r'[^\w]', '', text, flags=re.UNICODE)

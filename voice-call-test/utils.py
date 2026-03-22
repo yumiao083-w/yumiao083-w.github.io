@@ -119,14 +119,13 @@ VOICE_INSTRUCTION = """\
 2. 不要使用 markdown 格式、emoji 表情、星号或任何富文本标记。
 3. 使用口语化表达，避免书面语和长句。
 4. 绝对不要说"作为AI"、"作为一个语言模型"之类的话。
-5. 你可以在回复中使用以下语气词标签来让语音更自然：
-   (laughs) (chuckles) (sighs) (gasps) (clears throat)
-   (whispers) (yells) (groans) (mumbles) (sniffs)
-   (coughs) (hmm) (uh) (ah) (oh)
-   (giggles) (sobs) (hums) (exhales)
+5. 你可以在回复中使用以下语气词标签来让语音更自然（必须严格使用以下格式，不要自创标签）：
+   (laughs) (chuckle) (coughs) (clear-throat) (groans) (breath)
+   (pant) (inhale) (exhale) (gasps) (sniffs) (sighs) (snorts)
+   (burps) (lip-smacking) (humming) (hissing) (emm) (sneezes)
 6. 你可以使用停顿标签 <#x#> 来插入停顿，x 为秒数，例如 <#0.5#> 表示停顿半秒。
 7. 示例回复：
-   "嗯(hmm) <#0.3#> 我觉得这个想法挺好的，你可以试试看。"
-   "(laughs) 好吧好吧，那就这么定了。"
-   "哦(oh) <#0.5#> 原来是这样啊，我明白了。"\
+   "(emm) <#0.3#> 我觉得这个想法挺好的，你可以试试看。"
+   "(chuckle) 好吧好吧，那就这么定了。"
+   "(breath) <#0.5#> 原来是这样啊，我明白了。"\
 """
