@@ -24,7 +24,10 @@ app = Flask(__name__)
 # 密钥管理
 _used_keys: set = set()
 _active_tokens: set = set()
-_guest_tokens: dict = {}  # token → 创建时间戳，2小时过期
+_guest_tokens: dict = {}  # token → 创建时间戳，30分钟过期
+_token_times: dict = {}   # token → 创建时间戳（所有token，30分钟过期）
+
+SESSION_TIMEOUT = 1800  # 30 分钟
 
 # 会话管理（内存，不持久化）
 _sessions: dict = {}
@@ -54,6 +57,12 @@ def setup():
     token = request.args.get("token", "")
     if not token or token not in _active_tokens:
         return redirect("/")
+    # 过期检查
+    if token in _token_times and time.time() - _token_times[token] > SESSION_TIMEOUT:
+        _active_tokens.discard(token)
+        _token_times.pop(token, None)
+        _guest_tokens.pop(token, None)
+        return redirect("/")
     return render_template("setup.html")
 
 
@@ -62,6 +71,12 @@ def call():
     """通话页 — 需要有效 token"""
     token = request.args.get("token", "")
     if not token or token not in _active_tokens:
+        return redirect("/")
+    # 过期检查
+    if token in _token_times and time.time() - _token_times[token] > SESSION_TIMEOUT:
+        _active_tokens.discard(token)
+        _token_times.pop(token, None)
+        _guest_tokens.pop(token, None)
         return redirect("/")
     return render_template("call.html")
 
@@ -93,6 +108,7 @@ def api_auth():
     token = hashlib.sha256(f"{key}_{time.time()}".encode()).hexdigest()[:16]
     _used_keys.add(key)
     _active_tokens.add(token)
+    _token_times[token] = time.time()
 
     return jsonify({"token": token})
 
@@ -105,6 +121,7 @@ def api_guest_token():
     token = hashlib.sha256(f"guest_{time.time()}".encode()).hexdigest()[:16]
     _active_tokens.add(token)
     _guest_tokens[token] = time.time()
+    _token_times[token] = time.time()
     return jsonify({"token": token})
 
 
@@ -119,12 +136,21 @@ def api_chat():
     if not token or token not in _active_tokens:
         return jsonify({"error": "未授权"}), 401
 
-    # 访客 token 过期检查（2小时）
+    # 访客 token 过期检查（30分钟）
     if token in _guest_tokens:
-        if time.time() - _guest_tokens[token] > 7200:
+        if time.time() - _guest_tokens[token] > SESSION_TIMEOUT:
             _active_tokens.discard(token)
             del _guest_tokens[token]
-            return jsonify({"error": "访客令牌已过期，请重新登录"}), 401
+            _token_times.pop(token, None)
+            return jsonify({"error": "会话已过期（30分钟），请重新登录"}), 401
+
+    # 所有 token 过期检查（30分钟）
+    if token in _token_times:
+        if time.time() - _token_times[token] > SESSION_TIMEOUT:
+            _active_tokens.discard(token)
+            _token_times.pop(token, None)
+            _guest_tokens.pop(token, None)
+            return jsonify({"error": "会话已过期（30分钟），请重新登录"}), 401
 
     text = (data.get("text") or "").strip()
     if not text:
