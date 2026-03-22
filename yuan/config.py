@@ -61,6 +61,10 @@ MOONSHOT_TEMPERATURE = 0.8
 ENABLE_IMAGE_RECOGNITION = True
 ENABLE_EMOJI_RECOGNITION = True
 
+# 智谱 GLM-ASR 语音识别（首选，中文最佳）
+# API申请 https://open.bigmodel.cn/
+ZHIPU_API_KEY = ''
+
 # 图片识别提示词
 IMAGE_RECOGNITION_PROMPT = '请用中文描述这张图片的主要内容或主题，尽可能详细全面。不要使用"这是"、"这张"等开头，直接描述。如果有文字，请包含在描述中。'
 # 表情包识别提示词

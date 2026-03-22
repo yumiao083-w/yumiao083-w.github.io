@@ -972,16 +972,47 @@ async def _send_voice_reply(update, text: str):
 async def _transcribe_voice(ogg_path: str) -> str:
     """
     语音转文字。
-    优先用 Groq Whisper API（免费、快），
-    失败则降级到中转站 Whisper，
+    优先用 智谱 GLM-ASR（中文最佳），
+    失败则降级 Groq Whisper，
+    再失败降级中转站 Whisper，
     都失败返回 None。
     """
     _ensure_yuan()
 
     from openai import OpenAI
     import httpx
+    import requests as http_requests
+    import re
 
-    # ===== 1. Groq Whisper（首选） =====
+    # ===== 0. GLM-ASR（首选，中文识别最好） =====
+    zhipu_key = getattr(config, 'ZHIPU_API_KEY', '') or os.environ.get('ZHIPU_API_KEY', '')
+    if zhipu_key:
+        try:
+            glm_url = "https://open.bigmodel.cn/api/paas/v4/audio/transcriptions"
+            with open(ogg_path, "rb") as f:
+                resp = http_requests.post(
+                    glm_url,
+                    headers={"Authorization": f"Bearer {zhipu_key}"},
+                    files={"file": ("audio.ogg", f, "audio/ogg")},
+                    data={"model": "glm-asr"},
+                    timeout=30,
+                )
+            if resp.status_code == 200:
+                result = resp.json()
+                text = result.get("text", "").strip()
+                # 清理 GLM-ASR 特殊标签
+                text = re.sub(r'<\|/?[A-Za-z_0-9]+\|>', '', text).strip()
+                if text and len(text) > 1:
+                    logger.info(f"[STT] GLM-ASR 转写成功: {text[:80]}")
+                    return text
+                else:
+                    logger.info(f"[STT] GLM-ASR 返回空或太短，降级")
+            else:
+                logger.warning(f"[STT] GLM-ASR 失败 HTTP {resp.status_code}: {resp.text[:200]}")
+        except Exception as e:
+            logger.warning(f"[STT] GLM-ASR 异常: {e}")
+
+    # ===== 1. Groq Whisper =====
     groq_key = getattr(config, 'GROQ_API_KEY', '') or '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'
     if groq_key:
         try:

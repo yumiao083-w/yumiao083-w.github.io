@@ -915,6 +915,45 @@ def register_voice_routes(app):
                 logger.warning(f"[VoiceCall] [STT] 录音太短 ({file_size} bytes)，跳过")
                 return jsonify({'text': '', 'message': '录音太短'})
 
+            # ===== GLM-ASR 首选（中文识别最好） =====
+            zhipu_key = getattr(config, 'ZHIPU_API_KEY', '') if 'config' in dir() else ''
+            if not zhipu_key:
+                try:
+                    import config as _cfg
+                    zhipu_key = getattr(_cfg, 'ZHIPU_API_KEY', '')
+                except Exception:
+                    zhipu_key = os.environ.get('ZHIPU_API_KEY', '')
+
+            if zhipu_key:
+                try:
+                    import re as _re
+                    glm_url = "https://open.bigmodel.cn/api/paas/v4/audio/transcriptions"
+                    with open(tmp_path, 'rb') as f:
+                        resp = http_requests.post(
+                            glm_url,
+                            headers={"Authorization": f"Bearer {zhipu_key}"},
+                            files={"file": ("audio.webm", f, "audio/webm")},
+                            data={"model": "glm-asr"},
+                            timeout=30,
+                        )
+                    if resp.status_code == 200:
+                        result = resp.json()
+                        text = result.get('text', '').strip()
+                        text = _re.sub(r'<\|/?[A-Za-z_0-9]+\|>', '', text).strip()
+                        if text and len(text) > 1 and not _is_whisper_hallucination(text):
+                            stt_time = time.time() - t_start
+                            logger.info(f"[VoiceCall] [STT] [GLM-ASR] 识别成功: 「{text}」 ({stt_time:.2f}s)")
+                            return jsonify({'text': text, 'time': round(stt_time, 2), 'engine': 'GLM-ASR'})
+                        elif text and _is_whisper_hallucination(text):
+                            logger.info(f"[VoiceCall] [STT] [GLM-ASR] 过滤幻觉: 「{text}」")
+                            return jsonify({'text': '', 'message': '静音或噪声'})
+                        else:
+                            logger.info("[VoiceCall] [STT] [GLM-ASR] 返回空，降级 Whisper")
+                    else:
+                        logger.warning(f"[VoiceCall] [STT] [GLM-ASR] HTTP {resp.status_code}: {resp.text[:200]}")
+                except Exception as e:
+                    logger.warning(f"[VoiceCall] [STT] [GLM-ASR] 异常: {e}")
+
             # Whisper 引擎列表：Groq 优先，降级到中转站
             whisper_engines = [
                 {
