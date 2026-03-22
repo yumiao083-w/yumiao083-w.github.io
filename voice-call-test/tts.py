@@ -10,6 +10,19 @@ logger = logging.getLogger(__name__)
 DEFAULT_VOICE_ID = "male-qn-qingse"
 DEFAULT_MODEL = "speech-02-hd"
 
+# 匹配语气词标签 (laughs) (hmm) (sighs) 等
+_VOICE_TAG_RE = re.compile(r"\([a-zA-Z\s\-]+\)")
+# 匹配停顿标签 <#0.5#> <#1.2#>
+_PAUSE_TAG_RE = re.compile(r"<#[\d.]+#>")
+
+
+def _clean_for_tts(text: str) -> str:
+    """清理文本中的语气标签和停顿标签，只保留要朗读的内容。"""
+    text = _VOICE_TAG_RE.sub("", text)
+    text = _PAUSE_TAG_RE.sub("", text)
+    text = re.sub(r"\s{2,}", " ", text)
+    return text.strip()
+
 
 def synthesize(text, api_key=None, voice_id=None, group_id=None, model=None):
     """
@@ -34,6 +47,9 @@ def synthesize(text, api_key=None, voice_id=None, group_id=None, model=None):
     # ── 参数处理 ──
     if not text or not isinstance(text, str):
         raise ValueError("text 参数不能为空")
+
+    # 清理语气标签和停顿标签
+    text = _clean_for_tts(text)
 
     # 过滤纯标点/空白
     stripped = re.sub(r'[^\w]', '', text, flags=re.UNICODE)

@@ -4,6 +4,7 @@ import os
 import re
 import time
 import tempfile
+import subprocess
 import requests
 import logging
 
@@ -37,7 +38,7 @@ def _clean_glm_tags(text: str) -> str:
     return text.strip()
 
 
-def _recognize_glm(tmp_path: str) -> dict | None:
+def _recognize_glm(audio_path: str, audio_ext: str, audio_mime: str) -> dict | None:
     """
     使用智谱 GLM-ASR 进行语音识别。
     返回 dict 或 None（表示该引擎不可用，应降级）。
@@ -53,9 +54,10 @@ def _recognize_glm(tmp_path: str) -> dict | None:
     }
 
     try:
-        with open(tmp_path, "rb") as f:
+        filename = "audio" + audio_ext
+        with open(audio_path, "rb") as f:
             files = {
-                "file": ("audio.webm", f, "audio/webm"),
+                "file": (filename, f, audio_mime),
             }
             data = {
                 "model": "glm-asr",
@@ -104,7 +106,7 @@ def _recognize_glm(tmp_path: str) -> dict | None:
         return None
 
 
-def _recognize_dashscope(tmp_path: str) -> dict | None:
+def _recognize_dashscope(audio_path: str, audio_ext: str, audio_mime: str) -> dict | None:
     """
     使用阿里 DashScope Fun-ASR 非流式同步识别。
     Fun-ASR 的 Recognition.call() 需要 dashscope SDK，
@@ -117,7 +119,7 @@ def _recognize_dashscope(tmp_path: str) -> dict | None:
     return None  # 暂不启用
 
 
-def _recognize_groq(tmp_path: str) -> dict | None:
+def _recognize_groq(audio_path: str, audio_ext: str, audio_mime: str) -> dict | None:
     """
     使用 Groq Whisper 进行语音识别（降级方案）。
     """
@@ -133,9 +135,10 @@ def _recognize_groq(tmp_path: str) -> dict | None:
     }
 
     try:
-        with open(tmp_path, "rb") as f:
+        filename = "audio" + audio_ext
+        with open(audio_path, "rb") as f:
             files = {
-                "file": ("audio.webm", f, "audio/webm"),
+                "file": (filename, f, audio_mime),
             }
             data = {
                 "model": "whisper-large-v3-turbo",
@@ -182,6 +185,31 @@ def _recognize_groq(tmp_path: str) -> dict | None:
         return {"error": f"语音识别异常: {str(e)}"}
 
 
+def _convert_to_wav(src_path: str) -> str | None:
+    """用 ffmpeg 将音频转为 16kHz mono WAV，返回新文件路径。失败返回 None。"""
+    fd, wav_path = tempfile.mkstemp(suffix=".wav")
+    os.close(fd)
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-y", "-i", src_path, "-ar", "16000", "-ac", "1", "-f", "wav", wav_path],
+            capture_output=True, timeout=15,
+        )
+        if result.returncode != 0:
+            logger.error("ffmpeg 转换失败: %s", result.stderr.decode(errors="replace")[:300])
+            os.remove(wav_path)
+            return None
+        return wav_path
+    except FileNotFoundError:
+        logger.warning("ffmpeg 未安装，跳过转换")
+        os.remove(wav_path)
+        return None
+    except Exception as e:
+        logger.error("ffmpeg 异常: %s", e)
+        if os.path.exists(wav_path):
+            os.remove(wav_path)
+        return None
+
+
 def recognize(audio_file):
     """
     语音识别入口。按优先级尝试：GLM-ASR → Groq Whisper。
@@ -194,6 +222,7 @@ def recognize(audio_file):
                失败: { error } 或 { text: "", message: "录音太短" }
     """
     tmp_path = None
+    wav_path = None
     try:
         # 1. 保存到临时文件
         fd, tmp_path = tempfile.mkstemp(suffix=".webm")
@@ -205,19 +234,26 @@ def recognize(audio_file):
         if file_size < 1000:
             return {"text": "", "message": "录音太短"}
 
-        # 3. 按优先级尝试各引擎
+        # 3. 用 ffmpeg 转为 WAV（兼容性更好）
+        wav_path = _convert_to_wav(tmp_path)
+        # 优先用 wav，转换失败就用原始 webm
+        audio_path = wav_path if wav_path else tmp_path
+        audio_ext = ".wav" if wav_path else ".webm"
+        audio_mime = "audio/wav" if wav_path else "audio/webm"
+
+        # 4. 按优先级尝试各引擎
         engines = [
             ("GLM-ASR", _recognize_glm),
             ("Groq-Whisper", _recognize_groq),
         ]
 
         for name, engine_fn in engines:
-            result = engine_fn(tmp_path)
+            result = engine_fn(audio_path, audio_ext, audio_mime)
             if result is not None:
                 logger.info("语音识别使用引擎: %s", name)
                 return result
 
-        # 4. 所有引擎都不可用
+        # 5. 所有引擎都不可用
         return {"error": "语音识别未配置（需设置 ZHIPU_API_KEY 或 GROQ_API_KEY）"}
 
     except Exception as e:
@@ -226,5 +262,10 @@ def recognize(audio_file):
         if tmp_path and os.path.exists(tmp_path):
             try:
                 os.remove(tmp_path)
+            except OSError:
+                pass
+        if wav_path and os.path.exists(wav_path):
+            try:
+                os.remove(wav_path)
             except OSError:
                 pass
