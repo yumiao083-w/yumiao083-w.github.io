@@ -122,7 +122,8 @@ VOICE_INSTRUCTION = """\
 5. 你可以在回复中使用以下语气词标签来让语音更自然（必须严格使用以下格式，不要自创标签）：
    (laughs) (chuckle) (coughs) (clear-throat) (groans) (breath)
    (pant) (inhale) (exhale) (gasps) (sniffs) (sighs) (snorts)
-   (burps) (lip-smacking) (humming) (hissing) (emm) (sneezes)
+   (burps) (lip-smacking) (humming) (hissing) (emm) (whistles)
+   (sneezes) (crying) (applause)
 6. 你可以使用停顿标签 <#x#> 来插入停顿，x 为秒数，例如 <#0.5#> 表示停顿半秒。
 7. 示例回复：
    "(emm) <#0.3#> 我觉得这个想法挺好的，你可以试试看。"

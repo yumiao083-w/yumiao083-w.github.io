@@ -8,13 +8,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 DEFAULT_VOICE_ID = "male-qn-qingse"
-DEFAULT_MODEL = "speech-02-hd"
+DEFAULT_MODEL = "speech-2.8-hd"
 
-# MiniMax speech-02 原生支持的语气词标签
+# MiniMax speech-2.8 原生支持的语气词标签
 _MINIMAX_SUPPORTED_TAGS = {
     'laughs', 'chuckle', 'coughs', 'clear-throat', 'groans', 'breath',
     'pant', 'inhale', 'exhale', 'gasps', 'sniffs', 'sighs', 'snorts',
-    'burps', 'lip-smacking', 'humming', 'hissing', 'emm', 'sneezes',
+    'burps', 'lip-smacking', 'humming', 'hissing', 'emm', 'whistles',
+    'sneezes', 'crying', 'applause',
 }
 
 # AI 可能输出的变体标签 → MiniMax 格式映射
