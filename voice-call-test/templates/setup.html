@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>准备通话</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  body {
+    background: #000;
+    color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+    min-height: 100vh;
+    padding: 0 16px;
+    padding-bottom: 100px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page-title {
+    font-size: 34px;
+    font-weight: 700;
+    padding: 60px 0 8px 4px;
+    letter-spacing: -0.5px;
+  }
+  .card {
+    background: #1c1c1e;
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .card-title {
+    font-size: 17px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+  .card-desc {
+    font-size: 14px;
+    color: #8e8e93;
+    margin-bottom: 14px;
+    line-height: 1.5;
+  }
+  .optional-tag {
+    color: #8e8e93;
+    font-weight: 400;
+    font-size: 14px;
+  }
+  textarea, input[type="text"], input[type="password"], input[type="url"], select {
+    width: 100%;
+    background: #2c2c2e;
+    border: none;
+    border-radius: 10px;
+    color: #fff;
+    font-size: 15px;
+    padding: 12px 14px;
+    font-family: inherit;
+    outline: none;
+    resize: vertical;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  textarea::placeholder, input::placeholder {
+    color: #636366;
+  }
+  select {
+    cursor: pointer;
+  }
+  select option {
+    background: #2c2c2e;
+    color: #fff;
+  }
+  .privacy-hint {
+    font-size: 13px;
+    color: #8e8e93;
+    margin-top: 10px;
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    line-height: 1.4;
+  }
+  .privacy-hint .lock-icon {
+    flex-shrink: 0;
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  .section-header .arrow {
+    font-size: 13px;
+    color: #8e8e93;
+    transition: transform 0.2s;
+    margin-left: 8px;
+  }
+  .section-header .arrow.open {
+    transform: rotate(90deg);
+  }
+  .section-content {
+    display: none;
+    margin-top: 14px;
+  }
+  .section-content.open {
+    display: block;
+  }
+  .sub-section {
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid #38383a;
+  }
+  .sub-section:first-child {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+  }
+  .sub-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+  .sub-desc {
+    font-size: 13px;
+    color: #8e8e93;
+    margin-bottom: 12px;
+    line-height: 1.4;
+  }
+  .field-group {
+    margin-bottom: 10px;
+  }
+  .field-label {
+    font-size: 13px;
+    color: #8e8e93;
+    margin-bottom: 6px;
+  }
+  .model-row {
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+  }
+  .model-row input, .model-row select {
+    flex: 1;
+    min-width: 0;
+  }
+  .btn-secondary {
+    background: #2c2c2e;
+    color: #0a84ff;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 14px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
+    flex-shrink: 0;
+  }
+  .btn-secondary:active {
+    opacity: 0.7;
+  }
+  .btn-import {
+    background: #2c2c2e;
+    color: #0a84ff;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    margin-top: 10px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn-import:active {
+    opacity: 0.7;
+  }
+  .error-msg {
+    color: #ff453a;
+    font-size: 13px;
+    margin-top: 6px;
+    display: none;
+  }
+  .start-btn-wrapper {
+    padding: 16px;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, #000 30%);
+    padding-top: 30px;
+    z-index: 100;
+  }
+  .start-btn {
+    width: 100%;
+    background: #0a84ff;
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    padding: 16px;
+    font-size: 17px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: opacity 0.15s;
+  }
+  .start-btn:active {
+    opacity: 0.8;
+  }
+  #fileInput {
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<h1 class="page-title">准备通话</h1>
+
+<!-- 区块1: 个人信息 -->
+<div class="card">
+  <div class="card-title">袁朗想了解你的一切</div>
+  <div class="card-desc">告诉袁朗关于你的事情，他会记住这些，让通话更有温度。</div>
+  <textarea id="userInfo" rows="4" placeholder="介绍一下你自己吧...（你的名字、性格、喜好，任何你想让袁朗知道的）"></textarea>
+  <div class="privacy-hint">
+    <span class="lock-icon">🔒</span>
+    <span>你的信息不会被存储，仅用于本次通话。我们尊重你的隐私。</span>
+  </div>
+</div>
+
+<!-- 区块2: 话题 -->
+<div class="card">
+  <div class="card-title">想聊什么话题 <span class="optional-tag">（非必填）</span></div>
+  <input type="text" id="topic" placeholder="比如：最近的烦恼、电影推荐、随便聊聊...">
+</div>
+
+<!-- 区块2.5: 选择模型 -->
+<div class="card">
+  <div class="card-title">对话模型</div>
+  <div class="card-desc">选择 AI 使用的模型</div>
+  <div id="builtinModelContainer">
+    <select id="builtinModelSelect">
+      <option value="" disabled selected>加载中...</option>
+    </select>
+  </div>
+</div>
+
+<!-- 区块3: 补充设定 -->
+<div class="card">
+  <div class="section-header" onclick="toggleSection('extraPrompt')">
+    <span class="card-title" style="margin-bottom:0">补充设定</span>
+    <span class="arrow" id="arrow-extraPrompt">▶</span>
+  </div>
+  <div class="section-content" id="section-extraPrompt">
+    <div class="sub-desc">添加世界书、角色设定等额外提示词</div>
+    <textarea id="extraPrompt" rows="8" placeholder="粘贴额外的角色设定、世界书内容..."></textarea>
+    <button class="btn-import" onclick="document.getElementById('fileInput').click()">📄 导入文件</button>
+    <input type="file" id="fileInput" accept=".txt,.md,.json" onchange="importFile(event)">
+    <div class="privacy-hint">
+      <span class="lock-icon">🔒</span>
+      <span>所有设定仅存储在你的浏览器中，不会上传到服务器</span>
+    </div>
+  </div>
+</div>
+
+<!-- 区块4: 自定义API -->
+<div class="card">
+  <div class="section-header" onclick="toggleSection('customApi')">
+    <span class="card-title" style="margin-bottom:0">自定义API</span>
+    <span class="arrow" id="arrow-customApi">▶</span>
+  </div>
+  <div class="section-content" id="section-customApi">
+
+    <!-- 4a. LLM -->
+    <div class="sub-section">
+      <div class="sub-title">LLM 对话模型</div>
+      <div class="sub-desc" id="llmSubDesc">不填则使用内置API。填写后将覆盖上方的内置模型设置</div>
+      <div class="field-group">
+        <div class="field-label">API 地址</div>
+        <input type="url" id="llmBaseUrl" placeholder="https://api.example.com/v1">
+      </div>
+      <div class="field-group">
+        <div class="field-label">API Key</div>
+        <input type="password" id="llmApiKey" placeholder="sk-...">
+      </div>
+      <div class="field-group">
+        <div class="field-label">模型</div>
+        <div class="model-row">
+          <input type="text" id="llmModel" placeholder="模型名称">
+          <button class="btn-secondary" onclick="fetchModels()">获取模型列表</button>
+        </div>
+        <div class="error-msg" id="modelError"></div>
+      </div>
+      <div class="privacy-hint">
+        <span class="lock-icon">🔒</span>
+        <span>API密钥仅存储在你的浏览器中</span>
+      </div>
+    </div>
+
+    <!-- 4b. MiniMax TTS -->
+    <div class="sub-section">
+      <div class="sub-title">MiniMax 语音合成</div>
+      <div class="sub-desc" id="ttsSubDesc">不填则使用内置语音</div>
+      <div class="field-group">
+        <div class="field-label">API Key</div>
+        <input type="password" id="ttsApiKey" placeholder="MiniMax API Key">
+      </div>
+      <div class="field-group">
+        <div class="field-label">Group ID</div>
+        <input type="text" id="ttsGroupId" placeholder="MiniMax Group ID（数字）">
+      </div>
+      <div class="field-group">
+        <div class="field-label">Voice ID（音色）</div>
+        <input type="text" id="ttsVoiceId" placeholder="如 male-qn-qingse 或克隆音色ID">
+      </div>
+      <div class="field-group">
+        <div class="field-label">TTS 模型</div>
+        <select id="ttsModel">
+          <option value="speech-02-hd">speech-02-hd（高清）</option>
+          <option value="speech-02">speech-02（标准）</option>
+          <option value="speech-01-hd">speech-01-hd</option>
+          <option value="speech-01">speech-01</option>
+        </select>
+      </div>
+      <div class="sub-desc" style="margin-top:8px;margin-bottom:0">从 <a href="https://platform.minimax.chat" target="_blank" style="color:#0a84ff">MiniMax 开放平台</a> 获取 API Key 和 Group ID</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 底部按钮 -->
+<div class="start-btn-wrapper">
+  <button class="start-btn" onclick="startCall()">开始通话</button>
+</div>
+
+<script>
+  // 获取 token
+  var token = new URLSearchParams(window.location.search).get('token');
+  var isGuest = new URLSearchParams(window.location.search).get('guest') === '1';
+  if (!token) {
+    window.location.href = '/';
+  }
+
+  // 访客模式处理
+  if (isGuest) {
+    // 隐藏内置模型区域
+    document.getElementById('builtinModelContainer').parentElement.style.display = 'none';
+    // 自动展开自定义API区域
+    toggleSection('customApi');
+    // 更新提示文案
+    document.getElementById('llmSubDesc').textContent = '访客模式：必须填写自己的 LLM API';
+    document.getElementById('ttsSubDesc').textContent = '访客模式：必须填写自己的 MiniMax TTS API';
+  } else {
+    // 页面加载 - 加载内置模型列表
+    loadBuiltinModels();
+  }
+
+  // 获取内置模型列表
+  function loadBuiltinModels() {
+    var container = document.getElementById('builtinModelContainer');
+    var select = document.getElementById('builtinModelSelect');
+
+    fetch('/api/builtin-models')
+      .then(function(res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function(data) {
+        var models = data.models || data.data || data;
+        if (!Array.isArray(models) || models.length === 0) {
+          throw new Error('空列表');
+        }
+
+        // 清空 select 并填充
+        select.innerHTML = '';
+        models.forEach(function(m) {
+          var modelId = typeof m === 'string' ? m : (m.id || m.name || '');
+          var opt = document.createElement('option');
+          opt.value = modelId;
+          opt.textContent = modelId;
+          select.appendChild(opt);
+        });
+      })
+      .catch(function(err) {
+        // 失败时替换为手动输入框
+        container.innerHTML = '<div class="error-msg" style="display:block;margin-bottom:8px">获取模型列表失败</div>' +
+          '<input type="text" id="builtinModelInput" placeholder="手动输入模型名称">';
+      });
+  }
+
+  // 折叠/展开
+  function toggleSection(id) {
+    var content = document.getElementById('section-' + id);
+    var arrow = document.getElementById('arrow-' + id);
+    var isOpen = content.classList.contains('open');
+    if (isOpen) {
+      content.classList.remove('open');
+      arrow.classList.remove('open');
+      arrow.textContent = '▶';
+    } else {
+      content.classList.add('open');
+      arrow.classList.add('open');
+      arrow.textContent = '▼';
+    }
+  }
+
+  // 导入文件
+  function importFile(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      document.getElementById('extraPrompt').value = e.target.result;
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+  }
+
+  // 获取模型列表
+  function fetchModels() {
+    var baseUrl = document.getElementById('llmBaseUrl').value.trim();
+    var apiKey = document.getElementById('llmApiKey').value.trim();
+    var errorEl = document.getElementById('modelError');
+    errorEl.style.display = 'none';
+
+    if (!baseUrl) {
+      errorEl.textContent = '请先填写 API 地址';
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    var url = '/api/models?base_url=' + encodeURIComponent(baseUrl);
+    if (apiKey) {
+      url += '&api_key=' + encodeURIComponent(apiKey);
+    }
+
+    fetch(url)
+      .then(function(res) {
+        if (!res.ok) throw new Error('请求失败 (' + res.status + ')');
+        return res.json();
+      })
+      .then(function(data) {
+        var models = data.models || data.data || data;
+        if (!Array.isArray(models) || models.length === 0) {
+          throw new Error('未获取到模型列表');
+        }
+
+        // 获取当前值
+        var currentModel = '';
+        var modelEl = document.getElementById('llmModel');
+        if (modelEl) currentModel = modelEl.value;
+
+        // 创建 select 替换 input
+        var select = document.createElement('select');
+        select.id = 'llmModel';
+
+        // 空选项
+        var emptyOpt = document.createElement('option');
+        emptyOpt.value = '';
+        emptyOpt.textContent = '请选择模型...';
+        select.appendChild(emptyOpt);
+
+        models.forEach(function(m) {
+          var opt = document.createElement('option');
+          var modelId = typeof m === 'string' ? m : (m.id || m.name || '');
+          opt.value = modelId;
+          opt.textContent = modelId;
+          if (modelId === currentModel) opt.selected = true;
+          select.appendChild(opt);
+        });
+
+        // 替换
+        var container = modelEl.parentNode;
+        container.replaceChild(select, modelEl);
+      })
+      .catch(function(err) {
+        errorEl.textContent = '获取失败：' + err.message;
+        errorEl.style.display = 'block';
+      });
+  }
+
+  // 开始通话
+  function startCall() {
+    // 访客模式验证
+    if (isGuest) {
+      var llmUrl = document.getElementById('llmBaseUrl').value.trim();
+      var llmKey = document.getElementById('llmApiKey').value.trim();
+      var ttsKeyVal = document.getElementById('ttsApiKey').value.trim();
+      if (!llmUrl || !llmKey) {
+        alert('访客模式需要填写 LLM API 地址和 API Key');
+        return;
+      }
+      if (!ttsKeyVal) {
+        alert('访客模式需要填写 MiniMax TTS API Key');
+        return;
+      }
+    }
+
+    // 收集所有数据
+    var userInfo = document.getElementById('userInfo').value || '';
+    var topicVal = document.getElementById('topic').value || '';
+    var extraPromptVal = document.getElementById('extraPrompt').value || '';
+
+    // 模型选择
+    var model = '';
+    var builtinSelect = document.getElementById('builtinModelSelect');
+    var builtinInput = document.getElementById('builtinModelInput');
+    if (builtinSelect) model = builtinSelect.value || '';
+    else if (builtinInput) model = builtinInput.value.trim() || '';
+
+    // 自定义LLM API
+    var customLlm = '';
+    var llmUrl = document.getElementById('llmBaseUrl').value.trim();
+    var llmKey = document.getElementById('llmApiKey').value.trim();
+    var llmModelVal = document.getElementById('llmModel').value.trim();
+    if (llmUrl && llmKey) {
+      customLlm = JSON.stringify({base_url: llmUrl, api_key: llmKey, model: llmModelVal});
+    }
+
+    // 自定义TTS API
+    var customTts = '';
+    var ttsKeyVal = document.getElementById('ttsApiKey').value.trim();
+    var ttsGroupVal = document.getElementById('ttsGroupId').value.trim();
+    var ttsVoiceVal = document.getElementById('ttsVoiceId').value.trim();
+    var ttsModelVal = document.getElementById('ttsModel').value;
+    if (ttsKeyVal) {
+      var ttsObj = {api_key: ttsKeyVal};
+      if (ttsGroupVal) ttsObj.group_id = ttsGroupVal;
+      if (ttsVoiceVal) ttsObj.voice_id = ttsVoiceVal;
+      if (ttsModelVal) ttsObj.model = ttsModelVal;
+      customTts = JSON.stringify(ttsObj);
+    }
+
+    // 编码到URL参数
+    var params = new URLSearchParams();
+    params.set('token', token);
+    if (userInfo) params.set('user_info', userInfo);
+    if (topicVal) params.set('topic', topicVal);
+    if (extraPromptVal) params.set('extra_prompt', extraPromptVal);
+    if (model) params.set('model', model);
+    if (customLlm) params.set('custom_llm', customLlm);
+    if (customTts) params.set('custom_tts', customTts);
+    if (isGuest) params.set('guest', '1');
+
+    window.location.href = '/call?' + params.toString();
+  }
+</script>
+
+</body>
+</html>

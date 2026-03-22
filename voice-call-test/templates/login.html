@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>语音通话 — 密钥验证</title>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+html, body {
+  height: 100%;
+  background: #000;
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 32px;
+  min-height: 100vh;
+}
+.container {
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: #3a3a3c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  color: #fff;
+  margin-bottom: 16px;
+  user-select: none;
+}
+.title {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  text-align: center;
+}
+.subtitle {
+  font-size: 14px;
+  color: #8e8e93;
+  margin-bottom: 32px;
+  text-align: center;
+}
+.input-key {
+  width: 100%;
+  padding: 14px 16px;
+  border: none;
+  border-radius: 12px;
+  background: #1c1c1e;
+  color: #fff;
+  font-size: 16px;
+  letter-spacing: 2px;
+  outline: none;
+  margin-bottom: 16px;
+  text-align: center;
+}
+.input-key::placeholder {
+  color: #636366;
+  letter-spacing: 2px;
+}
+.btn-login {
+  width: 100%;
+  padding: 14px 0;
+  border: none;
+  border-radius: 12px;
+  background: #0a84ff;
+  color: #fff;
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.btn-login:active {
+  opacity: 0.7;
+}
+.btn-login:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.error-msg {
+  color: #ff453a;
+  font-size: 13px;
+  margin-top: 16px;
+  text-align: center;
+  min-height: 20px;
+}
+.footer {
+  position: fixed;
+  bottom: 24px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 12px;
+  color: #48484a;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="avatar">袁</div>
+  <div class="title">袁朗 · 语音通话</div>
+  <div class="subtitle">请输入体验密钥</div>
+  <input class="input-key" id="keyInput" type="text" placeholder="输入密钥" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+  <button class="btn-login" id="loginBtn" onclick="doLogin()">验证并进入</button>
+  <div class="error-msg" id="errorMsg"></div>
+  <div style="margin-top:24px;text-align:center">
+    <div style="color:#636366;font-size:13px;margin-bottom:12px">─── 或者 ───</div>
+    <button class="btn-login" style="background:#2c2c2e;font-size:15px;font-weight:500;padding:12px 0" onclick="doGuestLogin()">使用自己的 API，免密钥进入</button>
+    <div style="color:#636366;font-size:12px;margin-top:8px">需要自备 LLM 和 TTS 的 API Key</div>
+  </div>
+</div>
+<div class="footer">一次性密钥 · 刷新后需重新验证</div>
+<script>
+var keyInput = document.getElementById('keyInput');
+var loginBtn = document.getElementById('loginBtn');
+var errorMsg = document.getElementById('errorMsg');
+
+keyInput.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') doLogin();
+});
+
+async function doLogin() {
+  var key = keyInput.value.trim();
+  if (!key) {
+    errorMsg.textContent = '请输入密钥';
+    return;
+  }
+  errorMsg.textContent = '';
+  loginBtn.disabled = true;
+  loginBtn.textContent = '验证中...';
+  try {
+    var res = await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: key })
+    });
+    var result = await res.json();
+    if (result.token) {
+      window.location.href = '/setup?token=' + result.token;
+    } else if (result.error) {
+      errorMsg.textContent = result.error;
+    } else {
+      errorMsg.textContent = '验证失败，请重试';
+    }
+  } catch (e) {
+    errorMsg.textContent = '网络错误，请重试';
+  } finally {
+    loginBtn.disabled = false;
+    loginBtn.textContent = '验证并进入';
+  }
+}
+
+async function doGuestLogin() {
+  errorMsg.textContent = '';
+  try {
+    var res = await fetch('/api/guest-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    var result = await res.json();
+    if (result.token) {
+      window.location.href = '/setup?token=' + result.token + '&guest=1';
+    } else {
+      errorMsg.textContent = '获取访客令牌失败';
+    }
+  } catch (e) {
+    errorMsg.textContent = '网络错误，请重试';
+  }
+}
+</script>
+</body>
+</html>
