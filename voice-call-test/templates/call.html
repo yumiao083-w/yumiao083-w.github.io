@@ -60,18 +60,6 @@
             justify-content: center;
             gap: 16px;
         }
-        .dial-avatar {
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #3a3a3c, #636366);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 48px;
-            color: var(--text-primary);
-            font-weight: 300;
-        }
         .dial-name {
             font-size: 28px;
             font-weight: 500;
@@ -248,63 +236,11 @@
             margin-top: 4px;
         }
 
-        /* 头像区 */
-        .call-avatar-area {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 12px 0 4px;
-            position: relative;
-            width: 100%;
-        }
-        .call-avatar-wrapper {
-            position: relative;
-            width: 100px;
-            height: 100px;
-        }
-        .call-avatar {
-            width: 100px;
-            height: 100px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #3a3a3c, #636366);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 40px;
-            font-weight: 300;
-            position: relative;
-            z-index: 2;
-        }
-        #rippleContainer {
-            position: absolute;
-            inset: -30px;
-            z-index: 1;
-        }
-        .ripple {
-            position: absolute;
-            inset: 0;
-            border-radius: 50%;
-            border: 2px solid rgba(255,255,255,0.25);
-            opacity: 0;
-        }
-
-        /* 波纹动画 */
-        @keyframes ripple {
-            0% { transform: scale(0.8); opacity: 1; }
-            100% { transform: scale(1.8); opacity: 0; }
-        }
-        .listening .ripple {
-            animation: ripple 2.4s ease-out infinite;
-        }
-        .listening .ripple:nth-child(1) { animation-delay: 0s; }
-        .listening .ripple:nth-child(2) { animation-delay: 0.6s; }
-        .listening .ripple:nth-child(3) { animation-delay: 1.2s; }
-
         /* 名字 */
         .call-name {
             font-size: 34px;
             font-weight: 600;
-            margin-top: 16px;
+            margin-top: 12px;
             text-align: center;
             width: 100%;
         }
@@ -479,11 +415,6 @@
 
         /* 小屏适配 */
         @media (max-height: 700px) {
-            .dial-avatar {
-                width: 90px;
-                height: 90px;
-                font-size: 36px;
-            }
             .dial-name { font-size: 24px; }
             .btn-call-start {
                 width: 64px;
@@ -493,16 +424,6 @@
                 width: 30px;
                 height: 30px;
             }
-            .call-avatar-wrapper {
-                width: 80px;
-                height: 80px;
-            }
-            .call-avatar {
-                width: 80px;
-                height: 80px;
-                font-size: 32px;
-            }
-            #rippleContainer { inset: -20px; }
             .call-name { font-size: 28px; }
             .ctrl-btn {
                 width: 60px;
@@ -559,15 +480,6 @@
             </button>
             <div class="call-topbar-right">
                 <button class="btn-settings" onclick="openSettings()">⚙️</button>
-            </div>
-        </div>
-
-        <!-- 头像区（波纹动画） -->
-        <div class="call-avatar-area">
-            <div class="call-avatar-wrapper" id="rippleContainer">
-                <div class="ripple"></div>
-                <div class="ripple"></div>
-                <div class="ripple"></div>
             </div>
         </div>
 
@@ -642,7 +554,7 @@ let customLlm = null;
 try { const _cl = _params.get('custom_llm'); if (_cl) customLlm = JSON.parse(_cl); } catch(e) {}
 let customTts = null;
 try { const _ct = _params.get('custom_tts'); if (_ct) customTts = JSON.parse(_ct); } catch(e) {}
-const selectedModel = _params.get('model') || '';
+let selectedModel = _params.get('model') || '';
 
 // 构建 custom_prompt
 let customPrompt = '';
@@ -851,8 +763,6 @@ function startRecording() {
     };
     mediaRecorder.start(100);
     isListening = true;
-    document.getElementById('rippleContainer').classList.add('listening');
-    document.getElementById('hint').textContent = '正在聆听...';
     silenceStart = null;
     startSilenceDetection();
 }
@@ -872,7 +782,6 @@ function startSilenceDetection() {
 function stopRecording() {
     if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
     isListening = false;
-    document.getElementById('rippleContainer').classList.remove('listening');
     if (silenceTimer) { clearInterval(silenceTimer); silenceTimer = null; }
 }
 function startListening() { if (isListening || isMuted || !isInCall || isAiSpeaking) return; if (mediaStream) startRecording(); }
@@ -958,11 +867,19 @@ function updateTimer() {
 document.getElementById('textInput').addEventListener('keydown', e => { if (e.key === 'Enter') { sendTextInput(); e.preventDefault(); } });
 
 // === 设置弹窗 ===
+var _settingsModelLoaded = false;
+
 function openSettings() {
     // 填充当前值
     document.getElementById('settingsUserInfo').value = _params.get('user_info') || '';
     document.getElementById('settingsTopic').value = _params.get('topic') || '';
     document.getElementById('settingsExtraPrompt').value = _params.get('extra_prompt') || '';
+
+    // 内置模型
+    if (!_settingsModelLoaded) {
+        loadSettingsBuiltinModels();
+        _settingsModelLoaded = true;
+    }
 
     // LLM
     if (customLlm) {
@@ -982,6 +899,70 @@ function openSettings() {
     document.getElementById('settingsOverlay').classList.add('active');
 }
 
+function loadSettingsBuiltinModels() {
+    var sel = document.getElementById('settingsBuiltinModel');
+    sel.innerHTML = '<option value="" disabled selected>加载中...</option>';
+    fetch('/api/builtin-models').then(r => r.json()).then(data => {
+        var models = data.models || [];
+        if (models.length === 0) {
+            sel.innerHTML = '<option value="">无可用模型</option>';
+            return;
+        }
+        sel.innerHTML = '';
+        models.forEach(function(m) {
+            var id = typeof m === 'string' ? m : (m.id || m.name || '');
+            var opt = document.createElement('option');
+            opt.value = id;
+            opt.textContent = id;
+            if (id === selectedModel) opt.selected = true;
+            sel.appendChild(opt);
+        });
+    }).catch(function() {
+        sel.innerHTML = '<option value="">获取失败</option>';
+    });
+}
+
+function settingsFetchLlmModels() {
+    var url = document.getElementById('settingsLlmUrl').value.trim();
+    var key = document.getElementById('settingsLlmKey').value.trim();
+    var errEl = document.getElementById('settingsLlmModelError');
+    errEl.style.display = 'none';
+    if (!url || !key) {
+        errEl.textContent = '请先填写 API 地址和 Key';
+        errEl.style.display = 'block';
+        return;
+    }
+    fetch('/api/models?base_url=' + encodeURIComponent(url) + '&api_key=' + encodeURIComponent(key))
+        .then(r => r.json())
+        .then(data => {
+            var models = data.models || [];
+            if (models.length === 0) throw new Error('空列表');
+            var input = document.getElementById('settingsLlmModel');
+            var currentVal = input.value;
+            var sel = document.createElement('select');
+            sel.id = 'settingsLlmModel';
+            sel.style.cssText = input.style.cssText;
+            sel.className = input.className;
+            var empty = document.createElement('option');
+            empty.value = '';
+            empty.textContent = '请选择...';
+            sel.appendChild(empty);
+            models.forEach(function(m) {
+                var id = typeof m === 'string' ? m : (m.id || '');
+                var opt = document.createElement('option');
+                opt.value = id;
+                opt.textContent = id;
+                if (id === currentVal) opt.selected = true;
+                sel.appendChild(opt);
+            });
+            input.parentNode.replaceChild(sel, input);
+        })
+        .catch(function(e) {
+            errEl.textContent = '获取失败: ' + e.message;
+            errEl.style.display = 'block';
+        });
+}
+
 function closeSettings() {
     document.getElementById('settingsOverlay').classList.remove('active');
 }
@@ -998,10 +979,17 @@ function saveSettings() {
     if (tp) customPrompt += '# 本次话题\n' + tp + '\n\n';
     if (ep) customPrompt += '# 补充设定\n' + ep + '\n\n';
 
+    // 内置模型
+    var builtinSel = document.getElementById('settingsBuiltinModel');
+    if (builtinSel && builtinSel.value) {
+        selectedModel = builtinSel.value;
+    }
+
     // LLM
     var llmUrl = document.getElementById('settingsLlmUrl').value.trim();
     var llmKey = document.getElementById('settingsLlmKey').value.trim();
-    var llmModel = document.getElementById('settingsLlmModel').value.trim();
+    var llmModelEl = document.getElementById('settingsLlmModel');
+    var llmModel = llmModelEl ? llmModelEl.value.trim() : '';
     if (llmUrl && llmKey) {
         customLlm = { base_url: llmUrl, api_key: llmKey, model: llmModel };
     } else {
@@ -1023,6 +1011,12 @@ function saveSettings() {
     }
 
     closeSettings();
+    // 显示保存确认
+    document.getElementById('statusLine').textContent = '✅ 设置已保存并应用';
+    setTimeout(function() {
+        var sl = document.getElementById('statusLine');
+        if (sl.textContent === '✅ 设置已保存并应用') sl.textContent = '';
+    }, 2000);
 }
 </script>
 
@@ -1032,6 +1026,16 @@ function saveSettings() {
         <div class="settings-header">
             <div class="settings-title">通话设置</div>
             <button class="btn-settings-close" onclick="closeSettings()">✕</button>
+        </div>
+
+        <div class="settings-section">
+            <div class="settings-section-title">对话模型（内置）</div>
+            <div class="settings-field">
+                <select id="settingsBuiltinModel" style="width:100%;background:#2c2c2e;border:none;border-radius:10px;color:#fff;font-size:15px;padding:10px 12px;-webkit-appearance:none">
+                    <option value="" disabled selected>点击设置按钮加载</option>
+                </select>
+            </div>
+            <div class="settings-hint">选择内置中转站的模型，自定义LLM填写后会覆盖此选项</div>
         </div>
 
         <div class="settings-section">
@@ -1067,7 +1071,11 @@ function saveSettings() {
             </div>
             <div class="settings-field">
                 <label>模型</label>
-                <input type="text" id="settingsLlmModel" placeholder="模型名称">
+                <div style="display:flex;gap:8px;align-items:stretch">
+                    <input type="text" id="settingsLlmModel" placeholder="模型名称" style="flex:1">
+                    <button onclick="settingsFetchLlmModels()" style="background:#2c2c2e;color:#0a84ff;border:none;border-radius:10px;padding:10px 12px;font-size:13px;white-space:nowrap;cursor:pointer;flex-shrink:0">获取列表</button>
+                </div>
+                <div id="settingsLlmModelError" style="color:#ff453a;font-size:12px;margin-top:4px;display:none"></div>
             </div>
         </div>
 
@@ -1096,8 +1104,8 @@ function saveSettings() {
             </div>
         </div>
 
-        <button class="btn-settings-save" onclick="saveSettings()">保存设置</button>
-        <div class="settings-hint" style="text-align:center;margin-top:8px">设置立即生效，下一条消息将使用新配置</div>
+        <button class="btn-settings-save" onclick="saveSettings()">保存并应用</button>
+        <div class="settings-hint" style="text-align:center;margin-top:8px">保存后立即生效，下一条消息使用新配置</div>
     </div>
 </div>
 </body>
