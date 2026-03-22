@@ -41,7 +41,8 @@ def _clean_glm_tags(text: str) -> str:
 def _recognize_glm(audio_path: str, audio_ext: str, audio_mime: str) -> dict | None:
     """
     使用智谱 GLM-ASR 进行语音识别。
-    返回 dict 或 None（表示该引擎不可用，应降级）。
+    返回 dict: 成功 {text, time, engine} 或失败 {error, engine, fallback}
+    返回 None 仅当未配置 API Key。
     """
     api_key = os.environ.get("ZHIPU_API_KEY", "").strip()
     if not api_key:
@@ -74,14 +75,15 @@ def _recognize_glm(audio_path: str, audio_ext: str, audio_mime: str) -> dict | N
         elapsed = round(time.time() - start_time, 2)
 
         if resp.status_code != 200:
-            logger.error("GLM-ASR HTTP %d: %s", resp.status_code, resp.text[:300])
-            return None  # 降级到下一个引擎
+            err_msg = f"GLM-ASR HTTP {resp.status_code}: {resp.text[:200]}"
+            logger.error(err_msg)
+            return {"error": err_msg, "engine": "glm-asr", "fallback": True}
 
         try:
             result = resp.json()
         except Exception:
             logger.error("GLM-ASR 返回了无效的 JSON")
-            return None
+            return {"error": "GLM-ASR 返回无效 JSON", "engine": "glm-asr", "fallback": True}
 
         # GLM-ASR 返回格式: {"text": "识别结果", ...}
         text = result.get("text", "").strip()
@@ -97,13 +99,13 @@ def _recognize_glm(audio_path: str, audio_ext: str, audio_mime: str) -> dict | N
 
     except requests.exceptions.Timeout:
         logger.error("GLM-ASR 超时")
-        return None
+        return {"error": "GLM-ASR 超时", "engine": "glm-asr", "fallback": True}
     except requests.exceptions.ConnectionError:
         logger.error("GLM-ASR 连接失败")
-        return None
+        return {"error": "GLM-ASR 连接失败", "engine": "glm-asr", "fallback": True}
     except Exception as e:
         logger.error("GLM-ASR 异常: %s", e)
-        return None
+        return {"error": f"GLM-ASR 异常: {e}", "engine": "glm-asr", "fallback": True}
 
 
 def _recognize_dashscope(audio_path: str, audio_ext: str, audio_mime: str) -> dict | None:
@@ -247,13 +249,23 @@ def recognize(audio_file):
             ("Groq-Whisper", _recognize_groq),
         ]
 
+        errors = []
         for name, engine_fn in engines:
             result = engine_fn(audio_path, audio_ext, audio_mime)
-            if result is not None:
-                logger.info("语音识别使用引擎: %s", name)
-                return result
+            if result is None:
+                continue  # 未配置，跳过
+            # 如果是带 fallback 标记的失败，记录错误并继续尝试下一个
+            if result.get("fallback"):
+                errors.append(f"{name}: {result.get('error', '未知错误')}")
+                logger.warning("引擎 %s 失败，尝试下一个: %s", name, result.get('error'))
+                continue
+            # 成功（可能有 text 或 error）
+            logger.info("语音识别使用引擎: %s", name)
+            return result
 
-        # 5. 所有引擎都不可用
+        # 5. 所有引擎都失败
+        if errors:
+            return {"error": "语音识别失败: " + " | ".join(errors)}
         return {"error": "语音识别未配置（需设置 ZHIPU_API_KEY 或 GROQ_API_KEY）"}
 
     except Exception as e:
