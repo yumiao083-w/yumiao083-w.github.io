@@ -82,6 +82,14 @@ def _normalize_voice_tags(text: str) -> str:
     return result.strip()
 
 
+def _convert_pause_tags(text: str) -> str:
+    """将停顿标签 <#x#> 转为中文标点（MiniMax 不认这个格式）。"""
+    def _pause_to_punct(m):
+        seconds = float(m.group(1))
+        return '……' if seconds >= 0.5 else '，'
+    return re.sub(r'<#([\d.]+)#>', _pause_to_punct, text)
+
+
 def synthesize(text, api_key=None, voice_id=None, group_id=None, model=None):
     """
     将文本合成为 MP3 语音。
@@ -108,6 +116,8 @@ def synthesize(text, api_key=None, voice_id=None, group_id=None, model=None):
 
     # 将语气标签转为 MiniMax 支持的格式
     text = _normalize_voice_tags(text)
+    # 将停顿标签转为中文标点
+    text = _convert_pause_tags(text)
 
     # 过滤纯标点/空白
     stripped = re.sub(r'[^\w]', '', text, flags=re.UNICODE)
@@ -166,7 +176,7 @@ def synthesize(text, api_key=None, voice_id=None, group_id=None, model=None):
             api_url,
             headers=headers,
             json=payload,
-            timeout=30,
+            timeout=60,
         )
     except requests.exceptions.Timeout:
         raise Exception("MiniMax TTS 请求超时（30s）")

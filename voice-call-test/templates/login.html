@@ -2,131 +2,213 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>语音通话 — 密钥验证</title>
 <style>
+/* 苹果原生的基础重置与字体设置 */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
+
 html, body {
-  height: 100%;
-  background: #000;
-  color: #fff;
-  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  min-height: 100%;
+  background: #E5E5EA; /* 桌面端展示时的外部背景色 */
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
-body {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 0 32px;
-  min-height: 100vh;
-}
-.container {
+
+/* 内部应用容器（适配多尺寸屏幕） */
+.app-container {
+  background: #F2F2F7; /* iOS 系统级浅灰背景 */
   width: 100%;
-  max-width: 340px;
+  max-width: 480px; /* 限制最大宽度，完美适配各类屏幕 */
+  min-height: 100vh; /* 自动撑满屏幕高度 */
+  margin: 0 auto; /* PC 端居中显示 */
+  position: relative;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  box-shadow: 0 0 20px rgba(0,0,0,0.05); /* 为 PC 端增加一点层次感阴影 */
 }
-.avatar {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: #3a3a3c;
+
+/* 页面内容区 */
+.content {
+  flex: 1;
+  padding: 0 20px;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 32px;
-  color: #fff;
-  margin-bottom: 16px;
-  user-select: none;
+  flex-direction: column;
+  margin-top: 80px; /* 增加顶部边距，留出呼吸感 */
 }
-.title {
-  font-size: 24px;
-  font-weight: 600;
+
+/* iOS Large Title 大标题 */
+.large-title {
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: 0.37px;
+  color: #000;
+  line-height: 1.2;
   margin-bottom: 8px;
-  text-align: center;
 }
+
 .subtitle {
-  font-size: 14px;
-  color: #8e8e93;
+  font-size: 15px;
+  color: #8E8E93;
   margin-bottom: 32px;
-  text-align: center;
 }
+
+/* iOS 系统分组列表样式 (Grouped Table View) */
+.ios-input-group {
+  background: #FFFFFF;
+  border-radius: 10px;
+  padding: 4px 16px;
+  margin-bottom: 24px;
+}
+
 .input-key {
   width: 100%;
-  padding: 14px 16px;
+  height: 44px;
   border: none;
-  border-radius: 12px;
-  background: #1c1c1e;
-  color: #fff;
-  font-size: 16px;
-  letter-spacing: 2px;
+  background: transparent;
+  font-size: 17px;
+  color: #000;
   outline: none;
-  margin-bottom: 16px;
-  text-align: center;
+  font-family: inherit;
 }
+
 .input-key::placeholder {
-  color: #636366;
-  letter-spacing: 2px;
+  color: #C7C7CC; /* iOS 原生占位符颜色 */
 }
-.btn-login {
+
+/* 主操作按钮（黑白配色） */
+.btn-primary {
   width: 100%;
-  padding: 14px 0;
+  height: 50px;
+  background: #000000; /* 改为纯黑背景 */
+  color: #FFFFFF; /* 改为纯白文字 */
   border: none;
-  border-radius: 12px;
-  background: #0a84ff;
-  color: #fff;
+  border-radius: 14px;
   font-size: 17px;
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.2s;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
-.btn-login:active {
-  opacity: 0.7;
+
+.btn-primary:active {
+  opacity: 0.5; /* 原生点击反馈 */
 }
-.btn-login:disabled {
+
+.btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
 .error-msg {
-  color: #ff453a;
+  color: #FF3B30; /* iOS 系统红（错误提示保留红色以保障体验） */
   font-size: 13px;
-  margin-top: 16px;
+  margin-top: 12px;
   text-align: center;
-  min-height: 20px;
+  min-height: 18px;
 }
+
+/* 底部操作区 */
+.bottom-actions {
+  margin-top: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.divider-text {
+  font-size: 13px;
+  color: #8E8E93;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 16px;
+}
+
+/* 访客按钮（黑白配色） */
+.btn-guest {
+  background: transparent;
+  color: #000000; /* 改为纯黑文字 */
+  border: none;
+  font-size: 17px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.btn-guest:active {
+  opacity: 0.5;
+}
+
+.guest-hint {
+  font-size: 13px;
+  color: #8E8E93;
+  margin-top: 8px;
+}
+
 .footer {
-  position: fixed;
-  bottom: 24px;
-  left: 0;
-  right: 0;
   text-align: center;
-  font-size: 12px;
-  color: #48484a;
+  font-size: 13px;
+  color: #8E8E93;
+  margin-top: auto;
+  margin-bottom: 40px;
+}
+
+/* iOS 底部 Home 横条 */
+.home-indicator {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 134px;
+  height: 5px;
+  background: #000;
+  border-radius: 100px;
+  z-index: 100;
 }
 </style>
 </head>
 <body>
-<div class="container">
-  <div class="avatar">袁</div>
-  <div class="title">袁朗 · 语音通话</div>
-  <div class="subtitle">请输入体验密钥</div>
-  <input class="input-key" id="keyInput" type="text" placeholder="输入密钥" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-  <button class="btn-login" id="loginBtn" onclick="doLogin()">验证并进入</button>
-  <div class="error-msg" id="errorMsg"></div>
-  <div style="margin-top:24px;text-align:center">
-    <div style="color:#636366;font-size:13px;margin-bottom:12px">─── 或者 ───</div>
-    <button class="btn-login" style="background:#2c2c2e;font-size:15px;font-weight:500;padding:12px 0" onclick="doGuestLogin()">使用自己的 API，免密钥进入</button>
-    <div style="color:#636366;font-size:12px;margin-top:8px">需要自备 LLM 和 TTS 的 API Key</div>
-  </div>
+
+<div class="app-container">
+  
+    <!-- 核心交互区 -->
+    <div class="content">
+      <!-- iOS 标准的大标题布局 -->
+      <div class="large-title">给袁朗打<br>一通电话吧</div>
+      <div class="subtitle">输入体验密钥以验证身份</div>
+      
+      <!-- iOS 标准分组输入框 -->
+      <div class="ios-input-group">
+        <input class="input-key" id="keyInput" type="text" placeholder="密钥" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      </div>
+      
+      <button class="btn-primary" id="loginBtn" onclick="doLogin()">验证并进入</button>
+      <div class="error-msg" id="errorMsg"></div>
+      
+      <div class="bottom-actions">
+        <div class="divider-text">或</div>
+        <button class="btn-guest" onclick="doGuestLogin()">使用自己的 API 进入</button>
+        <div class="guest-hint">需要自备 LLM 和 TTS 的 API Key</div>
+      </div>
+
+      <div class="footer">一次性密钥 · 刷新后需重新验证</div>
+    </div>
+
+    <!-- 仿真 Home 触控条 -->
+    <div class="home-indicator"></div>
+
 </div>
-<div class="footer">一次性密钥 · 刷新后需重新验证</div>
+
 <script>
+// 所有 JS 逻辑完全原样保留，未做任何修改
 var keyInput = document.getElementById('keyInput');
 var loginBtn = document.getElementById('loginBtn');
 var errorMsg = document.getElementById('errorMsg');

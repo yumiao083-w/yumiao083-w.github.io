@@ -24,7 +24,7 @@ app = Flask(__name__)
 # 密钥管理
 _used_keys: set = set()
 _active_tokens: set = set()
-_guest_tokens: set = set()  # 免密钥访客token，必须自带API
+_guest_tokens: dict = {}  # token → 创建时间戳，2小时过期
 
 # 会话管理（内存，不持久化）
 _sessions: dict = {}
@@ -104,7 +104,7 @@ def api_guest_token():
     """
     token = hashlib.sha256(f"guest_{time.time()}".encode()).hexdigest()[:16]
     _active_tokens.add(token)
-    _guest_tokens.add(token)
+    _guest_tokens[token] = time.time()
     return jsonify({"token": token})
 
 
@@ -118,6 +118,13 @@ def api_chat():
     token = (data.get("token") or "").strip()
     if not token or token not in _active_tokens:
         return jsonify({"error": "未授权"}), 401
+
+    # 访客 token 过期检查（2小时）
+    if token in _guest_tokens:
+        if time.time() - _guest_tokens[token] > 7200:
+            _active_tokens.discard(token)
+            del _guest_tokens[token]
+            return jsonify({"error": "访客令牌已过期，请重新登录"}), 401
 
     text = (data.get("text") or "").strip()
     if not text:
@@ -135,6 +142,7 @@ def api_chat():
             return jsonify({"error": "访客模式需要自备 TTS API（请在设置中填写 MiniMax API Key）"}), 400
     custom_prompt = data.get("custom_prompt")  # str | None
     req_model = data.get("model")             # str | None — 前端选择的模型
+    max_history = min(100, max(1, int(data.get("max_history") or 20)))  # 1-100轮
 
     # 构建 system prompt
     parts = []
@@ -145,11 +153,13 @@ def api_chat():
     parts.append(VOICE_INSTRUCTION)
     system_prompt = "\n\n".join(parts)
 
-    # 获取 / 创建 session history
+    # 获取 / 创建 session history（限制条数）
     with _sessions_lock:
         if session_id not in _sessions:
             _sessions[session_id] = []
-        history = list(_sessions[session_id])  # shallow copy
+        full_history = _sessions[session_id]
+        max_msgs = max_history * 2  # 每轮一问一答
+        history = list(full_history[-max_msgs:]) if len(full_history) > max_msgs else list(full_history)
 
     # 构建 messages
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": text}]
@@ -254,6 +264,9 @@ def api_chat():
                 _sessions.setdefault(session_id, [])
                 _sessions[session_id].append({"role": "user", "content": text})
                 _sessions[session_id].append({"role": "assistant", "content": full_text})
+                # 限制历史长度（最多保留 200 条 = 100 轮）
+                if len(_sessions[session_id]) > 200:
+                    _sessions[session_id] = _sessions[session_id][-200:]
 
         except Exception as exc:
             logger.exception("chat worker error")
