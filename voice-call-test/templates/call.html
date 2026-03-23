@@ -4,53 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>语音通话</title>
+    <link rel="stylesheet" href="/static/theme-ios.css">
+    <link rel="stylesheet" href="/static/theme-y2k.css">
     <style>
-        /* === 主题系统 CSS变量 === */
-
-        /* 默认主题：iOS 风格 */
-        :root, [data-theme="ios"] {
-            --bg-color: #000000;
-            --bg-glass: rgba(255, 255, 255, 0.15);
-            --bg-glass-active: #FFFFFF;
-            --text-primary: #FFFFFF;
-            --text-secondary: #8E8E93;
-            --icon-active: #000000;
-            --system-green: #34C759;
-            --system-red: #FF3B30;
-            --system-blue: #0A84FF;
-            --system-gray-bg: #1C1C1E;
-            --system-input-bg: #2C2C2E;
-            --font-main: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", sans-serif;
-            --border-radius-card: 12px;
-            --border-radius-btn: 50%;
-            --bg-blur-gradient: radial-gradient(circle at 50% 15%, #2a2a30 0%, #000000 65%);
-            --dial-name-size: 36px;
-            --ctrl-btn-size: 72px;
-            --topbar-bg: transparent;
-        }
-
-        /* 千禧年主题骨架：诺基亚/早期手机风格 */
-        [data-theme="y2k"] {
-            --bg-color: #2b3a4a;
-            --bg-glass: rgba(100, 180, 220, 0.25);
-            --bg-glass-active: #7ec8e3;
-            --text-primary: #e0f0e8;
-            --text-secondary: #8ab8a0;
-            --icon-active: #1a2a3a;
-            --system-green: #4caf50;
-            --system-red: #e53935;
-            --system-blue: #42a5f5;
-            --system-gray-bg: #1e2d3d;
-            --system-input-bg: #263848;
-            --font-main: "Courier New", "Nokia Sans", monospace;
-            --border-radius-card: 4px;
-            --border-radius-btn: 8px;
-            --bg-blur-gradient: linear-gradient(180deg, #3a5a6a 0%, #1a2a3a 100%);
-            --dial-name-size: 28px;
-            --ctrl-btn-size: 64px;
-            --topbar-bg: rgba(30, 45, 60, 0.9);
-        }
-
         /* 全局重置 */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         

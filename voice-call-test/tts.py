@@ -126,24 +126,32 @@ def synthesize(text, api_key=None, voice_id=None, group_id=None, model=None):
         return None
 
     if api_key is None:
-        api_key = os.environ.get("MINIMAX_API_KEY")
+        from llm import get_tts_defaults
+        _defaults = get_tts_defaults()
+        api_key = _defaults.get("api_key") or os.environ.get("MINIMAX_API_KEY")
     if not api_key:
         raise ValueError(
             "未提供 api_key，且环境变量 MINIMAX_API_KEY 未设置"
         )
 
     if group_id is None:
-        group_id = os.environ.get("MINIMAX_GROUP_ID", "")
+        from llm import get_tts_defaults
+        _defaults = get_tts_defaults()
+        group_id = _defaults.get("group_id") or os.environ.get("MINIMAX_GROUP_ID", "")
     if not group_id:
         raise ValueError(
             "未提供 group_id，且环境变量 MINIMAX_GROUP_ID 未设置"
         )
 
     if voice_id is None:
-        voice_id = os.environ.get("MINIMAX_VOICE_ID", DEFAULT_VOICE_ID)
+        from llm import get_tts_defaults
+        _defaults = get_tts_defaults()
+        voice_id = _defaults.get("voice_id") or os.environ.get("MINIMAX_VOICE_ID", DEFAULT_VOICE_ID)
 
     if model is None:
-        model = os.environ.get("MINIMAX_TTS_MODEL", DEFAULT_MODEL)
+        from llm import get_tts_defaults
+        _defaults = get_tts_defaults()
+        model = _defaults.get("model") or os.environ.get("MINIMAX_TTS_MODEL", DEFAULT_MODEL)
 
     # ── 构造请求 ──
     api_url = f"https://api.minimax.chat/v1/t2a_v2?GroupId={group_id}"

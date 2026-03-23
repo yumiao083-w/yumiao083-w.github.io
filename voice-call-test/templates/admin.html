@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>管理面板</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  min-height: 100%;
+  background: #E5E5EA;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.app-container {
+  background: #F2F2F7;
+  width: 100%;
+  max-width: 520px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 0 20px 40px;
+  box-shadow: 0 0 20px rgba(0,0,0,0.05);
+}
+.large-title {
+  font-size: 34px;
+  font-weight: 700;
+  color: #000;
+  padding: 60px 0 8px;
+}
+.subtitle {
+  font-size: 15px;
+  color: #8E8E93;
+  margin-bottom: 24px;
+}
+.card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.card-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #000;
+  margin-bottom: 4px;
+}
+.card-desc {
+  font-size: 13px;
+  color: #8E8E93;
+  margin-bottom: 12px;
+}
+.stats-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.stat-box {
+  flex: 1;
+  background: #F2F2F7;
+  border-radius: 10px;
+  padding: 12px;
+  text-align: center;
+}
+.stat-num {
+  font-size: 28px;
+  font-weight: 700;
+  color: #000;
+}
+.stat-label {
+  font-size: 12px;
+  color: #8E8E93;
+  margin-top: 2px;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:active { opacity: 0.5; }
+.btn-secondary {
+  background: #E5E5EA;
+  color: #000;
+}
+.btn-danger {
+  background: #FF3B30;
+  color: #fff;
+}
+.btn-small {
+  padding: 6px 12px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+.btn-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.key-list {
+  margin-top: 12px;
+  max-height: 300px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.key-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #F2F2F7;
+  border-radius: 8px;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+.key-text {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 13px;
+  color: #000;
+  word-break: break-all;
+  flex: 1;
+  margin-right: 8px;
+  cursor: pointer;
+}
+.key-text:active { opacity: 0.5; }
+.badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.badge-ok { background: #34C75933; color: #248A3D; }
+.badge-used { background: #FF3B3033; color: #FF3B30; }
+.badge-guest { background: #0A84FF33; color: #0A84FF; }
+.session-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #F2F2F7;
+  border-radius: 8px;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+.session-info { flex: 1; }
+.session-token { font-family: monospace; color: #000; font-weight: 500; }
+.session-meta { color: #8E8E93; font-size: 12px; margin-top: 2px; }
+.gen-options {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.gen-options label {
+  font-size: 13px;
+  color: #8E8E93;
+}
+.gen-options input {
+  width: 60px;
+  background: #F2F2F7;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 15px;
+  font-family: inherit;
+  outline: none;
+  -webkit-appearance: none;
+}
+.gen-options input:focus {
+  background: #fff;
+  border-color: #C7C7CC;
+}
+.toast {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #000;
+  color: #fff;
+  padding: 10px 24px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 9999;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; }
+.new-keys-area {
+  display: none;
+  margin-top: 12px;
+  background: #F2F2F7;
+  border-radius: 10px;
+  padding: 12px;
+}
+.new-keys-area .copy-all-btn {
+  margin-bottom: 8px;
+}
+.new-keys-text {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: #000;
+  user-select: all;
+}
+</style>
+</head>
+<body>
+
+<div class="app-container">
+
+  <h1 class="large-title">管理面板</h1>
+  <div class="subtitle">密钥管理 · 会话监控</div>
+
+  <!-- 密钥统计 -->
+  <div class="card">
+    <div class="card-title">密钥概览</div>
+    <div class="stats-row">
+      <div class="stat-box">
+        <div class="stat-num" id="statTotal">-</div>
+        <div class="stat-label">总数</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" id="statAvail">-</div>
+        <div class="stat-label">可用</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" id="statUsed">-</div>
+        <div class="stat-label">已用</div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-small" onclick="loadKeys()">刷新</button>
+      <button class="btn btn-small btn-secondary" onclick="resetAllUsed()">重置已用状态</button>
+      <button class="btn btn-small btn-danger" onclick="deleteUsedKeys()">删除已用密钥</button>
+    </div>
+  </div>
+
+  <!-- 生成密钥 -->
+  <div class="card">
+    <div class="card-title">生成新密钥</div>
+    <div class="card-desc">生成后立即生效，无需重启</div>
+    <div class="gen-options">
+      <label>数量</label>
+      <input type="number" id="genCount" value="10" min="1" max="50">
+      <label>长度</label>
+      <input type="number" id="genLength" value="8" min="6" max="32">
+      <button class="btn btn-small" onclick="generateKeys()">生成</button>
+    </div>
+    <div class="new-keys-area" id="newKeysArea">
+      <button class="btn btn-small btn-secondary copy-all-btn" onclick="copyNewKeys()">复制全部</button>
+      <div class="new-keys-text" id="newKeysText"></div>
+    </div>
+  </div>
+
+  <!-- 密钥列表 -->
+  <div class="card">
+    <div class="card-title">所有密钥</div>
+    <div class="card-desc">点击密钥可复制，右侧显示状态</div>
+    <div class="key-list" id="keyList">
+      <div style="color:#8E8E93;font-size:14px;text-align:center;padding:20px">加载中...</div>
+    </div>
+  </div>
+
+  <!-- 活跃会话 -->
+  <div class="card">
+    <div class="card-title">活跃会话</div>
+    <div class="card-desc">当前在线的用户会话</div>
+    <div class="btn-row" style="margin-bottom:12px">
+      <button class="btn btn-small" onclick="loadSessions()">刷新</button>
+      <button class="btn btn-small btn-secondary" onclick="clearExpired()">清理过期</button>
+    </div>
+    <div id="sessionList">
+      <div style="color:#8E8E93;font-size:14px;text-align:center;padding:20px">加载中...</div>
+    </div>
+  </div>
+
+  <!-- 口令管理 -->
+  <div class="card">
+    <div class="card-title">口令兑换</div>
+    <div class="card-desc">用户输入口令自动领密钥，每天限额自动重置</div>
+    <div id="redeemList" style="margin-bottom:12px">
+      <div style="color:#8E8E93;font-size:14px;text-align:center;padding:20px">加载中...</div>
+    </div>
+    <div style="border-top:0.5px solid #E5E5EA;padding-top:12px;margin-top:8px">
+      <div class="card-desc" style="margin-bottom:8px">添加新口令</div>
+      <div class="gen-options">
+        <label>口令</label>
+        <input type="text" id="newRedeemCode" placeholder="输入口令" style="width:120px">
+        <label>每日</label>
+        <input type="number" id="newRedeemLimit" value="10" min="1" max="100" style="width:50px">
+        <button class="btn btn-small" onclick="addRedeem()">添加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 内置 API 配置 -->
+  <div class="card">
+    <div class="card-title">内置 API 配置</div>
+    <div class="card-desc">LLM 中转站和 TTS 配置，修改立即生效</div>
+
+    <!-- 默认模型 -->
+    <div style="margin-bottom:16px">
+      <div style="font-size:14px;font-weight:500;margin-bottom:6px">默认模型</div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="cfgDefaultModel" placeholder="模型名称" style="flex:1;background:#F2F2F7;border:1px solid transparent;border-radius:8px;padding:10px 12px;font-size:15px;outline:none;font-family:inherit;-webkit-appearance:none">
+        <button class="btn btn-small" onclick="saveDefaultModel()">保存</button>
+      </div>
+    </div>
+
+    <!-- LLM Providers 列表 -->
+    <div style="border-top:0.5px solid #E5E5EA;padding-top:12px;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:14px;font-weight:500">LLM 中转站</div>
+        <button class="btn btn-small" onclick="loadApiConfig()">刷新</button>
+      </div>
+      <div id="providerList">
+        <div style="color:#8E8E93;font-size:14px;text-align:center;padding:12px">加载中...</div>
+      </div>
+    </div>
+
+    <!-- 添加新 Provider -->
+    <div style="border-top:0.5px solid #E5E5EA;padding-top:12px;margin-bottom:16px">
+      <div style="font-size:13px;color:#8E8E93;margin-bottom:8px">添加新中转站</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <input type="text" id="newProvName" placeholder="名称（如 provider1）" style="background:#F2F2F7;border:1px solid transparent;border-radius:8px;padding:10px 12px;font-size:15px;outline:none;font-family:inherit;-webkit-appearance:none">
+        <input type="url" id="newProvUrl" placeholder="API 地址 (https://...)" style="background:#F2F2F7;border:1px solid transparent;border-radius:8px;padding:10px 12px;font-size:15px;outline:none;font-family:inherit;-webkit-appearance:none">
+        <input type="text" id="newProvKeys" placeholder="API Key（多个用逗号分隔）" style="background:#F2F2F7;border:1px solid transparent;border-radius:8px;padding:10px 12px;font-size:15px;outline:none;font-family:inherit;-webkit-appearance:none">
+        <button class="btn btn-small" onclick="addProvider()">添加</button>
+      </div>
+    </div>
+
+    <!-- MiniMax TTS -->
+    <div style="border-top:0.5px solid #E5E5EA;padding-top:12px">
+      <div style="font-size:14px;font-weight:500;margin-bottom:8px">MiniMax TTS</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <input type="password" id="cfgTtsKey" placeholder="API Key" style="background:#F2F2F7;border:1px solid transparent;border-radius:8px;padding:10px 12px;font-size:15px;outline:none;font-family:inherit;-webkit-appearance:none">
+        <input type="text" id="cfgTtsGroup" placeholder="Group ID" style="background:#F2F2F7;border:1px solid transparent;border-radius:8px;padding:10px 12px;font-size:15px;outline:none;font-family:inherit;-webkit-appearance:none">
+        <input type="text" id="cfgTtsVoice" placeholder="Voice ID（如 male-qn-qingse）" style="background:#F2F2F7;border:1px solid transparent;border-radius:8px;padding:10px 12px;font-size:15px;outline:none;font-family:inherit;-webkit-appearance:none">
+        <select id="cfgTtsModel" style="background:#F2F2F7;border:1px solid transparent;border-radius:8px;padding:10px 12px;font-size:15px;outline:none;font-family:inherit;-webkit-appearance:none;background-image:url(&quot;data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23C7C7CC' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e&quot;);background-repeat:no-repeat;background-position:right 12px center;background-size:16px;padding-right:40px">
+          <option value="speech-2.8-hd">speech-2.8-hd（高清·支持语气词）</option>
+          <option value="speech-2.8-turbo">speech-2.8-turbo（快速·支持语气词）</option>
+          <option value="speech-02-hd">speech-02-hd（旧版高清）</option>
+          <option value="speech-02">speech-02（旧版标准）</option>
+        </select>
+        <button class="btn btn-small" onclick="saveTtsConfig()">保存 TTS 配置</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TTS API 服务管理 -->
+  <div class="card">
+    <div class="card-title">TTS API 服务</div>
+    <div class="card-desc">用户管理 · 卡密管理 · 使用记录</div>
+
+    <!-- 用户列表 -->
+    <div style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:14px;font-weight:500">注册用户</div>
+        <button class="btn btn-small" onclick="loadTtsUsers()">刷新</button>
+      </div>
+      <div id="ttsUserList">
+        <div style="color:#8E8E93;font-size:14px;text-align:center;padding:12px">加载中...</div>
+      </div>
+    </div>
+
+    <!-- 生成卡密 -->
+    <div style="border-top:0.5px solid #E5E5EA;padding-top:12px;margin-bottom:16px">
+      <div style="font-size:14px;font-weight:500;margin-bottom:8px">生成充值卡密</div>
+      <div class="gen-options">
+        <label>数量</label>
+        <input type="number" id="cardCount" value="10" min="1" max="50">
+        <label>面额(元)</label>
+        <input type="number" id="cardAmount" value="5" min="0.5" max="100" step="0.5">
+        <button class="btn btn-small" onclick="generateCards()">生成</button>
+      </div>
+      <div id="newCardsArea" style="display:none;margin-top:8px;background:#F2F2F7;border-radius:10px;padding:12px">
+        <button class="btn btn-small btn-secondary" onclick="copyCards()" style="margin-bottom:6px">复制全部</button>
+        <div id="newCardsText" style="font-family:monospace;font-size:13px;white-space:pre-wrap;word-break:break-all;user-select:all"></div>
+      </div>
+    </div>
+
+    <!-- 卡密列表 -->
+    <div style="border-top:0.5px solid #E5E5EA;padding-top:12px;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:14px;font-weight:500">卡密列表</div>
+        <div class="btn-row">
+          <button class="btn btn-small btn-secondary" onclick="loadTtsCards(true)">仅未用</button>
+          <button class="btn btn-small" onclick="loadTtsCards(false)">全部</button>
+        </div>
+      </div>
+      <div id="ttsCardList" style="max-height:200px;overflow-y:auto">
+        <div style="color:#8E8E93;font-size:14px;text-align:center;padding:12px">加载中...</div>
+      </div>
+    </div>
+
+    <!-- 使用记录 -->
+    <div style="border-top:0.5px solid #E5E5EA;padding-top:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:14px;font-weight:500">最近调用</div>
+        <button class="btn btn-small" onclick="loadTtsUsage()">刷新</button>
+      </div>
+      <div id="ttsUsageList" style="max-height:200px;overflow-y:auto">
+        <div style="color:#8E8E93;font-size:14px;text-align:center;padding:12px">加载中...</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const PW = new URLSearchParams(window.location.search).get('pw') || '';
+
+function api(url, method, body) {
+  const opts = {
+    method: method || 'GET',
+    headers: { 'X-Admin-Password': PW, 'Content-Type': 'application/json' },
+  };
+  if (body) opts.body = JSON.stringify(body);
+  return fetch(url, opts).then(r => r.json());
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(() => toast('已复制')).catch(() => {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('已复制');
+  });
+}
+
+// 密钥列表
+function loadKeys() {
+  api('/api/admin/keys').then(data => {
+    document.getElementById('statTotal').textContent = data.total;
+    document.getElementById('statAvail').textContent = data.available;
+    document.getElementById('statUsed').textContent = data.used;
+
+    const list = document.getElementById('keyList');
+    if (!data.keys || data.keys.length === 0) {
+      list.innerHTML = '<div style="color:#8E8E93;font-size:14px;text-align:center;padding:20px">暂无密钥</div>';
+      return;
+    }
+    list.innerHTML = data.keys.map(k => `
+      <div class="key-item">
+        <span class="key-text" onclick="copyText('${k.key}')" title="点击复制">${k.key}</span>
+        <span class="badge ${k.used ? 'badge-used' : 'badge-ok'}">${k.used ? '已用' : '可用'}</span>
+      </div>
+    `).join('');
+  }).catch(() => toast('加载失败'));
+}
+
+// 生成密钥
+function generateKeys() {
+  const count = parseInt(document.getElementById('genCount').value) || 10;
+  const length = parseInt(document.getElementById('genLength').value) || 8;
+  api('/api/admin/keys/generate', 'POST', { count, length }).then(data => {
+    const area = document.getElementById('newKeysArea');
+    const text = document.getElementById('newKeysText');
+    area.style.display = 'block';
+    text.textContent = data.generated.join('\n');
+    toast('已生成 ' + data.count + ' 个密钥');
+    loadKeys();
+  }).catch(() => toast('生成失败'));
+}
+
+function copyNewKeys() {
+  const text = document.getElementById('newKeysText').textContent;
+  copyText(text);
+}
+
+// 重置已用
+function resetAllUsed() {
+  if (!confirm('确认重置所有已用密钥？它们将可以再次使用')) return;
+  api('/api/admin/keys/reset-used', 'POST', { keys: ['all'] }).then(data => {
+    toast('已重置 ' + data.count + ' 个');
+    loadKeys();
+  }).catch(() => toast('操作失败'));
+}
+
+// 删除已用密钥
+function deleteUsedKeys() {
+  if (!confirm('确认删除所有已用密钥？此操作不可恢复')) return;
+  api('/api/admin/keys').then(data => {
+    const usedKeys = data.keys.filter(k => k.used).map(k => k.key);
+    if (usedKeys.length === 0) { toast('没有已用密钥'); return; }
+    return api('/api/admin/keys/delete', 'POST', { keys: usedKeys });
+  }).then(data => {
+    if (data) { toast('已删除 ' + data.count + ' 个'); loadKeys(); }
+  }).catch(() => toast('操作失败'));
+}
+
+// 会话列表
+function loadSessions() {
+  api('/api/admin/sessions').then(data => {
+    const list = document.getElementById('sessionList');
+    if (!data.sessions || data.sessions.length === 0) {
+      list.innerHTML = '<div style="color:#8E8E93;font-size:14px;text-align:center;padding:20px">暂无活跃会话</div>';
+      return;
+    }
+    list.innerHTML = data.sessions.map(s => `
+      <div class="session-item">
+        <div class="session-info">
+          <div class="session-token">${s.token}</div>
+          <div class="session-meta">${s.type} · 已用 ${s.elapsed_min} 分钟 · 剩余 ${s.remaining_min} 分钟</div>
+        </div>
+        <span class="badge ${s.expired ? 'badge-used' : 'badge-ok'}">${s.expired ? '已过期' : '在线'}</span>
+      </div>
+    `).join('');
+  }).catch(() => toast('加载失败'));
+}
+
+// 清理过期
+function clearExpired() {
+  api('/api/admin/sessions/clear-expired', 'POST').then(data => {
+    toast('已清理 ' + data.cleared + ' 个过期会话');
+    loadSessions();
+  }).catch(() => toast('操作失败'));
+}
+
+// 初始加载
+loadKeys();
+loadSessions();
+loadRedeemCodes();
+loadApiConfig();
+loadTtsUsers();
+loadTtsCards(false);
+loadTtsUsage();
+
+// 口令管理
+function loadRedeemCodes() {
+  api('/api/admin/redeem').then(data => {
+    const list = document.getElementById('redeemList');
+    if (!data.codes || data.codes.length === 0) {
+      list.innerHTML = '<div style="color:#8E8E93;font-size:14px;text-align:center;padding:12px">暂无口令</div>';
+      return;
+    }
+    list.innerHTML = data.codes.map(c => `
+      <div class="key-item">
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:15px">${c.code}</div>
+          <div style="font-size:12px;color:#8E8E93;margin-top:2px">
+            今日 ${c.today_used}/${c.daily_limit} · 剩余 ${c.today_remaining}
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-small btn-secondary" onclick="resetRedeem('${c.code}')">重置</button>
+          <button class="btn btn-small btn-danger" onclick="deleteRedeem('${c.code}')">删除</button>
+        </div>
+      </div>
+    `).join('');
+  }).catch(() => toast('加载口令失败'));
+}
+
+function addRedeem() {
+  const code = document.getElementById('newRedeemCode').value.trim();
+  const limit = parseInt(document.getElementById('newRedeemLimit').value) || 10;
+  if (!code) { toast('请输入口令'); return; }
+  api('/api/admin/redeem/add', 'POST', { code, daily_limit: limit }).then(data => {
+    if (data.ok) { toast('口令已添加'); document.getElementById('newRedeemCode').value = ''; loadRedeemCodes(); }
+    else toast(data.error || '添加失败');
+  }).catch(() => toast('操作失败'));
+}
+
+function resetRedeem(code) {
+  api('/api/admin/redeem/reset', 'POST', { code }).then(data => {
+    if (data.ok) { toast('已重置'); loadRedeemCodes(); }
+  }).catch(() => toast('操作失败'));
+}
+
+function deleteRedeem(code) {
+  if (!confirm('确认删除口令 "' + code + '"？')) return;
+  api('/api/admin/redeem/delete', 'POST', { code }).then(data => {
+    if (data.ok) { toast('已删除'); loadRedeemCodes(); }
+  }).catch(() => toast('操作失败'));
+}
+
+// === 内置 API 配置管理 ===
+function loadApiConfig() {
+  api('/api/admin/api-config').then(data => {
+    // 默认模型
+    document.getElementById('cfgDefaultModel').value = data.default_model || '';
+
+    // Provider 列表
+    const list = document.getElementById('providerList');
+    if (!data.providers || data.providers.length === 0) {
+      list.innerHTML = '<div style="color:#8E8E93;font-size:14px;text-align:center;padding:12px">暂无中转站</div>';
+    } else {
+      list.innerHTML = data.providers.map(p => {
+        var keysHtml = p.keys.map((k,i) => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:0.5px solid #E5E5EA">
+            <span style="font-family:monospace;font-size:12px;word-break:break-all;flex:1;margin-right:8px;cursor:pointer" onclick="copyText('${k}')" title="点击复制">${k.slice(0,8)}...${k.slice(-4)}</span>
+            <button class="btn btn-small btn-danger" style="padding:3px 8px;font-size:11px" onclick="removeProviderKey('${p.name}','${k}')">删除</button>
+          </div>
+        `).join('');
+        return `
+        <div class="key-item" style="flex-direction:column;align-items:stretch;gap:6px;margin-bottom:6px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <span style="font-weight:600">${p.name}</span>
+              <span class="badge ${p.enabled ? 'badge-ok' : 'badge-used'}" style="margin-left:6px">${p.enabled ? '启用' : '禁用'}</span>
+              <span style="font-size:12px;color:#8E8E93;margin-left:6px">${p.key_count} 个 key</span>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-small btn-secondary" onclick="toggleProvider('${p.name}',${!p.enabled})">${p.enabled ? '禁用' : '启用'}</button>
+              <button class="btn btn-small btn-danger" onclick="deleteProvider('${p.name}')">删除</button>
+            </div>
+          </div>
+          <div style="font-size:12px;color:#8E8E93;word-break:break-all">${p.base_url}</div>
+          <div style="max-height:150px;overflow-y:auto">${keysHtml}</div>
+          <div style="display:flex;gap:6px;margin-top:4px">
+            <input type="text" id="addkey_${p.name}" placeholder="追加 Key（多个逗号分隔）" style="flex:1;background:#fff;border:1px solid #E5E5EA;border-radius:6px;padding:6px 10px;font-size:13px;outline:none;font-family:inherit">
+            <button class="btn btn-small" style="font-size:12px" onclick="addProviderKey('${p.name}')">追加</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    // TTS
+    var tts = data.tts || {};
+    if (tts.api_key) document.getElementById('cfgTtsKey').value = tts.api_key;
+    if (tts.group_id) document.getElementById('cfgTtsGroup').value = tts.group_id;
+    if (tts.voice_id) document.getElementById('cfgTtsVoice').value = tts.voice_id;
+    if (tts.model) document.getElementById('cfgTtsModel').value = tts.model;
+  }).catch(() => toast('加载配置失败'));
+}
+
+function saveDefaultModel() {
+  var model = document.getElementById('cfgDefaultModel').value.trim();
+  if (!model) { toast('请输入模型名'); return; }
+  api('/api/admin/api-config/model', 'POST', { model }).then(data => {
+    if (data.ok) toast('默认模型已保存');
+    else toast(data.error || '保存失败');
+  }).catch(() => toast('操作失败'));
+}
+
+function addProvider() {
+  var name = document.getElementById('newProvName').value.trim();
+  var url = document.getElementById('newProvUrl').value.trim();
+  var keys = document.getElementById('newProvKeys').value.trim();
+  if (!name || !url || !keys) { toast('请填写完整信息'); return; }
+  api('/api/admin/api-config/provider/add', 'POST', { name, base_url: url, keys }).then(data => {
+    if (data.ok) {
+      toast('中转站已添加');
+      document.getElementById('newProvName').value = '';
+      document.getElementById('newProvUrl').value = '';
+      document.getElementById('newProvKeys').value = '';
+      loadApiConfig();
+    } else toast(data.error || '添加失败');
+  }).catch(() => toast('操作失败'));
+}
+
+function toggleProvider(name, enabled) {
+  api('/api/admin/api-config/provider/update', 'POST', { name, enabled }).then(data => {
+    if (data.ok) { toast(enabled ? '已启用' : '已禁用'); loadApiConfig(); }
+  }).catch(() => toast('操作失败'));
+}
+
+function deleteProvider(name) {
+  if (!confirm('确认删除中转站 "' + name + '"？')) return;
+  api('/api/admin/api-config/provider/delete', 'POST', { name }).then(data => {
+    if (data.ok) { toast('已删除'); loadApiConfig(); }
+  }).catch(() => toast('操作失败'));
+}
+
+function addProviderKey(name) {
+  var input = document.getElementById('addkey_' + name);
+  var keys = input.value.trim();
+  if (!keys) { toast('请输入 Key'); return; }
+  api('/api/admin/api-config/provider/update', 'POST', { name, add_keys: keys }).then(data => {
+    if (data.ok) { toast('Key 已追加'); input.value = ''; loadApiConfig(); }
+    else toast(data.error || '追加失败');
+  }).catch(() => toast('操作失败'));
+}
+
+function removeProviderKey(name, key) {
+  if (!confirm('确认删除这个 Key？')) return;
+  api('/api/admin/api-config/provider/update', 'POST', { name, remove_keys: [key] }).then(data => {
+    if (data.ok) { toast('Key 已删除'); loadApiConfig(); }
+  }).catch(() => toast('操作失败'));
+}
+
+function saveTtsConfig() {
+  var cfg = {
+    api_key: document.getElementById('cfgTtsKey').value.trim(),
+    group_id: document.getElementById('cfgTtsGroup').value.trim(),
+    voice_id: document.getElementById('cfgTtsVoice').value.trim(),
+    model: document.getElementById('cfgTtsModel').value,
+  };
+  api('/api/admin/api-config/tts', 'POST', cfg).then(data => {
+    if (data.ok) toast('TTS 配置已保存');
+    else toast(data.error || '保存失败');
+  }).catch(() => toast('操作失败'));
+}
+
+// === TTS API 服务管理 ===
+function loadTtsUsers() {
+  api('/api/admin/tts-users').then(data => {
+    var list = document.getElementById('ttsUserList');
+    var users = data.users || [];
+    if (users.length === 0) {
+      list.innerHTML = '<div style="color:#8E8E93;font-size:14px;text-align:center;padding:12px">暂无用户</div>';
+      return;
+    }
+    list.innerHTML = users.map(u => `
+      <div class="key-item" style="flex-direction:column;align-items:stretch;gap:4px;margin-bottom:4px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <span style="font-weight:600">${u.nickname}</span>
+            <span style="font-size:12px;color:#8E8E93;margin-left:6px">余额 ¥${u.balance_yuan}</span>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-small btn-secondary" onclick="adjustBalance('${u.api_key_full}','${u.nickname}')">充值</button>
+            <button class="btn btn-small btn-danger" onclick="deleteTtsUser('${u.api_key_full}')">删除</button>
+          </div>
+        </div>
+        <div style="font-size:11px;color:#8E8E93">
+          Key: <span style="font-family:monospace;cursor:pointer" onclick="copyText('${u.api_key_full}')" title="点击复制完整Key">${u.api_key}</span>
+          · ${u.total_calls} 次调用 · ${u.total_chars} 字符
+        </div>
+      </div>
+    `).join('');
+  }).catch(() => toast('加载用户失败'));
+}
+
+function adjustBalance(apiKey, nickname) {
+  var amount = prompt('给 ' + nickname + ' 调整余额（正数充值，负数扣费，单位元）：');
+  if (amount === null) return;
+  amount = parseFloat(amount);
+  if (isNaN(amount)) { toast('请输入数字'); return; }
+  api('/api/admin/tts-users/adjust', 'POST', { api_key: apiKey, amount: amount }).then(data => {
+    if (data.ok) { toast('余额已调整为 ¥' + data.balance_yuan); loadTtsUsers(); }
+    else toast(data.error || '操作失败');
+  }).catch(() => toast('操作失败'));
+}
+
+function deleteTtsUser(apiKey) {
+  if (!confirm('确认删除该用户？余额将清零')) return;
+  api('/api/admin/tts-users/delete', 'POST', { api_key: apiKey }).then(data => {
+    if (data.ok) { toast('已删除'); loadTtsUsers(); }
+  }).catch(() => toast('操作失败'));
+}
+
+function generateCards() {
+  var count = parseInt(document.getElementById('cardCount').value) || 10;
+  var amount = parseFloat(document.getElementById('cardAmount').value) || 5;
+  api('/api/admin/tts-cards/generate', 'POST', { count, amount }).then(data => {
+    var cards = data.cards || [];
+    var area = document.getElementById('newCardsArea');
+    var text = document.getElementById('newCardsText');
+    area.style.display = 'block';
+    text.textContent = cards.map(c => c.code + '  (¥' + c.amount_yuan + ')').join('\n');
+    toast('已生成 ' + cards.length + ' 张卡密');
+    loadTtsCards(false);
+  }).catch(() => toast('生成失败'));
+}
+
+function copyCards() {
+  var text = document.getElementById('newCardsText').textContent;
+  copyText(text);
+}
+
+function loadTtsCards(unusedOnly) {
+  var url = '/api/admin/tts-cards' + (unusedOnly ? '?unused=1' : '');
+  api(url).then(data => {
+    var list = document.getElementById('ttsCardList');
+    var cards = data.cards || [];
+    if (cards.length === 0) {
+      list.innerHTML = '<div style="color:#8E8E93;font-size:14px;text-align:center;padding:12px">暂无卡密</div>';
+      return;
+    }
+    list.innerHTML = cards.map(c => `
+      <div class="key-item">
+        <span class="key-text" onclick="copyText('${c.code}')" title="点击复制" style="font-size:12px">${c.code}</span>
+        <span style="font-size:12px;color:#8E8E93;margin:0 8px">¥${c.amount_yuan}</span>
+        <span class="badge ${c.used ? 'badge-used' : 'badge-ok'}">${c.used ? '已用' : '可用'}</span>
+      </div>
+    `).join('');
+  }).catch(() => toast('加载卡密失败'));
+}
+
+function loadTtsUsage() {
+  api('/api/admin/tts-usage').then(data => {
+    var list = document.getElementById('ttsUsageList');
+    var records = data.records || [];
+    if (records.length === 0) {
+      list.innerHTML = '<div style="color:#8E8E93;font-size:14px;text-align:center;padding:12px">暂无记录</div>';
+      return;
+    }
+    list.innerHTML = records.map(r => {
+      var t = new Date(r.time * 1000);
+      var ts = t.toLocaleString('zh-CN', {hour12:false});
+      return `
+        <div style="padding:6px 0;border-bottom:0.5px solid #E5E5EA;font-size:12px">
+          <span style="font-weight:500">${r.nickname}</span>
+          <span style="color:#8E8E93"> · ${r.chars}字 · ¥${(r.cost_cents/100).toFixed(2)} · ${r.model} · ${ts}</span>
+        </div>`;
+    }).join('');
+  }).catch(() => toast('加载记录失败'));
+}
+</script>
+</body>
+</html>
