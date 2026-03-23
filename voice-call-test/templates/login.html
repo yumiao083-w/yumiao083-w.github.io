@@ -5,6 +5,34 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>语音通话 — 密钥验证</title>
 <style>
+/* === 主题系统 CSS 变量 === */
+:root, [data-theme="ios"] {
+  --login-bg: #E5E5EA;
+  --login-container-bg: #F2F2F7;
+  --login-text: #000;
+  --login-text-secondary: #8E8E93;
+  --login-card-bg: #FFFFFF;
+  --login-input-bg: #FFFFFF;
+  --login-input-border: transparent;
+  --login-btn-bg: #007AFF;
+  --login-btn-color: #FFFFFF;
+  --login-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  --login-radius: 12px;
+}
+[data-theme="y2k"] {
+  --login-bg: #1a2a3a;
+  --login-container-bg: #2b3a4a;
+  --login-text: #e0f0e8;
+  --login-text-secondary: #8ab8a0;
+  --login-card-bg: #263848;
+  --login-input-bg: #1e2d3d;
+  --login-input-border: #4a7a6a;
+  --login-btn-bg: #4caf50;
+  --login-btn-color: #fff;
+  --login-font: "Courier New", "Nokia Sans", monospace;
+  --login-radius: 4px;
+}
+
 /* 苹果原生的基础重置与字体设置 */
 * {
   margin: 0;
@@ -14,24 +42,24 @@
 
 html, body {
   min-height: 100%;
-  background: #E5E5EA; /* 桌面端展示时的外部背景色 */
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  background: var(--login-bg);
+  font-family: var(--login-font);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 /* 内部应用容器（适配多尺寸屏幕） */
 .app-container {
-  background: #F2F2F7; /* iOS 系统级浅灰背景 */
+  background: var(--login-container-bg);
   width: 100%;
-  max-width: 480px; /* 限制最大宽度，完美适配各类屏幕 */
-  min-height: 100vh; /* 自动撑满屏幕高度 */
-  margin: 0 auto; /* PC 端居中显示 */
+  max-width: 480px;
+  min-height: 100vh;
+  margin: 0 auto;
   position: relative;
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 0 20px rgba(0,0,0,0.05); /* 为 PC 端增加一点层次感阴影 */
+  box-shadow: 0 0 20px rgba(0,0,0,0.05);
 }
 
 /* 页面内容区 */
@@ -195,11 +223,29 @@ html, body {
       
       <div class="bottom-actions">
         <div class="divider-text">或</div>
+        <button class="btn-guest" onclick="showRedeem()">输入口令领取密钥</button>
+        <div class="guest-hint" id="redeemHint">从小红书获取口令，自动领密钥</div>
+      </div>
+
+      <!-- 口令输入区（默认隐藏） -->
+      <div id="redeemArea" style="display:none;margin-top:16px">
+        <div class="ios-input-group">
+          <input class="input-key" id="redeemInput" type="text" placeholder="输入口令" autocomplete="off" autocorrect="off">
+        </div>
+        <button class="btn-primary" id="redeemBtn" onclick="doRedeem()" style="background:#34C759">领取密钥并进入</button>
+        <div class="error-msg" id="redeemError"></div>
+      </div>
+
+      <div class="bottom-actions" style="margin-top:24px">
+        <div class="divider-text">或</div>
         <button class="btn-guest" onclick="doGuestLogin()">使用自己的 API 进入</button>
         <div class="guest-hint">需要自备 LLM 和 TTS 的 API Key</div>
       </div>
 
-      <div class="footer">一次性密钥 · 刷新后需重新验证</div>
+      <div class="footer">
+        <a href="/tts-api" style="color:#000;font-weight:500;text-decoration:none">TTS API · 按量付费使用袁朗音色 →</a>
+        <br><span style="margin-top:4px;display:inline-block">一次性密钥 · 刷新后需重新验证</span>
+      </div>
     </div>
 
     <!-- 仿真 Home 触控条 -->
@@ -208,6 +254,11 @@ html, body {
 </div>
 
 <script>
+// === 主题初始化 ===
+(function() {
+    try { var t = localStorage.getItem('ui_theme') || 'ios'; document.documentElement.setAttribute('data-theme', t); } catch(e) {}
+})();
+
 // 所有 JS 逻辑完全原样保留，未做任何修改
 var keyInput = document.getElementById('keyInput');
 var loginBtn = document.getElementById('loginBtn');
@@ -263,6 +314,52 @@ async function doGuestLogin() {
     }
   } catch (e) {
     errorMsg.textContent = '网络错误，请重试';
+  }
+}
+
+function showRedeem() {
+  var area = document.getElementById('redeemArea');
+  area.style.display = area.style.display === 'none' ? 'block' : 'none';
+  if (area.style.display === 'block') {
+    document.getElementById('redeemInput').focus();
+  }
+}
+
+var redeemInput = document.getElementById('redeemInput');
+redeemInput.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') doRedeem();
+});
+
+async function doRedeem() {
+  var code = document.getElementById('redeemInput').value.trim();
+  var redeemError = document.getElementById('redeemError');
+  var redeemBtn = document.getElementById('redeemBtn');
+  redeemError.textContent = '';
+  if (!code) {
+    redeemError.textContent = '请输入口令';
+    return;
+  }
+  redeemBtn.disabled = true;
+  redeemBtn.textContent = '领取中...';
+  try {
+    var res = await fetch('/api/redeem', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: code })
+    });
+    var result = await res.json();
+    if (result.token) {
+      window.location.href = '/setup?token=' + result.token;
+    } else if (result.error) {
+      redeemError.textContent = result.error;
+    } else {
+      redeemError.textContent = '领取失败，请重试';
+    }
+  } catch (e) {
+    redeemError.textContent = '网络错误，请重试';
+  } finally {
+    redeemBtn.disabled = false;
+    redeemBtn.textContent = '领取密钥并进入';
   }
 }
 </script>
