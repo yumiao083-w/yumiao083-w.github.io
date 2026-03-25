@@ -1420,7 +1420,8 @@ def call_chat_api_with_retry(messages_to_send, user_id, max_retries=2, is_summar
                 api_client = OpenAI(
                     api_key=p_key,
                     base_url=p_url,
-                    default_headers=_headers
+                    default_headers=_headers,
+                    max_retries=5,  # 503时多重试几次（Antigravity反代Claude不稳定）
                 )
 
                 response = api_client.chat.completions.create(
