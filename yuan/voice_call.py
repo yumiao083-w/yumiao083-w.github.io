@@ -185,17 +185,36 @@ def _tts_to_mp3(text: str) -> bytes:
 #  LLM 流式调用 + 分句 TTS
 # =====================================================================
 
-def stream_chat_and_tts(user_text: str, history: list, ws_send):
+def stream_chat_and_tts(user_text: str, history: list, ws_send, rt_opts: dict = None):
     """
     流式调 LLM，分句 TTS，通过 ws_send 推音频给前端。
 
     ws_send(json_str): 发送 JSON 到 WebSocket
     history: [{"role": "user"/"assistant", "content": "..."}]
+    rt_opts: 前端传来的运行时设置（model, custom_api, share_wechat_ctx, world_info, memory_retrieval）
     """
     from openai import OpenAI
 
+    if rt_opts is None:
+        rt_opts = {}
+
     t_start = time.time()
-    providers = _get_chat_providers()
+
+    # 决定用哪个 API：前端自定义 > 内置中转站
+    custom_api = rt_opts.get('custom_api')
+    if custom_api and custom_api.get('base_url') and custom_api.get('api_key'):
+        providers = [{
+            'name': '自定义API',
+            'base_url': custom_api['base_url'],
+            'api_key': custom_api['api_key'],
+            'model': custom_api.get('model', ''),
+        }]
+    else:
+        providers = _get_chat_providers()
+
+    # 前端指定的模型覆盖 provider 默认模型
+    rt_model = rt_opts.get('model', '')
+
     temperature = _cfg('TEMPERATURE', 1.0)
     max_token = _cfg('MAX_TOKEN', 4000)
 
@@ -212,13 +231,16 @@ def stream_chat_and_tts(user_text: str, history: list, ws_send):
     # 构建 messages
     logger.info(f"[VoiceCall] [1/4] 构建 system prompt...")
     t_prompt = time.time()
-    system_prompt = _build_voice_system_prompt(user_text)
+    system_prompt = _build_voice_system_prompt(user_text, rt_opts=rt_opts)
     logger.info(f"[VoiceCall] [1/4] system prompt 构建完成，长度: {len(system_prompt)} 字符 ({time.time()-t_prompt:.1f}s)")
 
     messages = [{"role": "system", "content": system_prompt}]
 
-    # 如果开启了共享微信上下文，注入微信聊天历史
-    if _cfg('VOICE_SHARE_WECHAT_CONTEXT', False):
+    # 如果开启了共享微信上下文（优先用前端传来的设置）
+    share_wechat = rt_opts.get('share_wechat_ctx')
+    if share_wechat is None:
+        share_wechat = _cfg('VOICE_SHARE_WECHAT_CONTEXT', False)
+    if share_wechat:
         wechat_context = _get_wechat_context()
         if wechat_context:
             messages.extend(wechat_context)
@@ -247,7 +269,7 @@ def stream_chat_and_tts(user_text: str, history: list, ws_send):
                 base_url=provider.get('base_url', ''),
                 default_headers=_BROWSER_HEADERS,
             )
-            model = provider.get('model', '')
+            model = rt_model if rt_model else provider.get('model', '')
             p_name = provider.get('name', '未命名')
 
             logger.info(f"[VoiceCall] [2/4] 调用 LLM [{p_name}] model={model}")
@@ -373,8 +395,10 @@ def _send_sentence_audio(sentence: str, idx: int, ws_send):
         }))
 
 
-def _build_voice_system_prompt(current_message=""):
+def _build_voice_system_prompt(current_message="", rt_opts=None):
     """构建语音通话专用的系统提示词（复用 bot.py 五板块架构 + 语音通话指令）"""
+    if rt_opts is None:
+        rt_opts = {}
 
     # 如果配置了自定义提示词文件，优先使用（给朋友体验用，不含私人记忆）
     custom_file = _cfg('VOICE_CUSTOM_PROMPT_FILE', '')
@@ -433,14 +457,20 @@ def _build_voice_system_prompt(current_message=""):
         prompt_parts.append(f"\n\n{short_term}")
 
     # ========== 板块6: 世界书（可选） ==========
-    if _cfg('VOICE_ENABLE_WORLD_INFO', False):
+    world_info_enabled = rt_opts.get('world_info')
+    if world_info_enabled is None:
+        world_info_enabled = _cfg('VOICE_ENABLE_WORLD_INFO', False)
+    if world_info_enabled:
         world_info = _read_world_info(user_id, role_name, current_message)
         if world_info:
             prompt_parts.append(f"\n\n{world_info}")
             logger.debug(f"[VoiceCall] 世界书已注入，长度: {len(world_info)}")
 
     # ========== 板块7: 检索记忆（可选） ==========
-    if _cfg('VOICE_ENABLE_MEMORY_RETRIEVAL', True):
+    memory_retrieval_enabled = rt_opts.get('memory_retrieval')
+    if memory_retrieval_enabled is None:
+        memory_retrieval_enabled = _cfg('VOICE_ENABLE_MEMORY_RETRIEVAL', True)
+    if memory_retrieval_enabled:
         retrieved = _retrieve_memories(current_message)
         if retrieved:
             prompt_parts.append(f"\n\n{retrieved}")
@@ -669,6 +699,35 @@ def register_voice_routes(app):
             'VOICE_ENABLE_MEMORY_RETRIEVAL': _cfg('VOICE_ENABLE_MEMORY_RETRIEVAL', True),
         })
 
+    @app.route('/api/voice/models')
+    def voice_models():
+        """获取可用模型列表（内置或自定义）"""
+        from flask import request, jsonify
+        from openai import OpenAI
+
+        base_url = request.args.get('base_url', '').strip()
+        api_key = request.args.get('api_key', '').strip()
+
+        if not base_url or not api_key:
+            # 用内置中转站
+            providers = _get_chat_providers()
+            if providers:
+                base_url = providers[0].get('base_url', '')
+                api_key = providers[0].get('api_key', '')
+
+        if not base_url or not api_key:
+            return jsonify({'models': []})
+
+        try:
+            client = OpenAI(api_key=api_key, base_url=base_url, default_headers=_BROWSER_HEADERS)
+            resp = client.models.list()
+            models = [m.id for m in resp.data] if hasattr(resp, 'data') else []
+            models.sort()
+            return jsonify({'models': models})
+        except Exception as e:
+            logger.warning(f"[VoiceCall] 获取模型列表失败: {e}")
+            return jsonify({'models': [], 'error': str(e)})
+
     @app.route('/api/voice/logs')
     def voice_logs():
         """获取通话记录列表"""
@@ -870,7 +929,7 @@ def register_voice_routes(app):
                 {
                     'name': 'Groq',
                     'url': 'https://api.groq.com/openai/v1/audio/transcriptions',
-                    'api_key': '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',
+                    'api_key': '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',
                     'model': 'whisper-large-v3-turbo',
                 },
             ]
@@ -957,10 +1016,25 @@ def register_voice_routes(app):
         if not user_text:
             return jsonify({'error': '空消息'}), 400
 
+        # 读取前端传来的运行时设置
+        rt_opts = {
+            'model': req.get('model', ''),
+            'max_history': req.get('max_history', None),
+            'custom_api': req.get('custom_api', None),
+            'share_wechat_ctx': req.get('share_wechat_ctx', None),
+            'world_info': req.get('world_info', None),
+            'memory_retrieval': req.get('memory_retrieval', None),
+        }
+
         with _sessions_lock:
             if session_id not in _sessions:
                 _sessions[session_id] = {'history': [], 'queue': queue.Queue(), 'start_time': time.time()}
             sess = _sessions[session_id]
+
+        # 限制历史轮数
+        max_hist = int(rt_opts.get('max_history') or 0) or None
+        if max_hist and len(sess['history']) > max_hist * 2:
+            sess['history'] = sess['history'][-(max_hist * 2):]
 
         sess['history'].append({"role": "user", "content": user_text})
         result_queue = queue.Queue()
@@ -968,7 +1042,8 @@ def register_voice_routes(app):
         def do_chat():
             reply = stream_chat_and_tts(
                 user_text, sess['history'],
-                ws_send=lambda data: result_queue.put(data)
+                ws_send=lambda data: result_queue.put(data),
+                rt_opts=rt_opts
             )
             if reply:
                 sess['history'].append({"role": "assistant", "content": reply})

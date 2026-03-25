@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>语音通话</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="袁朗">
+    <link rel="apple-touch-icon" href="/static/icon-192.png">
+    <meta name="theme-color" content="#000000">
     <style>
         /* 引入苹果系默认字体 */
         :root {
@@ -421,6 +427,54 @@
         .dial-btn:active { transform: scale(0.9); }
         .dial-btn svg { width: 36px; height: 36px; fill: currentColor; }
 
+        /* ========= 聊天气泡样式 ========= */
+        .chat-bubble { max-width: 80%; padding: 10px 14px; border-radius: 18px; font-size: 15px; line-height: 1.4; word-wrap: break-word; margin-bottom: 6px; }
+        .chat-bubble.user { align-self: flex-end; background: #0a84ff; color: #fff; border-bottom-right-radius: 4px; }
+        .chat-bubble.ai { align-self: flex-start; background: #2c2c2e; color: #fff; border-bottom-left-radius: 4px; }
+        .chat-bubble.status-bubble { align-self: center; background: transparent; color: #8e8e93; font-size: 12px; padding: 4px 8px; }
+
+        /* ========= 日志面板 ========= */
+        .log-section { margin-top: 24px; }
+        .log-content { max-height: 200px; overflow-y: auto; padding: 8px 12px; background: #1C1C1E; border-radius: 10px; font-family: "SF Mono", Menlo, monospace; font-size: 11px; line-height: 1.6; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+        .log-content::-webkit-scrollbar { display: none; }
+        .log-line { margin-bottom: 2px; }
+        .log-time { color: #8E8E93; }
+        .log-info { color: #34C759; }
+        .log-warn { color: #FF9500; }
+        .log-error { color: #FF3B30; }
+        .log-debug { color: #0A84FF; }
+        .log-actions { display: flex; gap: 8px; margin-top: 8px; }
+        .log-actions button { flex: 1; background: #2C2C2E; border: none; border-radius: 8px; color: #fff; padding: 8px; font-size: 13px; font-family: inherit; cursor: pointer; }
+        .log-actions button:active { opacity: 0.5; }
+
+        /* ========= 设置弹窗内分组 ========= */
+        .settings-group { background: #2C2C2E; border-radius: 12px; overflow: hidden; margin-bottom: 1px; }
+        .settings-group .sg-field { border-bottom: 0.5px solid #38383A; }
+        .settings-group .sg-field:last-child { border-bottom: none; }
+        .settings-group input, .settings-group select, .settings-group textarea {
+            width: 100%; background: transparent; border: none; color: #fff; font-size: 15px; padding: 13px 16px; font-family: inherit; outline: none; -webkit-appearance: none;
+        }
+        .settings-group select {
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238E8E93' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat; background-position: right 12px center; background-size: 16px; padding-right: 40px;
+        }
+        .settings-section-title { font-size: 13px; font-weight: 500; color: #8e8e93; text-transform: uppercase; margin: 16px 0 6px 8px; letter-spacing: 0.5px; }
+        .settings-hint { font-size: 13px; color: #8e8e93; margin-top: 6px; padding-left: 8px; line-height: 1.4; }
+
+        /* ========= PWA 安装提示条 ========= */
+        .pwa-install-bar {
+            display: none; position: fixed; bottom: 60px; left: 12px; right: 12px; z-index: 2000;
+            background: #1c1c1e; border-radius: 14px; padding: 14px 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5); backdrop-filter: blur(20px);
+            flex-direction: row; align-items: center; gap: 12px;
+        }
+        .pwa-install-bar.show { display: flex; }
+        .pwa-install-bar .pwa-text { flex: 1; font-size: 14px; color: #fff; line-height: 1.3; }
+        .pwa-install-bar .pwa-text small { display: block; font-size: 12px; color: #8e8e93; margin-top: 2px; }
+        .pwa-install-btn { background: #0a84ff; color: #fff; border: none; border-radius: 20px; padding: 8px 18px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+        .pwa-install-btn:active { opacity: 0.7; }
+        .pwa-dismiss-btn { background: none; border: none; color: #8e8e93; font-size: 20px; cursor: pointer; padding: 4px 8px; }
+
         /* 通话记录详情弹窗 */
         .log-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); z-index: 1000; align-items: center; justify-content: center; }
         .log-modal.show { display: flex; }
@@ -476,8 +530,43 @@
 
     <!-- 设置弹窗 -->
     <div class="settings-modal" id="settingsModal">
-        <div class="settings-panel">
+        <div class="settings-panel" style="max-height:85vh">
             <h3>语音通话设置</h3>
+
+            <!-- 内置模型 -->
+            <div class="settings-section-title">对话模型</div>
+            <div class="settings-group">
+                <div class="sg-field">
+                    <select id="settingsBuiltinModel">
+                        <option value="" disabled selected>点击设置按钮加载</option>
+                    </select>
+                </div>
+            </div>
+            <div class="settings-hint">选择内置中转站的模型。自定义LLM填写后会覆盖此选项</div>
+
+            <!-- 自定义 LLM -->
+            <div class="settings-section-title">自定义 LLM</div>
+            <div class="settings-group">
+                <div class="sg-field"><input type="url" id="settingsLlmUrl" placeholder="API 地址 (https://...)"></div>
+                <div class="sg-field"><input type="password" id="settingsLlmKey" placeholder="API Key (sk-...)"></div>
+                <div class="sg-field" style="display:flex; align-items:stretch;">
+                    <input type="text" id="settingsLlmModel" placeholder="模型名称" style="flex:1;">
+                    <button onclick="settingsFetchLlmModels()" style="background:transparent;color:#0A84FF;border:none;padding:0 16px;font-size:14px;font-weight:500;white-space:nowrap;cursor:pointer;">获取</button>
+                </div>
+            </div>
+            <div id="settingsLlmModelError" style="color:#ff453a;font-size:13px;margin-top:6px;padding-left:8px;display:none"></div>
+
+            <!-- 对话记忆 -->
+            <div class="settings-section-title">对话记忆</div>
+            <div class="settings-group">
+                <div class="sg-field">
+                    <input type="number" id="settingsMaxHistory" min="1" max="100" value="20" placeholder="保留最近对话轮数 (1-100)">
+                </div>
+            </div>
+            <div class="settings-hint">轮数越多记忆越长，但响应可能变慢</div>
+
+            <!-- 通话模式 -->
+            <div class="settings-section-title">通话模式</div>
             <div class="setting-item">
                 <div>
                     <div class="setting-label">共享微信上下文</div>
@@ -504,6 +593,17 @@
                 <button class="btn-save-settings" onclick="saveSettings()">保存</button>
             </div>
             <div id="settingsStatus" style="text-align:center; font-size:13px; color:#8e8e93; margin-top:12px;"></div>
+
+            <!-- 调试日志 -->
+            <div class="log-section">
+                <div class="settings-section-title">调试日志</div>
+                <div class="log-content" id="logContent"></div>
+                <div class="log-actions">
+                    <button onclick="copyLog()">📋 复制日志</button>
+                    <button onclick="clearLog()">🗑️ 清空</button>
+                </div>
+                <div class="settings-hint">遇到问题时，复制日志发给开发者以便排查</div>
+            </div>
         </div>
     </div>
 
@@ -524,12 +624,9 @@
         </div>
     </div>
 
-    <div class="subtitle-area">
-        <div class="subtitle-scroll">
-            <div class="subtitle-text user-text" id="userSubtitle"></div>
-            <div class="subtitle-text" id="aiSubtitle"></div>
-            <div class="status-line" id="statusLine"></div>
-            <div class="stats-line" id="statsLine"></div>
+    <div class="subtitle-area" style="overflow:hidden;">
+        <div class="subtitle-scroll" id="chatContainer" style="overflow-y:auto; -webkit-overflow-scrolling:touch; display:flex; flex-direction:column; align-items:stretch; gap:6px; padding:10px 16px; height:100%;">
+            <!-- 聊天气泡动态追加到这里 -->
         </div>
     </div>
 
@@ -601,6 +698,15 @@
         </div>
     </div>
 
+    <!-- PWA 安装提示 -->
+    <div class="pwa-install-bar" id="pwaInstallBar">
+        <div class="pwa-text">
+            添加到主屏幕<small id="pwaInstallHint">获得更好的通话体验</small>
+        </div>
+        <button class="pwa-install-btn" id="pwaInstallBtn" onclick="pwaInstall()">安装</button>
+        <button class="pwa-dismiss-btn" onclick="pwaDismiss()">✕</button>
+    </div>
+
     <!-- 底部 Tab 栏 -->
     <div class="tab-bar" id="tabBar">
         <a class="tab-item active" onclick="switchView('recents')">
@@ -614,6 +720,49 @@
     </div>
 
 <script>
+// =====================================================================
+//  日志系统
+// =====================================================================
+var _logLines = [];
+function _ts() { return new Date().toLocaleTimeString('zh-CN',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
+function addLog(level, msg) {
+    var line = _ts() + ' [' + level + '] ' + msg;
+    _logLines.push(line);
+    if (_logLines.length > 500) _logLines = _logLines.slice(-300);
+    var el = document.getElementById('logContent');
+    if (el) {
+        var cls = 'log-' + level.toLowerCase();
+        el.innerHTML += '<div class="log-line ' + cls + '"><span class="log-time">' + _ts() + '</span> ' + msg + '</div>';
+        el.scrollTop = el.scrollHeight;
+    }
+}
+function copyLog() {
+    navigator.clipboard.writeText(_logLines.join('\n')).then(function(){ addLog('INFO', '日志已复制到剪贴板'); }).catch(function(){});
+}
+function clearLog() { _logLines = []; document.getElementById('logContent').innerHTML = ''; }
+
+// 环境检测
+addLog('INFO', '页面加载 | UA: ' + navigator.userAgent.slice(0, 80));
+addLog('INFO', 'MediaRecorder: ' + (typeof MediaRecorder !== 'undefined' ? '✅' : '❌'));
+addLog('INFO', 'getUserMedia: ' + (navigator.mediaDevices && navigator.mediaDevices.getUserMedia ? '✅' : '❌'));
+if (typeof MediaRecorder !== 'undefined') {
+    var _codecs = ['audio/webm;codecs=opus','audio/webm','audio/mp4'];
+    var _supported = _codecs.filter(function(c){return MediaRecorder.isTypeSupported(c)});
+    addLog('INFO', '录音格式: ' + (_supported.length ? _supported.join(', ') : '❌ 无'));
+}
+
+// =====================================================================
+//  运行时设置（即时生效，随请求发送）
+// =====================================================================
+var rtSettings = {
+    selectedModel: '',
+    customLlm: null,      // {base_url, api_key, model}
+    maxHistory: 20,
+    shareWechatCtx: false,
+    worldInfo: false,
+    memoryRetrieval: true,
+};
+
 // =====================================================================
 //  视图切换 + 通话记录
 // =====================================================================
@@ -639,6 +788,7 @@ function switchView(name) {
 }
 
 function startCall() {
+    unlockAudio();
     switchView('call');
     // 自动开始通话
     if (!isInCall) toggleCall();
@@ -791,55 +941,123 @@ function deleteLog() {
 document.addEventListener('DOMContentLoaded', () => loadCallLogs());
 
 // =====================================================================
-//  设置面板
+//  设置面板（即时生效 + 模型切换 + 日志）
 // =====================================================================
-function toggleSetting(btn) {
-    btn.classList.toggle('on');
-}
+function toggleSetting(btn) { btn.classList.toggle('on'); }
+
+var _settingsModelLoaded = false;
 
 function openSettings() {
-    // 从后端加载当前配置
-    fetch('/api/save_section', { method: 'GET' }).catch(() => {});
-    // 直接用 parse_config 的值（通过一个小 API）
-    fetch('/api/voice/settings')
-        .then(r => r.json())
-        .then(cfg => {
-            document.getElementById('tog-wechat-ctx').classList.toggle('on', cfg.VOICE_SHARE_WECHAT_CONTEXT || false);
-            document.getElementById('tog-world-info').classList.toggle('on', cfg.VOICE_ENABLE_WORLD_INFO || false);
-            document.getElementById('tog-memory-retrieval').classList.toggle('on', cfg.VOICE_ENABLE_MEMORY_RETRIEVAL !== false);
-        })
-        .catch(() => {});
+    // 加载当前模式开关
+    fetch('/api/voice/settings').then(r => r.json()).then(cfg => {
+        document.getElementById('tog-wechat-ctx').classList.toggle('on', rtSettings.shareWechatCtx);
+        document.getElementById('tog-world-info').classList.toggle('on', rtSettings.worldInfo);
+        document.getElementById('tog-memory-retrieval').classList.toggle('on', rtSettings.memoryRetrieval);
+    }).catch(() => {});
+
+    // 填充当前值
+    document.getElementById('settingsMaxHistory').value = rtSettings.maxHistory;
+
+    if (rtSettings.customLlm) {
+        document.getElementById('settingsLlmUrl').value = rtSettings.customLlm.base_url || '';
+        document.getElementById('settingsLlmKey').value = rtSettings.customLlm.api_key || '';
+        document.getElementById('settingsLlmModel').value = rtSettings.customLlm.model || '';
+    }
+
+    if (!_settingsModelLoaded) {
+        loadSettingsBuiltinModels();
+        _settingsModelLoaded = true;
+    }
+
     document.getElementById('settingsModal').classList.add('show');
 }
 
-function closeSettings() {
-    document.getElementById('settingsModal').classList.remove('show');
+function loadSettingsBuiltinModels() {
+    var sel = document.getElementById('settingsBuiltinModel');
+    sel.innerHTML = '<option value="" disabled selected>加载中...</option>';
+    fetch('/api/voice/models').then(r => r.json()).then(data => {
+        var models = data.models || [];
+        if (models.length === 0) { sel.innerHTML = '<option value="">无可用模型</option>'; return; }
+        sel.innerHTML = '';
+        models.forEach(function(m) {
+            var id = typeof m === 'string' ? m : (m.id || m.name || '');
+            var opt = document.createElement('option');
+            opt.value = id; opt.textContent = id;
+            if (id === rtSettings.selectedModel) opt.selected = true;
+            sel.appendChild(opt);
+        });
+    }).catch(function() { sel.innerHTML = '<option value="">获取失败</option>'; });
 }
 
-function saveSettings() {
-    const fields = {
-        VOICE_SHARE_WECHAT_CONTEXT: document.getElementById('tog-wechat-ctx').classList.contains('on'),
-        VOICE_ENABLE_WORLD_INFO: document.getElementById('tog-world-info').classList.contains('on'),
-        VOICE_ENABLE_MEMORY_RETRIEVAL: document.getElementById('tog-memory-retrieval').classList.contains('on'),
-    };
-    const status = document.getElementById('settingsStatus');
-    status.textContent = '保存中...';
+function settingsFetchLlmModels() {
+    var url = document.getElementById('settingsLlmUrl').value.trim();
+    var key = document.getElementById('settingsLlmKey').value.trim();
+    var errEl = document.getElementById('settingsLlmModelError');
+    errEl.style.display = 'none';
+    if (!url || !key) { errEl.textContent = '请先填写 API 地址和 Key'; errEl.style.display = 'block'; return; }
+    fetch('/api/voice/models?base_url=' + encodeURIComponent(url) + '&api_key=' + encodeURIComponent(key))
+        .then(r => r.json())
+        .then(data => {
+            var models = data.models || [];
+            if (models.length === 0) throw new Error('空列表');
+            var input = document.getElementById('settingsLlmModel');
+            var currentVal = input.value;
+            var sel = document.createElement('select');
+            sel.id = 'settingsLlmModel';
+            sel.style.cssText = input.style.cssText;
+            var empty = document.createElement('option');
+            empty.value = ''; empty.textContent = '请选择...';
+            sel.appendChild(empty);
+            models.forEach(function(m) {
+                var id = typeof m === 'string' ? m : (m.id || '');
+                var opt = document.createElement('option');
+                opt.value = id; opt.textContent = id;
+                if (id === currentVal) opt.selected = true;
+                sel.appendChild(opt);
+            });
+            input.parentNode.replaceChild(sel, input);
+        })
+        .catch(function(e) { errEl.textContent = '获取失败: ' + e.message; errEl.style.display = 'block'; });
+}
 
+function closeSettings() { document.getElementById('settingsModal').classList.remove('show'); }
+
+function saveSettings() {
+    // 更新运行时变量（即时生效，不写 config.py）
+    var builtinSel = document.getElementById('settingsBuiltinModel');
+    if (builtinSel && builtinSel.value) rtSettings.selectedModel = builtinSel.value;
+
+    var mh = parseInt(document.getElementById('settingsMaxHistory').value) || 20;
+    rtSettings.maxHistory = Math.max(1, Math.min(100, mh));
+
+    var llmUrl = document.getElementById('settingsLlmUrl').value.trim();
+    var llmKey = document.getElementById('settingsLlmKey').value.trim();
+    var llmModelEl = document.getElementById('settingsLlmModel');
+    var llmModel = llmModelEl ? llmModelEl.value.trim() : '';
+    if (llmUrl && llmKey) {
+        rtSettings.customLlm = { base_url: llmUrl, api_key: llmKey, model: llmModel };
+    } else {
+        rtSettings.customLlm = null;
+    }
+
+    rtSettings.shareWechatCtx = document.getElementById('tog-wechat-ctx').classList.contains('on');
+    rtSettings.worldInfo = document.getElementById('tog-world-info').classList.contains('on');
+    rtSettings.memoryRetrieval = document.getElementById('tog-memory-retrieval').classList.contains('on');
+
+    // 同时也保存到后端（持久化开关状态）
     fetch('/api/save_section', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ fields })
-    })
-    .then(r => r.json())
-    .then(result => {
-        if (result.error) {
-            status.textContent = '❌ ' + result.error;
-        } else {
-            status.textContent = '✅ 已保存';
-            setTimeout(() => { status.textContent = ''; closeSettings(); }, 1000);
-        }
-    })
-    .catch(e => { status.textContent = '❌ ' + e.message; });
+        body: JSON.stringify({ fields: {
+            VOICE_SHARE_WECHAT_CONTEXT: rtSettings.shareWechatCtx,
+            VOICE_ENABLE_WORLD_INFO: rtSettings.worldInfo,
+            VOICE_ENABLE_MEMORY_RETRIEVAL: rtSettings.memoryRetrieval,
+        }})
+    }).catch(() => {});
+
+    closeSettings();
+    addLog('INFO', '✅ 设置已保存并即时生效');
+    _addStatusBubble('✅ 设置已保存');
 }
 
 // =====================================================================
@@ -958,6 +1176,18 @@ function sendText(text) {
 
 // ── SSE 降级模式 ──
 function sendTextSSE(text) {
+    addLog('INFO', '发送文本: ' + text.slice(0, 50));
+    var body = { text: text, session_id: sessionId };
+    // 附加运行时设置
+    if (rtSettings.selectedModel) body.model = rtSettings.selectedModel;
+    if (rtSettings.maxHistory) body.max_history = rtSettings.maxHistory;
+    if (rtSettings.customLlm && rtSettings.customLlm.base_url && rtSettings.customLlm.api_key) {
+        body.custom_api = rtSettings.customLlm;
+    }
+    body.share_wechat_ctx = rtSettings.shareWechatCtx;
+    body.world_info = rtSettings.worldInfo;
+    body.memory_retrieval = rtSettings.memoryRetrieval;
+
     fetch('/api/voice/chat', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -990,46 +1220,72 @@ function sendTextSSE(text) {
 }
 
 // =====================================================================
+//  聊天容器辅助函数
+// =====================================================================
+var _currentAiBubble = null; // 当前 AI 正在流式输出的气泡
+function _scrollChat() {
+    var c = document.getElementById('chatContainer');
+    if (c) setTimeout(function(){ c.scrollTop = c.scrollHeight; }, 50);
+}
+function _addBubble(type, text) {
+    var c = document.getElementById('chatContainer');
+    if (!c) return null;
+    var div = document.createElement('div');
+    div.className = 'chat-bubble ' + type;
+    div.textContent = text;
+    c.appendChild(div);
+    _scrollChat();
+    return div;
+}
+function _addStatusBubble(text) {
+    return _addBubble('status-bubble', text);
+}
+
+// =====================================================================
 //  消息处理
 // =====================================================================
 function handleMessage(msg) {
     switch (msg.type) {
         case 'user_confirmed':
-            document.getElementById('userSubtitle').textContent = '你: ' + msg.text;
-            document.getElementById('statusLine').textContent = '已收到，正在处理...';
-            // AI 开始处理，立刻停止录音
+            _addBubble('user', msg.text);
+            _currentAiBubble = null;
+            addLog('INFO', '✅ 服务端已收到文本');
             isAiSpeaking = true;
             pauseListening();
             break;
 
         case 'status':
-            document.getElementById('statusLine').textContent = msg.message || '';
+            // 不加气泡，只记日志
+            addLog('DEBUG', '状态: ' + (msg.message || ''));
             break;
 
         case 'text_delta':
             currentAiText += msg.text;
-            document.getElementById('aiSubtitle').textContent = cleanVoiceTags(currentAiText);
+            if (!_currentAiBubble) {
+                _currentAiBubble = _addBubble('ai', cleanVoiceTags(currentAiText));
+            } else {
+                _currentAiBubble.textContent = cleanVoiceTags(currentAiText);
+            }
+            _scrollChat();
             break;
 
         case 'audio':
-            audioQueue.push({
-                audio: msg.audio,
-                text: msg.text,
-                index: msg.index,
-            });
+            addLog('DEBUG', 'TTS 音频 #' + msg.index + ' (' + (msg.audio||'').length + ' b64)');
+            audioQueue.push({ audio: msg.audio, text: msg.text, index: msg.index });
             playNext();
             break;
 
         case 'done':
-            document.getElementById('statusLine').textContent = '';
+            addLog('INFO', '✅ LLM 完成');
             if (msg.stats) {
-                let s = msg.stats;
-                let info = `总耗时 ${s.total_time}s`;
-                if (s.first_token_time) info += ` | 首token ${s.first_token_time}s`;
-                info += ` | LLM ${s.llm_time}s | ${s.sentences}句TTS`;
-                document.getElementById('statsLine').textContent = info;
+                var s = msg.stats;
+                var info = '总耗时 ' + s.total_time + 's';
+                if (s.first_token_time) info += ' | 首token ' + s.first_token_time + 's';
+                info += ' | LLM ' + s.llm_time + 's | ' + s.sentences + '句TTS';
+                _addStatusBubble(info);
+                addLog('INFO', info);
             }
-            // 如果没有音频在播放，恢复录音
+            _currentAiBubble = null;
             if (!isPlaying && audioQueue.length === 0) {
                 isAiSpeaking = false;
                 resumeListening();
@@ -1037,13 +1293,13 @@ function handleMessage(msg) {
             break;
 
         case 'tts_error':
-            console.warn('TTS error:', msg.message);
-            document.getElementById('statusLine').textContent = '⚠️ 语音合成失败: ' + msg.text;
+            addLog('ERROR', 'TTS 失败: ' + msg.text);
             break;
 
         case 'error':
-            document.getElementById('aiSubtitle').textContent = '⚠️ ' + msg.message;
-            document.getElementById('statusLine').textContent = '';
+            _addBubble('status-bubble', '⚠️ ' + msg.message);
+            addLog('ERROR', '服务端错误: ' + msg.message);
+            isAiSpeaking = false;
             resumeListening();
             break;
 
@@ -1060,6 +1316,7 @@ function playNext() {
     isPlaying = true;
 
     const item = audioQueue.shift();
+    addLog('DEBUG', '播放音频 #' + item.index);
     const audioData = Uint8Array.from(atob(item.audio), c => c.charCodeAt(0));
     const blob = new Blob([audioData], { type: 'audio/mpeg' });
     const url = URL.createObjectURL(blob);
@@ -1067,37 +1324,37 @@ function playNext() {
     const audio = new Audio(url);
     audio.volume = 1.0;
 
-    audio.onended = () => {
+    var playDone = false;
+    function onDone() {
+        if (playDone) return;
+        playDone = true;
         URL.revokeObjectURL(url);
         isPlaying = false;
-        if (audioQueue.length > 0) {
-            playNext();
-        } else {
-            // 所有音频播完，恢复语音识别
-            isAiSpeaking = false;
-            resumeListening();
-        }
-    };
+        if (audioQueue.length > 0) { playNext(); }
+        else { isAiSpeaking = false; resumeListening(); }
+    }
+    audio.onended = audio.onerror = onDone;
 
-    audio.onerror = () => {
-        URL.revokeObjectURL(url);
-        isPlaying = false;
-        if (audioQueue.length > 0) {
-            playNext();
-        } else {
-            isAiSpeaking = false;
-            resumeListening();
-        }
-    };
-
-    // AI 说话期间始终暂停录音
     pauseListening();
-    audio.play().catch(e => {
-        console.error('播放失败:', e);
-        isPlaying = false;
-        playNext();
+    audio.play().catch(function(e) {
+        addLog('WARN', '音频 play() 失败，尝试 AudioContext: ' + e.message);
+        try {
+            var ctx = _audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+            _audioCtx = ctx;
+            if (ctx.state === 'suspended') ctx.resume();
+            var buf = audioData.buffer.slice(audioData.byteOffset, audioData.byteOffset + audioData.byteLength);
+            ctx.decodeAudioData(buf.slice(0), function(decoded) {
+                var src = ctx.createBufferSource();
+                src.buffer = decoded;
+                src.connect(ctx.destination);
+                src.onended = onDone;
+                src.start(0);
+                addLog('INFO', '✅ AudioContext 播放成功');
+            }, function(err) { addLog('ERROR', 'AudioContext 解码失败'); onDone(); });
+        } catch(ctxErr) { addLog('ERROR', 'AudioContext 失败: ' + ctxErr.message); onDone(); }
     });
 }
+var _audioCtx = null;
 
 // =====================================================================
 //  语音识别（MediaRecorder 录音 + 后端 Whisper）
@@ -1116,14 +1373,16 @@ const MIN_RECORD_TIME = 500;       // 最短录音时间（毫秒）
 let recordStartTime = 0;
 
 function initRecognition() {
-    // 检查浏览器是否支持 MediaRecorder
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        addLog('ERROR', '浏览器不支持 getUserMedia');
         document.getElementById('hint').textContent = '⚠️ 浏览器不支持录音';
         return false;
     }
 
+    addLog('INFO', '请求麦克风权限...');
     navigator.mediaDevices.getUserMedia({ audio: true })
         .then(stream => {
+            addLog('INFO', '✅ 麦克风权限已获取');
             mediaStream = stream;
 
             // 初始化音量分析（用于静音检测）
@@ -1138,7 +1397,7 @@ function initRecognition() {
             startRecording();
         })
         .catch(err => {
-            console.error('麦克风权限获取失败:', err);
+            addLog('ERROR', '麦克风权限被拒绝: ' + err.message);
             document.getElementById('hint').textContent = '⚠️ 麦克风权限被拒绝，请打字输入';
         });
 
@@ -1181,82 +1440,47 @@ function startRecording() {
     mediaRecorder.onstop = () => {
         const recordDuration = Date.now() - recordStartTime;
         if (recordDuration < MIN_RECORD_TIME || audioChunks.length === 0) {
-            // 录音太短，重新开始
-            if (isInCall && !isMuted && !isPlaying && !isAiSpeaking) {
-                setTimeout(() => startRecording(), 200);
-            }
+            if (isInCall && !isMuted && !isPlaying && !isAiSpeaking) setTimeout(() => startRecording(), 200);
             return;
         }
-
-        // VAD 检查：没检测到人声直接丢弃，不发后端
         if (!hasVoiceActivity) {
-            console.log('VAD: 未检测到人声，跳过识别');
             audioChunks = [];
-            if (isInCall && !isMuted && !isPlaying && !isAiSpeaking) {
-                setTimeout(() => startRecording(), 200);
-            }
+            if (isInCall && !isMuted && !isPlaying && !isAiSpeaking) setTimeout(() => startRecording(), 200);
             return;
         }
-
         const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
         audioChunks = [];
-
         if (blob.size < 1000) {
-            // 文件太小，可能是空录音
-            if (isInCall && !isMuted && !isPlaying) {
-                setTimeout(() => startRecording(), 200);
-            }
+            if (isInCall && !isMuted && !isPlaying) setTimeout(() => startRecording(), 200);
             return;
         }
-
-        // 发送到后端识别
-        document.getElementById('userSubtitle').textContent = '🎤 识别中...';
-        document.getElementById('statusLine').textContent = '语音识别中...';
-
+        addLog('INFO', '发送录音到 STT (' + blob.size + ' bytes)');
+        _addStatusBubble('🎤 识别中...');
         const formData = new FormData();
         formData.append('audio', blob, 'recording.webm');
-
-        fetch('/api/voice/recognize', {
-            method: 'POST',
-            body: formData,
-        })
+        fetch('/api/voice/recognize', { method: 'POST', body: formData })
         .then(r => r.json())
         .then(result => {
             if (result.error) {
-                document.getElementById('statusLine').textContent = '⚠️ ' + result.error;
-                // 继续录音
-                if (isInCall && !isMuted && !isPlaying) {
-                    setTimeout(() => startRecording(), 500);
-                }
+                addLog('ERROR', 'STT 错误: ' + result.error);
+                _addStatusBubble('⚠️ ' + result.error);
+                if (isInCall && !isMuted && !isPlaying) setTimeout(() => startRecording(), 500);
                 return;
             }
-
-            const text = result.text?.trim();
+            const text = (result.text || '').trim();
             if (!text) {
-                document.getElementById('userSubtitle').textContent = '';
-                document.getElementById('statusLine').textContent = '';
-                // 空识别结果，继续录音
-                if (isInCall && !isMuted && !isPlaying) {
-                    setTimeout(() => startRecording(), 200);
-                }
+                addLog('DEBUG', 'STT 返回空');
+                if (isInCall && !isMuted && !isPlaying) setTimeout(() => startRecording(), 200);
                 return;
             }
-
-            // 识别成功，发送给 AI
-            let info = `识别耗时 ${result.time || '?'}s`;
-            document.getElementById('userSubtitle').textContent = '你: ' + text;
-            document.getElementById('statusLine').textContent = info + ' | 发送中...';
-            document.getElementById('statsLine').textContent = '';
+            addLog('INFO', 'STT: 「' + text.slice(0,30) + '」 (' + (result.engine||'?') + ', ' + (result.time||'?') + 's)');
             currentAiText = "";
-            document.getElementById('aiSubtitle').textContent = "";
             sendText(text);
         })
         .catch(err => {
-            console.error('语音识别请求失败:', err);
-            document.getElementById('statusLine').textContent = '⚠️ 网络错误';
-            if (isInCall && !isMuted && !isPlaying) {
-                setTimeout(() => startRecording(), 1000);
-            }
+            addLog('ERROR', 'STT 网络错误: ' + err.message);
+            _addStatusBubble('⚠️ 网络错误');
+            if (isInCall && !isMuted && !isPlaying) setTimeout(() => startRecording(), 1000);
         });
     };
 
@@ -1419,11 +1643,7 @@ function sendTextInput() {
     if (!text || !isInCall) return;
 
     input.value = '';
-    document.getElementById('userSubtitle').textContent = '你: ' + text;
-    document.getElementById('statusLine').textContent = '发送中...';
-    document.getElementById('statsLine').textContent = '';
     currentAiText = "";
-    document.getElementById('aiSubtitle').textContent = "";
     sendText(text);
 }
 
@@ -1464,6 +1684,93 @@ function updateTimer() {
     const sec = elapsed % 60;
     document.getElementById('callTimer').textContent =
         `${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
+    document.title = '通话中 ' + min.toString().padStart(2,'0') + ':' + sec.toString().padStart(2,'0') + ' · 袁朗';
+}
+
+// =====================================================================
+//  音频解锁（解决浏览器自动播放限制）
+// =====================================================================
+var _audioUnlocked = false;
+function unlockAudio() {
+    if (_audioUnlocked) return;
+    try {
+        _audioCtx = _audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        var buf = _audioCtx.createBuffer(1, 1, 22050);
+        var src = _audioCtx.createBufferSource();
+        src.buffer = buf; src.connect(_audioCtx.destination); src.start(0);
+        if (_audioCtx.state === 'suspended') _audioCtx.resume();
+    } catch(e) {}
+    try {
+        var silence = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAABhgC7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAAYYoRBqpAAAAAAD/+1DEAAAGAAGn9AAAIgAANP8AAAQAAAGkAAAAIAAANIAAAARMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQ==');
+        silence.play().then(function(){ _audioUnlocked = true; addLog('INFO', '✅ 音频已解锁'); }).catch(function(){});
+    } catch(e) {}
+    _audioUnlocked = true;
+}
+document.addEventListener('click', unlockAudio, {once: false});
+document.addEventListener('touchstart', unlockAudio, {once: false});
+
+// =====================================================================
+//  后台通知
+// =====================================================================
+var _notifPermission = false;
+if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission().then(function(p) { _notifPermission = (p === 'granted'); });
+} else if ('Notification' in window) {
+    _notifPermission = (Notification.permission === 'granted');
+}
+var _bgNotif = null;
+document.addEventListener('visibilitychange', function() {
+    if (document.hidden && isInCall && _notifPermission) {
+        var elapsed = callStartTime ? Math.floor((Date.now() - callStartTime) / 1000) : 0;
+        var m = Math.floor(elapsed / 60), s = elapsed % 60;
+        var t = m.toString().padStart(2,'0') + ':' + s.toString().padStart(2,'0');
+        _bgNotif = new Notification('袁朗 · 通话中', {
+            body: '通话时长 ' + t + '\n点击返回通话',
+            icon: '/static/icon-192.png', tag: 'yuanlang-call', renotify: true, silent: true
+        });
+        _bgNotif.onclick = function() { window.focus(); _bgNotif.close(); };
+    } else if (!document.hidden && _bgNotif) {
+        _bgNotif.close(); _bgNotif = null;
+    }
+});
+
+// =====================================================================
+//  PWA 安装提示
+// =====================================================================
+var _deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    _deferredPrompt = e;
+    document.getElementById('pwaInstallBar').classList.add('show');
+});
+function pwaInstall() {
+    if (_deferredPrompt) {
+        _deferredPrompt.prompt();
+        _deferredPrompt.userChoice.then(function(r) {
+            if (r.outcome === 'accepted') addLog('INFO', 'PWA 已安装');
+            _deferredPrompt = null;
+            document.getElementById('pwaInstallBar').classList.remove('show');
+        });
+    }
+}
+function pwaDismiss() { document.getElementById('pwaInstallBar').classList.remove('show'); }
+
+// iOS Safari 检测
+(function() {
+    var isIos = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    var isStandalone = window.navigator.standalone === true;
+    if (isIos && !isStandalone) {
+        var bar = document.getElementById('pwaInstallBar');
+        document.getElementById('pwaInstallHint').textContent = '点击 分享按钮 → 添加到主屏幕';
+        document.getElementById('pwaInstallBtn').textContent = '知道了';
+        document.getElementById('pwaInstallBtn').onclick = function() { pwaDismiss(); };
+        bar.classList.add('show');
+    }
+})();
+
+// Service Worker
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/static/sw.js').catch(function(e) { addLog('WARN', 'SW 注册失败: ' + e.message); });
 }
 </script>
 </body>
