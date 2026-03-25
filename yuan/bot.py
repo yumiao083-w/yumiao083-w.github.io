@@ -765,6 +765,31 @@ def get_user_prompt(user_id, retrieved_memories=None):
     if preset_content:
         final_prompt_parts.append(f"\n\n{preset_content}")
     
+    # ========== 板块2.5: 世界书（World Info） ==========
+    try:
+        from world_info import get_world_info_prompt
+        # 获取聊天历史用于关键词扫描
+        _wi_history = []
+        try:
+            with queue_lock:
+                _wi_user_data = chat_contexts.get(user_id, {})
+                if isinstance(_wi_user_data, dict):
+                    _wi_history = list(_wi_user_data.get(prompt_file_name, []))
+        except Exception:
+            pass
+        world_info_text = get_world_info_prompt(
+            user_id=user_id,
+            chat_history=_wi_history,
+            current_message="",  # 当前消息在 chat_with_gpt 里才有
+            user_name=user_id,
+            char_name=prompt_file_name,
+        )
+        if world_info_text:
+            final_prompt_parts.append(f"\n\n{world_info_text}")
+            logger.debug(f"用户 {user_id} 世界书已注入，长度: {len(world_info_text)}")
+    except Exception as e:
+        logger.error(f"加载世界书失败: {e}")
+
     if core_memory_content:
         final_prompt_parts.append(f"\n\n# 核心记忆\n{core_memory_content}")
         logger.debug(f"用户 {user_id} 核心记忆已注入，长度: {len(core_memory_content)}")
@@ -1390,10 +1415,12 @@ def call_chat_api_with_retry(messages_to_send, user_id, max_retries=2, is_summar
                 logger.debug(f"发送给 API 的消息 (ID: {user_id}): {messages_to_send}")
 
                 # 每次创建新 client 防止连接池污染
+                # 支持中转站配置 skip_browser_headers: True 跳过伪装头（如 Antigravity 反代）
+                _headers = {} if provider.get('skip_browser_headers') else _BROWSER_HEADERS
                 api_client = OpenAI(
                     api_key=p_key,
                     base_url=p_url,
-                    default_headers=_BROWSER_HEADERS
+                    default_headers=_headers
                 )
 
                 response = api_client.chat.completions.create(
@@ -3286,9 +3313,24 @@ def recognize_image_with_moonshot(image_path, is_emoji=False):
     try:
         # --- 核心识别逻辑 ---
         
-        # 读取图片内容并编码
-        with open(image_path, 'rb') as img_file:
-            image_content = base64.b64encode(img_file.read()).decode('utf-8')
+        # 读取图片内容并压缩后编码（避免请求体过大导致中转站断连）
+        try:
+            from PIL import Image
+            import io as _io
+            _img = Image.open(image_path)
+            # 如果是 RGBA/P 等模式，转成 RGB（JPEG 不支持透明通道）
+            if _img.mode not in ('RGB', 'L'):
+                _img = _img.convert('RGB')
+            _img.thumbnail((1024, 1024))  # 最大边缩到 1024px
+            _buf = _io.BytesIO()
+            _buf_fmt = 'JPEG'
+            _img.save(_buf, format=_buf_fmt, quality=85)
+            image_content = base64.b64encode(_buf.getvalue()).decode('utf-8')
+            logger.info(f"图片已压缩: 原始大小={os.path.getsize(image_path)}B, 压缩后={len(_buf.getvalue())}B")
+        except ImportError:
+            logger.warning("Pillow 未安装，使用原图发送（可能因体积过大失败）")
+            with open(image_path, 'rb') as img_file:
+                image_content = base64.b64encode(img_file.read()).decode('utf-8')
             
         headers = {
             'Authorization': f'Bearer {MOONSHOT_API_KEY}',

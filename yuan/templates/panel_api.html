@@ -465,6 +465,10 @@ function renderProviders(area) {
                         </div>
                         <input type="text" id="model-input-${area}-${idx}" value="${esc(p.model||'')}" placeholder="或手动输入" onchange="providerData['${area}'][${idx}].model=this.value; updateCardHeader(this,'${area}',${idx})" style="margin-top:4px;">
                     </div>
+                    <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+                        <input type="checkbox" id="skip-headers-${area}-${idx}" ${p.skip_browser_headers ? 'checked' : ''} onchange="providerData['${area}'][${idx}].skip_browser_headers=this.checked" style="width:auto;">
+                        <label for="skip-headers-${area}-${idx}" style="font-size:12px;color:#666;margin:0;cursor:pointer;">跳过伪装头（Antigravity等非公益站勾选）</label>
+                    </div>
                 </div>
                 <div class="card-actions">
                     <button class="remove-btn" onclick="removeProvider('${area}',${idx})">删除此中转站</button>
@@ -547,7 +551,7 @@ function updateCardHeader(inputEl, area, idx) {
 }
 
 function addProvider(area) {
-    providerData[area].push({ name: '新中转站', base_url: '', api_key: '', model: '' });
+    providerData[area].push({ name: '新中转站', base_url: '', api_key: '', model: '', skip_browser_headers: false });
     renderProviders(area);
     // 自动展开新添加的卡片
     setTimeout(() => {

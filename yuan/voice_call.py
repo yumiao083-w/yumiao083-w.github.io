@@ -264,8 +264,10 @@ def stream_chat_and_tts(user_text: str, history: list, ws_send, rt_opts: dict = 
 
     for provider in providers:
         try:
-            # 自定义API不带伪装头，中转站带伪装头
-            use_headers = {} if (custom_api and custom_api.get('base_url')) else _BROWSER_HEADERS
+            # 前端可通过 custom_api.skip_browser_headers 控制是否带伪装头
+            use_headers = _BROWSER_HEADERS
+            if custom_api and custom_api.get('skip_browser_headers'):
+                use_headers = {}
             client = OpenAI(
                 api_key=provider.get('api_key', ''),
                 base_url=provider.get('base_url', ''),
