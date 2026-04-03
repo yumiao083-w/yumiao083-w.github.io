@@ -84,6 +84,11 @@
         <input type="number" id="mem-groups" step="1" value="{{ config.MAX_GROUPS }}">
         <small>AI 能记住的短期对话轮数（一问一答为一轮），建议 5-15</small>
     </div>
+    <div class="field">
+        <label>工具调用日志保留轮数</label>
+        <input type="number" id="tool-log-rounds" step="1" min="0" max="20" value="{{ config.TOOL_LOG_KEEP_ROUNDS or 3 }}">
+        <small>上下文中保留最近几轮的工具调用记录，更早的只保留回复内容（减少 token 消耗），0=全部清除</small>
+    </div>
 
     <div class="save-bar">
         <button class="save-btn" onclick="saveMemSettings()">保存</button>
@@ -244,6 +249,7 @@ function saveMemSettings() {
         UPLOAD_MEMORY_TO_AI: document.getElementById('mem-upload').classList.contains('on'),
         ENABLE_SENSITIVE_CONTENT_CLEARING: document.getElementById('mem-sensitive').classList.contains('on'),
         MAX_GROUPS: document.getElementById('mem-groups').value,
+        TOOL_LOG_KEEP_ROUNDS: document.getElementById('tool-log-rounds').value,
     }, 'mem-settings-status');
 }
 

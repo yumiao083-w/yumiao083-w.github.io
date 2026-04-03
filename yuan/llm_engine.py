@@ -533,6 +533,30 @@ class LLMEngine:
                     )
                     if len(history) > context_limit:
                         history = history[-context_limit:]
+
+                    # 清理老的工具日志：只保留最近 N 轮的 <<SYS_TOOL_LOG>>
+                    import re as _re
+                    _tool_log_keep = int(
+                        self.config.get("TOOL_LOG_KEEP_ROUNDS", 3)
+                    )
+                    _tool_log_pattern = _re.compile(
+                        r"<<SYS_TOOL_LOG>>\n.*?\n<</SYS_TOOL_LOG>>\n",
+                        _re.DOTALL,
+                    )
+                    _tool_log_count = 0
+                    # 从后往前遍历，保留最近 N 条带工具日志的 assistant 消息
+                    for i in range(len(history) - 1, -1, -1):
+                        msg = history[i]
+                        if (msg.get("role") == "assistant"
+                                and "<<SYS_TOOL_LOG>>" in (msg.get("content") or "")):
+                            _tool_log_count += 1
+                            if _tool_log_count > _tool_log_keep:
+                                # 去掉工具日志，只保留回复内容
+                                history[i] = dict(msg)
+                                history[i]["content"] = _tool_log_pattern.sub(
+                                    "", msg["content"]
+                                )
+
                     messages_to_send.extend(history)
 
                     # 当前用户消息
