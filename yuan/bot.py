@@ -3020,30 +3020,24 @@ def main():
             tool_registry.register(ReadEmailTool())
             tool_registry.register(SendEmailTool())
 
-            # ========== MCP Server 桥接 ==========
-            from tools.mcp_bridge import MCPBridge
+            # ========== MCP 按需加载（元工具） ==========
+            from tools.mcp_loader import LoadMCPToolsTool
 
-            # 小红书 MCP（本地 Docker）
-            try:
-                xhs_bridge = MCPBridge(
-                    server_url="http://localhost:18060/mcp",
-                    token="",
-                    name_prefix="xhs_",
-                )
-                if xhs_bridge.connect():
-                    for mcp_tool in xhs_bridge.get_tools():
-                        tool_registry.register(mcp_tool)
-                    logger.info(f"小红书 MCP 已接入，{len(xhs_bridge.get_tools())} 个工具")
-                else:
-                    logger.warning("小红书 MCP 连接失败，跳过")
-            except Exception as e:
-                logger.warning(f"小红书 MCP 接入失败（可能未启动Docker）: {e}")
-
-            # 麦当劳 MCP（按需加载，暂不启用）
-            # mcd_bridge = MCPBridge(server_url="https://mcp.mcd.cn", token="23MRMsM9jRrRUUVxgHX3ToiQ6DsfP71E", name_prefix="mcd_")
-            # if mcd_bridge.connect():
-            #     for mcp_tool in mcd_bridge.get_tools():
-            #         tool_registry.register(mcp_tool)
+            mcp_configs = {
+                "xiaohongshu": {
+                    "url": getattr(config, 'XHS_MCP_URL', 'http://localhost:18060/mcp'),
+                    "token": getattr(config, 'XHS_MCP_TOKEN', ''),
+                    "prefix": "xhs_",
+                },
+                "mcdonald": {
+                    "url": "https://mcp.mcd.cn",
+                    "token": "23MRMsM9jRrRUUVxgHX3ToiQ6DsfP71E",
+                    "prefix": "mcd_",
+                },
+            }
+            mcp_loader = LoadMCPToolsTool(tool_registry, mcp_configs)
+            tool_registry.register(mcp_loader)
+            logger.info("MCP 按需加载元工具已注册（支持: xiaohongshu, mcdonald）")
 
             logger.info(f"\033[32m[Agent] Tool 注册完成: {len(tool_registry)} 个 Tool 就绪\033[0m")
             for tn, td in tool_registry.list_tools():
