@@ -813,12 +813,12 @@ class LLMEngine:
                     "content": result_str,
                 })
                 logger.info(
-                    "Tool '%s' 结果: %.200s", tool_name, result_str
+                    "Tool '%s' 结果: %.500s", tool_name, result_str
                 )
 
                 # 记录工具调用摘要（用于存入上下文）
                 self._last_tool_actions.append(
-                    f"• {tool_name}({json.dumps(tool_args, ensure_ascii=False)[:80]}) → {result_str[:150]}"
+                    f"• {tool_name}({json.dumps(tool_args, ensure_ascii=False)[:100]}) → {result_str[:1000]}"
                 )
 
         # 达到最大轮数，做最后一次不带 tools 的调用
