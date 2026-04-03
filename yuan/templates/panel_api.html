@@ -385,6 +385,55 @@
     </div>
 </div>
 
+<!-- ===== 6. Tavily 联网搜索 ===== -->
+<div class="section-card">
+    <h2>🔍 Tavily 联网搜索</h2>
+    <small style="color: #999; display: block; margin-bottom: 12px;">AI 联网搜索能力（需要 Tavily API Key）</small>
+    <div class="field">
+        <label>API Key</label>
+        <input type="password" id="tavily-key" value="{{ config.TAVILY_API_KEY or '' }}">
+        <small>在 <a href="https://tavily.com" target="_blank">tavily.com</a> 注册获取，免费 1000 次/月</small>
+    </div>
+    <div class="field">
+        <label>最大搜索结果数</label>
+        <input type="number" id="tavily-max-results" min="1" max="10" value="{{ config.TAVILY_MAX_RESULTS or 5 }}">
+        <small>每次搜索返回的结果条数（1-10）</small>
+    </div>
+    <div class="field">
+        <label>内容截断长度</label>
+        <input type="number" id="tavily-content-limit" min="50" max="2000" step="50" value="{{ config.TAVILY_CONTENT_LIMIT or 300 }}">
+        <small>每条搜索结果的最大字符数</small>
+    </div>
+    <div class="save-bar">
+        <button class="save-btn" onclick="saveTavily()">保存</button>
+        <span class="save-status" id="tavily-status"></span>
+    </div>
+</div>
+
+<!-- ===== 7. MCP 工具 ===== -->
+<div class="section-card">
+    <h2>🔌 MCP 工具</h2>
+    <small style="color: #999; display: block; margin-bottom: 12px;">小红书等 MCP Server 的连接配置</small>
+    <div class="field">
+        <label>小红书 MCP 端点</label>
+        <input type="text" id="mcp-xhs-url" value="{{ config.XHS_MCP_URL or 'http://localhost:18060/mcp' }}">
+    </div>
+    <div class="field">
+        <label>小红书 MCP Token</label>
+        <input type="text" id="mcp-xhs-token" value="{{ config.XHS_MCP_TOKEN or '' }}">
+        <small>留空则不传 Authorization 头</small>
+    </div>
+    <div class="field">
+        <label>MCP 结果截断长度</label>
+        <input type="number" id="mcp-result-max" min="500" max="20000" step="500" value="{{ config.MCP_RESULT_MAX_LENGTH or 3000 }}">
+        <small>MCP 工具返回结果的最大字符数，防止塞爆 AI 上下文</small>
+    </div>
+    <div class="save-bar">
+        <button class="save-btn" onclick="saveMcp()">保存</button>
+        <span class="save-status" id="mcp-status"></span>
+    </div>
+</div>
+
 <script>
 // ===== 通用工具 =====
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
@@ -784,6 +833,44 @@ function testTts() {
         btn.textContent = '🔊 试听当前配置';
         btn.disabled = false;
     });
+}
+
+// ===== Tavily 保存 =====
+function saveTavily() {
+    const s = document.getElementById('tavily-status');
+    s.textContent = '保存中...'; s.style.color = '#999';
+
+    // 先保存 API Key（通过通用 saveFields）
+    const apiKey = document.getElementById('tavily-key').value.trim();
+    const p1 = fetch('/api/save_section', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ fields: { TAVILY_API_KEY: apiKey } })
+    }).then(r => r.json());
+
+    // 再保存 max_results 和 content_limit（通过专用路由）
+    const p2 = fetch('/api/config/tavily', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            max_results: parseInt(document.getElementById('tavily-max-results').value) || 5,
+            content_limit: parseInt(document.getElementById('tavily-content-limit').value) || 300
+        })
+    }).then(r => r.json());
+
+    Promise.all([p1, p2]).then(([r1, r2]) => {
+        if (r1.error || r2.error) { s.textContent = '❌ ' + (r1.error || r2.error); s.style.color = '#ff3b30'; }
+        else { s.textContent = '✅ 已保存'; s.style.color = '#34c759'; setTimeout(() => s.textContent = '', 3000); }
+    }).catch(e => { s.textContent = '❌ ' + e.message; s.style.color = '#ff3b30'; });
+}
+
+// ===== MCP 保存 =====
+function saveMcp() {
+    const s = document.getElementById('mcp-status');
+    s.textContent = '保存中...'; s.style.color = '#999';
+    saveFields({
+        XHS_MCP_URL: document.getElementById('mcp-xhs-url').value.trim(),
+        XHS_MCP_TOKEN: document.getElementById('mcp-xhs-token').value.trim(),
+        MCP_RESULT_MAX_LENGTH: parseInt(document.getElementById('mcp-result-max').value) || 3000,
+    }, 'mcp-status');
 }
 
 // ===== 初始化 =====

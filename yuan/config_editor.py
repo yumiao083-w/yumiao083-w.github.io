@@ -3612,6 +3612,72 @@ def reset_memory_retrieval_prompt():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/config/tavily', methods=['GET'])
+@login_required
+def get_tavily_config():
+    """获取 Tavily 搜索配置"""
+    try:
+        config_vars = {}
+        config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.py')
+        with open(config_path, 'r', encoding='utf-8') as f:
+            exec(f.read(), config_vars)
+        return jsonify({
+            'max_results': config_vars.get('TAVILY_MAX_RESULTS', 5),
+            'content_limit': config_vars.get('TAVILY_CONTENT_LIMIT', 300),
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/config/tavily', methods=['POST'])
+@login_required
+def set_tavily_config():
+    """修改 Tavily 搜索配置"""
+    try:
+        data = request.json
+        config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.py')
+
+        with open(config_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        max_results = int(data.get('max_results', 5))
+        content_limit = int(data.get('content_limit', 300))
+
+        # 限制范围
+        max_results = max(1, min(10, max_results))
+        content_limit = max(50, min(2000, content_limit))
+
+        # 替换或追加
+        if 'TAVILY_MAX_RESULTS' in content:
+            content = re.sub(
+                r'TAVILY_MAX_RESULTS\s*=\s*\d+',
+                f'TAVILY_MAX_RESULTS = {max_results}',
+                content
+            )
+        else:
+            content += f'\nTAVILY_MAX_RESULTS = {max_results}\n'
+
+        if 'TAVILY_CONTENT_LIMIT' in content:
+            content = re.sub(
+                r'TAVILY_CONTENT_LIMIT\s*=\s*\d+',
+                f'TAVILY_CONTENT_LIMIT = {content_limit}',
+                content
+            )
+        else:
+            content += f'TAVILY_CONTENT_LIMIT = {content_limit}\n'
+
+        with open(config_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+
+        return jsonify({
+            'success': True,
+            'max_results': max_results,
+            'content_limit': content_limit,
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/tts_test', methods=['POST'])
 @login_required
 def api_tts_test():

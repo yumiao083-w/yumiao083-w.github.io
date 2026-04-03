@@ -63,7 +63,7 @@ ENABLE_EMOJI_RECOGNITION = True
 
 # 智谱 GLM-ASR 语音识别（首选，中文最佳）
 # API申请 https://open.bigmodel.cn/
-ZHIPU_API_KEY = ''
+ZHIPU_API_KEY = '81976c8a238348ceb966c77a76f6002f.9xvmObo64TvcKfEY'
 
 # 图片识别提示词
 IMAGE_RECOGNITION_PROMPT = '请用中文描述这张图片的主要内容或主题，尽可能详细全面。不要使用"这是"、"这张"等开头，直接描述。如果有文字，请包含在描述中。'
@@ -324,3 +324,15 @@ VOICE_CUSTOM_PROMPT_FILE = ''
 # 启用后自动创建 ngrok 隧道，手机通过 HTTPS 域名访问可使用麦克风
 ENABLE_NGROK = True
 NGROK_AUTH_TOKEN = '3BB5w1uMKhEayzqOna4BUTorenT_7mgQT5PBoK5HBWacwrfv5'
+
+# Tavily 联网搜索配置
+TAVILY_MAX_RESULTS = 5       # 搜索返回的最大结果数（1-10）
+TAVILY_CONTENT_LIMIT = 300   # 每条结果的内容截断长度（字符数）
+
+# MCP 工具结果截断配置
+MCP_RESULT_MAX_LENGTH = 3000  # MCP 工具返回结果的最大字符数，超出截断
+XHS_MCP_URL = 'http://localhost:18060/mcp'  # 小红书 MCP 服务端点
+XHS_MCP_TOKEN = ''  # 小红书 MCP Token（留空则不传）
+
+# Tavily 联网搜索 API
+TAVILY_API_KEY = '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'
