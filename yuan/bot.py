@@ -3015,18 +3015,14 @@ def main():
             tool_registry.register(ListFilesTool(allowed_dirs=_file_dirs, base_dir=root_dir))
             tool_registry.register(CreateDocxTool(base_dir=root_dir))
 
-            # ========== 邮箱收发 ==========
-            from tools.email_tool import ReadEmailTool, SendEmailTool
-            tool_registry.register(ReadEmailTool())
-            tool_registry.register(SendEmailTool())
-
             # ========== MCP 按需加载（元工具） ==========
             from tools.mcp_loader import LoadMCPToolsTool
 
+            import config as _cfg
             mcp_configs = {
                 "xiaohongshu": {
-                    "url": getattr(config, 'XHS_MCP_URL', 'http://localhost:18060/mcp'),
-                    "token": getattr(config, 'XHS_MCP_TOKEN', ''),
+                    "url": getattr(_cfg, 'XHS_MCP_URL', 'http://localhost:18060/mcp'),
+                    "token": getattr(_cfg, 'XHS_MCP_TOKEN', ''),
                     "prefix": "xhs_",
                 },
                 "mcdonald": {
