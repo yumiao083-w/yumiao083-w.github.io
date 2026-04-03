@@ -331,7 +331,7 @@ function renderContextCards() {
                 <button onclick="deleteContextMsg(${i})" style="background:#ff3b30;color:white;border:none;padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer;">删除</button>
             </div>
             <div style="padding:10px 12px;background:#f5f5f7;">
-                <div contenteditable="true" data-idx="${i}" onblur="updateContextMsg(${i},this.textContent)" style="font-size:13px;line-height:1.4;outline:none;max-height:60px;overflow-y:auto;white-space:pre-wrap;color:#666;">${esc(contextData[i].content||'')}</div>
+                <div contenteditable="true" data-idx="${i}" onblur="updateContextMsg(${i},this.textContent)" style="font-size:13px;line-height:1.4;outline:none;max-height:200px;overflow-y:auto;white-space:pre-wrap;color:#666;">${esc(contextData[i].content||'')}</div>
             </div>`;
             container.appendChild(sysCard);
             i++;
