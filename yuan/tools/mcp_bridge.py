@@ -84,7 +84,7 @@ class MCPProxyTool(Tool):
                 self._server_url,
                 json=payload,
                 headers=headers,
-                timeout=120,
+                timeout=300,  # 5分钟，发帖上传图片/视频较慢
                 )
             resp.raise_for_status()
 
