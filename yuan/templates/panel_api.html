@@ -434,6 +434,39 @@
     </div>
 </div>
 
+<!-- ===== 8. 邮箱 ===== -->
+<div class="section-card">
+    <h2>📧 邮箱收发</h2>
+    <small style="color: #999; display: block; margin-bottom: 12px;">配置后 AI 可以帮你读取和发送邮件</small>
+    <div class="field">
+        <label>邮箱地址</label>
+        <input type="text" id="email-address" value="{{ config.EMAIL_ADDRESS or '' }}" placeholder="example@qq.com">
+        <small>支持 QQ邮箱、Gmail、Outlook、163，服务器地址自动检测</small>
+    </div>
+    <div class="field">
+        <label>授权码</label>
+        <input type="password" id="email-password" value="{{ config.EMAIL_PASSWORD or '' }}">
+        <small>⚠️ 不是登录密码！QQ邮箱：设置→账户→生成授权码；Gmail：应用专用密码</small>
+    </div>
+    <div class="field">
+        <label>IMAP 服务器 <span style="font-weight:normal; color:#aaa;">（留空自动检测）</span></label>
+        <input type="text" id="email-imap" value="{{ config.EMAIL_IMAP_SERVER or '' }}" placeholder="自动检测">
+    </div>
+    <div class="field">
+        <label>SMTP 服务器 <span style="font-weight:normal; color:#aaa;">（留空自动检测）</span></label>
+        <input type="text" id="email-smtp" value="{{ config.EMAIL_SMTP_SERVER or '' }}" placeholder="自动检测">
+    </div>
+    <div class="field">
+        <label>SMTP 端口 <span style="font-weight:normal; color:#aaa;">（0=自动检测）</span></label>
+        <input type="number" id="email-port" value="{{ config.EMAIL_SMTP_PORT or 0 }}" placeholder="0">
+        <small>QQ/Gmail=465（SSL），Outlook=587（STARTTLS）</small>
+    </div>
+    <div class="save-bar">
+        <button class="save-btn" onclick="saveEmail()">保存</button>
+        <span class="save-status" id="email-status"></span>
+    </div>
+</div>
+
 <script>
 // ===== 通用工具 =====
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
@@ -871,6 +904,19 @@ function saveMcp() {
         XHS_MCP_TOKEN: document.getElementById('mcp-xhs-token').value.trim(),
         MCP_RESULT_MAX_LENGTH: parseInt(document.getElementById('mcp-result-max').value) || 3000,
     }, 'mcp-status');
+}
+
+// ===== 邮箱保存 =====
+function saveEmail() {
+    const s = document.getElementById('email-status');
+    s.textContent = '保存中...'; s.style.color = '#999';
+    saveFields({
+        EMAIL_ADDRESS: document.getElementById('email-address').value.trim(),
+        EMAIL_PASSWORD: document.getElementById('email-password').value.trim(),
+        EMAIL_IMAP_SERVER: document.getElementById('email-imap').value.trim(),
+        EMAIL_SMTP_SERVER: document.getElementById('email-smtp').value.trim(),
+        EMAIL_SMTP_PORT: parseInt(document.getElementById('email-port').value) || 0,
+    }, 'email-status');
 }
 
 // ===== 初始化 =====

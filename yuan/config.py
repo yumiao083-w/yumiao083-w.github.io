@@ -336,3 +336,10 @@ XHS_MCP_TOKEN = ''  # 小红书 MCP Token（留空则不传）
 
 # Tavily 联网搜索 API
 TAVILY_API_KEY = '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'
+
+# 邮箱配置（支持 QQ/Gmail/Outlook/163，IMAP/SMTP 服务器自动检测）
+EMAIL_ADDRESS = ''          # 邮箱地址
+EMAIL_PASSWORD = ''         # 授权码（非登录密码！QQ邮箱/163需要生成授权码）
+EMAIL_IMAP_SERVER = ''      # IMAP 服务器（留空自动检测）
+EMAIL_SMTP_SERVER = ''      # SMTP 服务器（留空自动检测）
+EMAIL_SMTP_PORT = 0         # SMTP 端口（0=自动检测，QQ/Gmail=465，Outlook=587）
