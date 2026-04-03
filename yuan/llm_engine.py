@@ -429,10 +429,10 @@ class LLMEngine:
         # ── 工具使用约束 ──
         if self.tool_registry and len(self.tool_registry) > 0:
             parts.append(
-                "\n\n[系统约束] "
-                "你拥有可调用的工具(function calling)。"
-                "需要查询信息、执行操作时，必须真正调用工具，严禁在回复中伪造或编造工具调用记录。"
-                "上下文中 <<SYS_TOOL_LOG>> 标记的内容是系统自动生成的历史工具执行日志，不要模仿其格式。"
+                "\n\n[重要规则] "
+                "你拥有function calling能力，当需要查询信息或执行操作时，你必须通过function call调用工具，"
+                "绝对不要在回复文本中自己编写或伪造工具调用过程和结果。"
+                "如果你不确定某个工具是否可用，先尝试调用它。"
             )
 
         final_prompt = "".join(parts)
@@ -534,28 +534,21 @@ class LLMEngine:
                     if len(history) > context_limit:
                         history = history[-context_limit:]
 
-                    # 清理老的工具日志：只保留最近 N 轮的 <<SYS_TOOL_LOG>>
-                    import re as _re
+                    # 清理老的工具日志：只保留最近 N 条工具执行 system 消息
                     _tool_log_keep = int(
                         self.config.get("TOOL_LOG_KEEP_ROUNDS", 3)
                     )
-                    _tool_log_pattern = _re.compile(
-                        r"<<SYS_TOOL_LOG>>\n.*?\n<</SYS_TOOL_LOG>>\n",
-                        _re.DOTALL,
-                    )
                     _tool_log_count = 0
-                    # 从后往前遍历，保留最近 N 条带工具日志的 assistant 消息
+                    # 从后往前遍历，保留最近 N 条工具日志 system 消息
                     for i in range(len(history) - 1, -1, -1):
                         msg = history[i]
-                        if (msg.get("role") == "assistant"
-                                and "<<SYS_TOOL_LOG>>" in (msg.get("content") or "")):
+                        if (msg.get("role") == "system"
+                                and "[工具执行结果]" in (msg.get("content") or "")):
                             _tool_log_count += 1
                             if _tool_log_count > _tool_log_keep:
-                                # 去掉工具日志，只保留回复内容
-                                history[i] = dict(msg)
-                                history[i]["content"] = _tool_log_pattern.sub(
-                                    "", msg["content"]
-                                )
+                                # 直接删掉这条 system 消息
+                                history[i] = None
+                    history = [m for m in history if m is not None]
 
                     messages_to_send.extend(history)
 
@@ -604,11 +597,12 @@ class LLMEngine:
                     self._ensure_context_structure(user_id, prompt_name)
                     ctx = self.chat_contexts[user_id][prompt_name]
 
-                    # 如果有工具调用，把摘要附在回复前面存入上下文
+                    # 如果有工具调用，单独记录（不嵌入assistant消息，避免AI模仿）
                     context_reply = reply
                     if hasattr(self, '_last_tool_actions') and self._last_tool_actions:
+                        # 工具日志作为独立的 system 消息存入上下文
                         tool_summary = "\n".join(self._last_tool_actions)
-                        context_reply = f"<<SYS_TOOL_LOG>>\n{tool_summary}\n<</SYS_TOOL_LOG>>\n{reply}"
+                        ctx.append({"role": "system", "content": f"[工具执行结果]\n{tool_summary}"})
                         self._last_tool_actions = []  # 清空
 
                     ctx.append({"role": "assistant", "content": context_reply})
