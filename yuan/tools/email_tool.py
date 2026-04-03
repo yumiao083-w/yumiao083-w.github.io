@@ -62,6 +62,27 @@ def _decode_header_value(value: str) -> str:
     return "".join(result)
 
 
+def _safe_decode(payload: bytes, charset: str) -> str:
+    """安全解码邮件内容，处理非标准编码"""
+    if not payload:
+        return ""
+    # 常见的非标准编码映射
+    charset_map = {
+        "unknown-8bit": "utf-8",
+        "x-unknown": "utf-8",
+        "default": "utf-8",
+        "": "utf-8",
+    }
+    charset = (charset or "utf-8").lower().strip()
+    charset = charset_map.get(charset, charset)
+    for enc in [charset, "utf-8", "gbk", "gb2312", "latin-1"]:
+        try:
+            return payload.decode(enc, errors="replace")
+        except (UnicodeDecodeError, LookupError):
+            continue
+    return payload.decode("utf-8", errors="replace")
+
+
 def _get_email_config():
     """从 config.py 读取邮箱配置"""
     try:
@@ -178,17 +199,17 @@ class ReadEmailTool(Tool):
                         if content_type == "text/plain":
                             payload = part.get_payload(decode=True)
                             charset = part.get_content_charset() or "utf-8"
-                            body = payload.decode(charset, errors="replace")
+                            body = _safe_decode(payload, charset)
                             break
                         elif content_type == "text/html" and not body:
                             payload = part.get_payload(decode=True)
                             charset = part.get_content_charset() or "utf-8"
-                            body = payload.decode(charset, errors="replace")
+                            body = _safe_decode(payload, charset)
                 else:
                     payload = msg.get_payload(decode=True)
                     if payload:
                         charset = msg.get_content_charset() or "utf-8"
-                        body = payload.decode(charset, errors="replace")
+                        body = _safe_decode(payload, charset)
 
                 # 截断正文
                 body = body.strip()

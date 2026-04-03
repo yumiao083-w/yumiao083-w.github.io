@@ -318,10 +318,26 @@ function renderContextCards() {
     const userName = window._contextUserName || '用户';
     const aiName = window._contextAiName || 'AI';
 
-    // 按轮次配对：user+assistant 为一轮
+    // 按轮次配对：user+assistant 为一轮，system 消息单独显示
     let i = 0;
     let roundNum = 1;
     while (i < contextData.length) {
+        // 跳过工具日志 system 消息（单独显示为灰色卡片）
+        if (contextData[i].role === 'system') {
+            const sysCard = document.createElement('div');
+            sysCard.style.cssText = 'border: 1px solid #ddd; border-radius: 10px; margin-bottom: 10px; overflow: hidden; opacity: 0.7;';
+            sysCard.innerHTML = `<div style="background:#e8e8ed;padding:6px 12px;font-size:12px;color:#666;display:flex;justify-content:space-between;align-items:center;">
+                <span>🔧 系统消息</span>
+                <button onclick="deleteContextMsg(${i})" style="background:#ff3b30;color:white;border:none;padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer;">删除</button>
+            </div>
+            <div style="padding:10px 12px;background:#f5f5f7;">
+                <div contenteditable="true" data-idx="${i}" onblur="updateContextMsg(${i},this.textContent)" style="font-size:13px;line-height:1.4;outline:none;max-height:60px;overflow-y:auto;white-space:pre-wrap;color:#666;">${esc(contextData[i].content||'')}</div>
+            </div>`;
+            container.appendChild(sysCard);
+            i++;
+            continue;
+        }
+
         const card = document.createElement('div');
         card.style.cssText = 'border: 1px solid #e0e0e0; border-radius: 10px; margin-bottom: 10px; overflow: hidden;';
 
@@ -355,9 +371,11 @@ function renderContextCards() {
 }
 
 function deleteRound(startIdx) {
-    // 删除一轮（user + assistant）
+    // 删除一轮（user + 后续 system + assistant）
     let count = 0;
     if (startIdx < contextData.length && contextData[startIdx].role === 'user') count++;
+    // 跳过中间的 system 消息
+    while (startIdx + count < contextData.length && contextData[startIdx + count].role === 'system') count++;
     if (startIdx + count < contextData.length && contextData[startIdx + count].role === 'assistant') count++;
     if (count > 0) {
         contextData.splice(startIdx, count);
