@@ -140,7 +140,10 @@ def async_update_core_memory(user_id, tag_description, user_message, ai_reply):
         user_id, tag_description, user_message, ai_reply,
         root_dir=bot.root_dir,
         prompt_mapping=bot.prompt_mapping,
+        chat_contexts=bot.chat_contexts,
+        queue_lock=bot.queue_lock,
         call_ai_fn=call_ai_for_summary,
+        get_user_memory_key_fn=bot.get_user_memory_key,
     )
 
 
