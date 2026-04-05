@@ -3438,6 +3438,8 @@ def _format_chat_providers_list(providers):
         lines.append(f"        'base_url': {repr(p.get('base_url', ''))},")
         lines.append(f"        'api_key': {repr(p.get('api_key', ''))},")
         lines.append(f"        'model': {repr(p.get('model', ''))},")
+        if p.get('skip_browser_headers'):
+            lines.append(f"        'skip_browser_headers': True,")
         lines.append('    },')
     lines.append(']')
     return '\n'.join(lines)

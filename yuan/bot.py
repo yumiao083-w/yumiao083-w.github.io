@@ -274,10 +274,11 @@ def _build_chat_providers():
 _chat_providers = _build_chat_providers()
 
 # 初始化OpenAI客户端（用第一个中转站）
+_first_provider = _chat_providers[0]
 client = OpenAI(
-    api_key=_chat_providers[0]['api_key'],
-    base_url=_chat_providers[0]['base_url'],
-    default_headers=_BROWSER_HEADERS
+    api_key=_first_provider['api_key'],
+    base_url=_first_provider['base_url'],
+    default_headers={} if _first_provider.get('skip_browser_headers') else _BROWSER_HEADERS
 )
 
 #初始化在线 AI 客户端 (如果启用)
