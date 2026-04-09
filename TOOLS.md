@@ -71,6 +71,13 @@ bash /home/node/.openclaw/workspace/setup/restore.sh
 - Endpoint: `https://api.tavily.com/search`
 - Free tier: 1,000 searches/month
 
+### 高德地图 (Amap)
+
+- Web服务 API Key: `cc3f32d36404453d7dadf6cf1cdae10f`
+- 文档: https://lbs.amap.com/api/webservice/summary
+- 用途: POI搜索、周边搜索、地理编码、路线规划
+- 免费额度: 5000次/天
+
 ### Telegram
 
 - Bot: 袁朗 (@yuanlang_love_bot)
