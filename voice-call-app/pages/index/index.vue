@@ -1250,12 +1250,7 @@ export default {
 
     async toggleAutoMemory(val) {
       this.memAutoEnabled = val;
-      try {
-        await setAutoMemory(this.token, val);
-        set(KEYS.AUTO_MEMORY, String(val));
-      } catch (e) {
-        uni.showToast({ title: '设置失败', icon: 'none' });
-      }
+      set(KEYS.AUTO_MEMORY, String(val));
     },
 
     startEditMem(mem) {

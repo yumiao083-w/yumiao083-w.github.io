@@ -718,7 +718,7 @@ export default {
         const engineInfo = result.engine ? (' [' + result.engine + ']') : '';
         const timeInfo = result.time ? (' ' + result.time + 's') : '';
         this.addLog('info', 'STT 识别: 「' + text.slice(0, 40) + '」' + engineInfo + timeInfo);
-        this.userText = '你: ' + text;
+        this.userText = text;
         this.statusLine = '识别耗时 ' + (result.time || '?') + 's' + engineInfo + ' | 发送中...';
         this.statsLine = '';
         this.aiText = '';
@@ -821,20 +821,23 @@ export default {
           if (audioLen < 100) {
             self.addLog('warn', '音频数据异常短，可能为空');
           }
-          // 收集 AI 音频片段
           self.audioSegments.push({
             type: 'ai',
             audio_b64: audioBase64,
             format: 'mp3',
             timestamp: Date.now(),
-            msg_index: self.assistantMsgCount
+            msg_index: self.assistantMsgCount,
+            seg_index: index
           });
-          // 后端已经做了 TTS，直接播放 base64 音频
-          if (self.audioPlayer && self.isInCall) {
-            self.addLog('info', '调用 playBase64Audio，播放器队列: ' + (self.audioPlayer.queue ? self.audioPlayer.queue.length : 0) + ' | isPlaying: ' + self.audioPlayer.isPlaying);
-            self.playBase64Audio(audioBase64);
-          } else {
-            self.addLog('error', '❌ 无法播放: audioPlayer=' + !!self.audioPlayer + ' isInCall=' + self.isInCall);
+
+          // 关键修复：按 index 缓冲并顺序播放，避免 SSE 分段乱序到达导致先播第3句再播第2句
+          self.pendingAudioMap[index] = audioBase64;
+          while (self.pendingAudioMap[self.nextAudioIndexToPlay] && self.audioPlayer && self.isInCall) {
+            const nextBase64 = self.pendingAudioMap[self.nextAudioIndexToPlay];
+            delete self.pendingAudioMap[self.nextAudioIndexToPlay];
+            self.addLog('info', '顺序播放音频 #' + self.nextAudioIndexToPlay + '，当前队列: ' + (self.audioPlayer.queue ? self.audioPlayer.queue.length : 0));
+            self.playBase64Audio(nextBase64);
+            self.nextAudioIndexToPlay++;
           }
         },
         onDone(stats) {
@@ -848,14 +851,15 @@ export default {
             const info = '回复 ' + (stats.total_time || '?') + 's · ' + (stats.sentences || '?') + '句TTS · ' + self.currentAiFullText.length + '字';
             self.statsLine = info;
           }
-          // 如果没有音频在播放，恢复录音
-          if (!self.audioPlayer || !self.audioPlayer.isPlaying) {
+          // 若还有排队音频/待排序音频，不要过早恢复录音
+          const hasPendingAudio = (self.audioPlayer && self.audioPlayer.queue && self.audioPlayer.queue.length > 0) || Object.keys(self.pendingAudioMap || {}).length > 0;
+          if (!self.audioPlayer || (!self.audioPlayer.isPlaying && !hasPendingAudio)) {
             self.addLog('info', '无音频在播放，恢复录音');
             self.isAiSpeaking = false;
             self.statusText = '已连接';
             self.startRecording();
           } else {
-            self.addLog('info', '音频播放中，等待播完后恢复录音');
+            self.addLog('info', '音频播放中或仍有待排序片段，等待播完后恢复录音');
           }
         },
         onError(message) {
@@ -1374,7 +1378,7 @@ export default {
       this.textInput = '';
       // 停止录音
       if (this.recorder) this.recorder.stop();
-      this.userText = '你: ' + text;
+      this.userText = text;
       this.statusLine = '发送中...';
       this.statsLine = '';
       this.aiText = '';
@@ -1834,6 +1838,18 @@ n-top: 28rpx;
   flex-direction: column;
   align-items: flex-start;
 }
+.setting-item.column .setting-label,
+.setting-item.column text,
+.settings-section-title,
+.settings-fetch-btn,
+.settings-model-name,
+.picker-display,
+.log-info,
+.log-warn,
+.log-error,
+.log-debug {
+  color: #FFFFFF !important;
+}
 .setting-label {
   font-size: 28rpx;
   color: #fff;
@@ -1888,8 +1904,8 @@ n-top: 28rpx;
   height: 300rpx;
   border-radius: 24rpx;
   overflow: hidden;
-  z-index: 50;
-  background: #000;
+  z-index: 120;
+  background: #111;
   border: 2rpx solid rgba(255,255,255,0.2);
   box-shadow: 0 8rpx 32rpx rgba(0,0,0,0.5);
   transition: all 0.3s ease;
@@ -1906,6 +1922,8 @@ n-top: 28rpx;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
+  background: #111;
 }
 .video-switch-btn {
   position: absolute;
