@@ -890,42 +890,43 @@ export default {
       // #ifdef APP-PLUS
       try {
         const self = this;
-        const fileName = `tts_${Date.now()}_${Math.random().toString(36).slice(2,6)}.mp3`;
+        const fileName = 'tts_' + Date.now() + '_' + Math.random().toString(36).slice(2,6) + '.mp3';
         const filePath = '_doc/' + fileName;
 
-        // 使用 plus.io.FileWriter 的 writeAsBinary 替代 atob（APP 环境更可靠）
-        plus.io.resolveLocalFileSystemURL('_doc/', (entry) => {
-          entry.getFile(fileName, { create: true }, (fileEntry) => {
-            fileEntry.createWriter((writer) => {
-              writer.onwriteend = () => {
-                const fileUrl = fileEntry.toURL();
-                self.addLog('info', 'TTS 文件写入成功: ' + fileUrl);
-                if (self.audioPlayer && self.isInCall) {
-                  self.audioPlayer.enqueue(fileUrl);
-                } else {
-                  self.addLog('warn', '播放器不可用或不在通话中');
-                }
-              };
-              writer.onerror = (e) => {
-                self.addLog('error', 'TTS 文件写入失败: ' + JSON.stringify(e));
-              };
-              // 关键修复: 用 base64 直接写入，避免 atob 兼容性问题
-              writer.seek(0);
-              const arrayBuffer = self._base64ToArrayBuffer(base64);
-              if (arrayBuffer) {
-                writer.write(arrayBuffer);
-              } else {
-                self.addLog('error', 'base64 解码失败');
+        // 方案1: 用 plus.io.convertLocalFileSystemURL 把 base64 直接写成文件
+        // 最可靠的方式：用原生 Blob + FileWriter.writeAsBinary
+        // 实测 plus.io.FileWriter.write(ArrayBuffer) 可能静默失败
+        // 改用：先 base64→ArrayBuffer，再用 uni.getFileSystemManager 写文件
+        const arrayBuffer = self._base64ToArrayBuffer(base64);
+        if (!arrayBuffer) {
+          self.addLog('error', 'base64 解码失败，跳过播放');
+          return;
+        }
+
+        // 方案A: 尝试 uni.getFileSystemManager (部分 APP 环境支持)
+        try {
+          const fsm = uni.getFileSystemManager();
+          const appUserDataPath = (typeof wx !== 'undefined' && wx.env && wx.env.USER_DATA_PATH)
+            ? wx.env.USER_DATA_PATH + '/' + fileName
+            : '_doc/' + fileName;
+          fsm.writeFile({
+            filePath: appUserDataPath,
+            data: arrayBuffer,
+            success: () => {
+              self.addLog('info', 'TTS 文件写入成功(FSM): ' + appUserDataPath);
+              if (self.audioPlayer && self.isInCall) {
+                self.audioPlayer.enqueue(appUserDataPath);
               }
-            }, (e) => {
-              self.addLog('error', 'createWriter 失败: ' + JSON.stringify(e));
-            });
-          }, (e) => {
-            self.addLog('error', 'getFile 失败: ' + JSON.stringify(e));
+            },
+            fail: (err) => {
+              self.addLog('warn', 'FSM 写入失败，尝试 plus.io: ' + JSON.stringify(err));
+              self._writeViaPlusIO(base64, fileName);
+            }
           });
-        }, (e) => {
-          self.addLog('error', 'resolveLocalFileSystemURL 失败: ' + JSON.stringify(e));
-        });
+        } catch (fsmErr) {
+          self.addLog('warn', 'FSM 不可用，尝试 plus.io: ' + (fsmErr.message || fsmErr));
+          self._writeViaPlusIO(base64, fileName);
+        }
       } catch (e) {
         this.addLog('error', 'playBase64Audio APP 异常: ' + (e.message || e));
       }
@@ -962,6 +963,59 @@ export default {
       } catch (e) {
         this.addLog('error', 'base64ToArrayBuffer 失败: ' + (e.message || e));
         return null;
+      }
+    },
+
+    // APP-PLUS: 用 plus.io 兜底写文件
+    _writeViaPlusIO(base64, fileName) {
+      const self = this;
+      try {
+        plus.io.resolveLocalFileSystemURL('_doc/', (dirEntry) => {
+          dirEntry.getFile(fileName, { create: true }, (fileEntry) => {
+            fileEntry.createWriter((writer) => {
+              writer.onwriteend = () => {
+                const localUrl = fileEntry.toLocalURL ? fileEntry.toLocalURL() : fileEntry.toURL();
+                self.addLog('info', 'TTS 文件写入成功(plus.io): ' + localUrl);
+                if (self.audioPlayer && self.isInCall) {
+                  self.audioPlayer.enqueue(localUrl);
+                } else {
+                  self.addLog('warn', '播放器不可用或不在通话中');
+                }
+              };
+              writer.onerror = (err) => {
+                self.addLog('error', 'plus.io 写入失败: ' + JSON.stringify(err));
+              };
+
+              try {
+                if (typeof writer.writeAsBinary === 'function') {
+                  const binary = typeof atob === 'function' ? atob(base64) : '';
+                  if (!binary) {
+                    self.addLog('error', 'writeAsBinary 前 atob 不可用或解码失败');
+                    return;
+                  }
+                  writer.writeAsBinary(binary);
+                } else {
+                  const arrayBuffer = self._base64ToArrayBuffer(base64);
+                  if (!arrayBuffer) {
+                    self.addLog('error', 'plus.io 写入前 base64 解码失败');
+                    return;
+                  }
+                  writer.write(arrayBuffer);
+                }
+              } catch (writeErr) {
+                self.addLog('error', 'plus.io 写入异常: ' + (writeErr.message || writeErr));
+              }
+            }, (err) => {
+              self.addLog('error', 'createWriter 失败: ' + JSON.stringify(err));
+            });
+          }, (err) => {
+            self.addLog('error', 'getFile 失败: ' + JSON.stringify(err));
+          });
+        }, (err) => {
+          self.addLog('error', 'resolveLocalFileSystemURL 失败: ' + JSON.stringify(err));
+        });
+      } catch (e) {
+        self.addLog('error', '_writeViaPlusIO 异常: ' + (e.message || e));
       }
     },
 
