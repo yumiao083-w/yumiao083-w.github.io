@@ -973,9 +973,18 @@ export default {
         plus.io.resolveLocalFileSystemURL('_doc/', (dirEntry) => {
           dirEntry.getFile(fileName, { create: true }, (fileEntry) => {
             fileEntry.createWriter((writer) => {
+              let writeFailed = false;
               writer.onwriteend = () => {
+                if (writeFailed) {
+                  self.addLog('warn', 'plus.io onwriteend 触发，但前面已经报错，跳过入队');
+                  return;
+                }
                 const localUrl = fileEntry.toLocalURL ? fileEntry.toLocalURL() : fileEntry.toURL();
-                self.addLog('info', 'TTS 文件写入成功(plus.io): ' + localUrl);
+                self.addLog('info', 'TTS 文件写入成功(plus.io): ' + localUrl + ' | size=' + (writer.length || 0));
+                if (!writer.length) {
+                  self.addLog('error', '写入后的 TTS 文件大小为 0，跳过播放');
+                  return;
+                }
                 if (self.audioPlayer && self.isInCall) {
                   self.audioPlayer.enqueue(localUrl);
                 } else {
@@ -983,17 +992,14 @@ export default {
                 }
               };
               writer.onerror = (err) => {
+                writeFailed = true;
                 self.addLog('error', 'plus.io 写入失败: ' + JSON.stringify(err));
               };
 
               try {
                 if (typeof writer.writeAsBinary === 'function') {
-                  const binary = typeof atob === 'function' ? atob(base64) : '';
-                  if (!binary) {
-                    self.addLog('error', 'writeAsBinary 前 atob 不可用或解码失败');
-                    return;
-                  }
-                  writer.writeAsBinary(binary);
+                  // 注意：APP-PLUS 的 writeAsBinary 这里实际要求 base64 字符串，不要先 atob
+                  writer.writeAsBinary(base64);
                 } else {
                   const arrayBuffer = self._base64ToArrayBuffer(base64);
                   if (!arrayBuffer) {
@@ -1003,6 +1009,7 @@ export default {
                   writer.write(arrayBuffer);
                 }
               } catch (writeErr) {
+                writeFailed = true;
                 self.addLog('error', 'plus.io 写入异常: ' + (writeErr.message || writeErr));
               }
             }, (err) => {
