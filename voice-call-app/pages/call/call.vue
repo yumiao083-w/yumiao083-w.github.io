@@ -44,7 +44,7 @@
 
     <!-- 字幕区 -->
     <scroll-view class="subtitle-area" scroll-y :scroll-top="subtitleScrollTop" v-if="showSubtitle">
-      <text class="user-subtitle" v-if="userText">你: {{ userText }}</text>
+      <text class="user-subtitle" v-if="userText">{{ userText }}</text>
       <text class="ai-subtitle" v-if="aiText">{{ aiText }}</text>
       <text class="status-line" v-if="statusLine">{{ statusLine }}</text>
       <text class="stats-line" v-if="statsLine">{{ statsLine }}</text>
@@ -1819,134 +1819,15 @@ export default {
 .video-container.fullscreen .video-switch-icon {
   font-size: 36rpx;
 }
-</style>
-n-top: 28rpx;
-}
-.settings-save-text {
-  color: #FFFFFF;
-  font-size: 30rpx;
-  font-weight: 600;
-}
-.setting-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 24rpx 0;
-  border-bottom: 1rpx solid #2C2C2E;
-}
-.setting-item.column {
-  flex-direction: column;
-  align-items: flex-start;
-}
-.setting-item.column .setting-label,
-.setting-item.column text,
-.settings-section-title,
-.settings-fetch-btn,
-.settings-model-name,
-.picker-display,
-.log-info,
-.log-warn,
-.log-error,
-.log-debug {
-  color: #FFFFFF !important;
-}
-.setting-label {
-  font-size: 28rpx;
-  color: #fff;
-  margin-bottom: 8rpx;
-}
-.setting-input {
-  width: 100%;
-  height: 72rpx;
-  background: #2C2C2E;
-  border-radius: 16rpx;
-  padding: 0 24rpx;
-  color: #fff;
-  font-size: 28rpx;
-  margin-top: 8rpx;
-}
-
-/* 过滤规则 */
-.filter-rule-item {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  margin-bottom: 16rpx;
-}
-.filter-rule-inputs {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8rpx;
-}
-.filter-input {
-  height: 64rpx !important;
-  font-size: 26rpx !important;
-}
-.filter-rule-del {
-  font-size: 32rpx;
-  color: #FF3B30;
-  padding: 8rpx 16rpx;
-  flex-shrink: 0;
-}
-.filter-rule-add {
-  padding: 16rpx 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* 视频预览 */
-.video-container {
-  position: absolute;
-  right: 24rpx;
-  width: 220rpx;
-  height: 300rpx;
-  border-radius: 24rpx;
-  overflow: hidden;
-  z-index: 120;
-  background: #111;
-  border: 2rpx solid rgba(255,255,255,0.2);
-  box-shadow: 0 8rpx 32rpx rgba(0,0,0,0.5);
-  transition: all 0.3s ease;
-}
-.video-container.fullscreen {
-  top: 0;
-  right: 0;
-  width: 100%;
-  height: 100%;
+.app-camera-container {
+  overflow: visible;
   border-radius: 0;
-  border: none;
+  background: transparent;
 }
-.video-preview {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  background: #111;
+.app-camera-container .video-preview {
+  border-radius: 0;
 }
-.video-switch-btn {
-  position: absolute;
-  bottom: 12rpx;
-  right: 12rpx;
-  width: 56rpx;
-  height: 56rpx;
-  border-radius: 50%;
-  background: rgba(0,0,0,0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.video-container.fullscreen .video-switch-btn {
-  bottom: 32rpx;
-  right: 32rpx;
-  width: 72rpx;
-  height: 72rpx;
-}
-.video-switch-icon {
-  font-size: 28rpx;
-}
-.video-container.fullscreen .video-switch-icon {
-  font-size: 36rpx;
+.app-camera-container.fullscreen {
+  overflow: visible;
 }
 </style>
