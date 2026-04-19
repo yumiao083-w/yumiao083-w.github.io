@@ -44,16 +44,10 @@
 
     <!-- 字幕区 -->
     <scroll-view class="subtitle-area" scroll-y :scroll-top="subtitleScrollTop" v-if="showSubtitle">
-      <view class="subtitle-bubble-row right" v-if="userText">
-        <view class="subtitle-bubble user-bubble">
-          <text class="subtitle-bubble-text">{{ userText }}</text>
-        </view>
-      </view>
-      <view class="subtitle-bubble-row left" v-if="aiText">
-        <view class="subtitle-bubble ai-bubble">
-          <text class="subtitle-bubble-text ai-bubble-text">{{ aiText }}</text>
-        </view>
-      </view>
+      <text class="user-subtitle" v-if="userText">你: {{ userText }}</text>
+      <text class="ai-subtitle" v-if="aiText">{{ aiText }}</text>
+      <text class="status-line" v-if="statusLine">{{ statusLine }}</text>
+      <text class="stats-line" v-if="statsLine">{{ statsLine }}</text>
     </scroll-view>
 
     <!-- 文字输入 -->
@@ -332,6 +326,8 @@ export default {
       userText: '',
       aiText: '',
       currentAiFullText: '',
+      statusLine: '',
+      statsLine: '',
       textInput: '',
       subtitleScrollTop: 0,
       userId: '',
@@ -502,6 +498,8 @@ export default {
       this.userText = '';
       this.aiText = '';
       this.currentAiFullText = '';
+      this.statusLine = '';
+      this.statsLine = '';
       this.callStartTime = Date.now();
 
       // 计时器
@@ -702,7 +700,8 @@ export default {
 
     async handleRecordingResult(filePath) {
       this.statusText = '语音识别中...';
-      this.userText = '识别中...';
+      this.userText = '🎤 识别中...';
+      this.statusLine = '语音识别中...';
       this.addLog('info', '发送录音到 STT: ' + filePath);
       try {
         const sttOptions = {};
@@ -711,6 +710,7 @@ export default {
         if (!text) {
           this.addLog('info', 'STT 返回空（静音段）');
           this.userText = '';
+          this.statusLine = '';
           this.statusText = '已连接';
           this.startRecording();
           return;
@@ -718,7 +718,10 @@ export default {
         const engineInfo = result.engine ? (' [' + result.engine + ']') : '';
         const timeInfo = result.time ? (' ' + result.time + 's') : '';
         this.addLog('info', 'STT 识别: 「' + text.slice(0, 40) + '」' + engineInfo + timeInfo);
-        this.userText = text;
+        this.userText = '你: ' + text;
+        this.statusLine = '识别耗时 ' + (result.time || '?') + 's' + engineInfo + ' | 发送中...';
+        this.statsLine = '';
+        this.aiText = '';
         this.sendToChat(text);
       } catch (err) {
         const errMsg = err.message || (err.data && err.data.error) || JSON.stringify(err).slice(0, 100);
@@ -797,15 +800,18 @@ export default {
         onUserConfirmed(confirmedText) {
           self.addLog('info', '✅ 服务端已确认收到文本');
           self.statusText = '已收到，正在处理...';
+          self.statusLine = '已收到，正在处理...';
         },
         onStatus(message) {
           self.addLog('info', '状态: ' + message);
           self.statusText = message;
+          self.statusLine = message;
         },
         onTextDelta(delta) {
           self.currentAiFullText += delta;
           self.aiText = self.cleanVoiceTags(self.currentAiFullText);
           self.statusText = '回复中...';
+          self.statusLine = '';
           self.subtitleScrollTop += 100;
         },
         onAudio(audioBase64, audioText, index) {
@@ -837,6 +843,11 @@ export default {
           self.messages.push({ role: 'assistant', content: self.currentAiFullText });
           self.assistantMsgCount++;
           self.statusText = '';
+          self.statusLine = '';
+          if (stats) {
+            const info = '回复 ' + (stats.total_time || '?') + 's · ' + (stats.sentences || '?') + '句TTS · ' + self.currentAiFullText.length + '字';
+            self.statsLine = info;
+          }
           // 如果没有音频在播放，恢复录音
           if (!self.audioPlayer || !self.audioPlayer.isPlaying) {
             self.addLog('info', '无音频在播放，恢复录音');
@@ -850,16 +861,20 @@ export default {
         onError(message) {
           self.addLog('error', '❌ Chat 错误: ' + message);
           self.statusText = '⚠️ ' + message;
+          self.aiText = '⚠️ ' + message;
+          self.statusLine = '';
           self.isAiSpeaking = false;
           self.startRecording();
         },
         onTtsError(errorText) {
           self.addLog('error', '❌ TTS 错误: ' + errorText);
           self.statusText = '⚠️ TTS: ' + errorText;
+          self.statusLine = '⚠️ 语音合成失败: ' + errorText;
         },
         onVisionLog(text) {
           self.addLog('info', '🎥 识图: ' + text);
           self.statusText = text;
+          self.statusLine = text;
         }
       });
     },
@@ -1292,7 +1307,10 @@ export default {
       this.textInput = '';
       // 停止录音
       if (this.recorder) this.recorder.stop();
-      this.userText = text;
+      this.userText = '你: ' + text;
+      this.statusLine = '发送中...';
+      this.statsLine = '';
+      this.aiText = '';
       console.log('[call] sendTextInput:', text);
       this.sendToChat(text);
     },
@@ -1384,43 +1402,49 @@ export default {
 /* 字幕区 */
 .subtitle-area {
   flex: 1;
-  padding: 24rpx 32rpx;
-  max-height: 400rpx;
+  max-height: 50vh;
+  padding: 20rpx 48rpx;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
   position: relative;
   z-index: 10;
 }
-.subtitle-bubble-row {
-  display: flex;
-  margin-bottom: 16rpx;
+.user-subtitle {
+  font-size: 34rpx;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.5;
+  text-align: center;
+  width: 100%;
+  font-weight: 400;
+  display: block;
+  margin-bottom: 24rpx;
 }
-.subtitle-bubble-row.right {
-  justify-content: flex-end;
-}
-.subtitle-bubble-row.left {
-  justify-content: flex-start;
-}
-.subtitle-bubble {
-  max-width: 80%;
-  padding: 16rpx 24rpx;
-  border-radius: 20rpx;
-}
-.user-bubble {
-  background: rgba(10, 132, 255, 0.25);
-  border-bottom-right-radius: 6rpx;
-}
-.ai-bubble {
-  background: rgba(255, 255, 255, 0.1);
-  border-bottom-left-radius: 6rpx;
-}
-.subtitle-bubble-text {
-  font-size: 28rpx;
-  color: #8E8E93;
+.ai-subtitle {
+  font-size: 44rpx;
+  color: #FFFFFF;
   line-height: 1.4;
-}
-.ai-bubble-text {
-  font-size: 36rpx;
-  color: #fff;
+  text-align: center;
+  width: 100%;
   font-weight: 500;
+  display: block;
+}
+.status-line {
+  font-size: 26rpx;
+  color: #8E8E93;
+  text-align: center;
+  width: 100%;
+  display: block;
+  margin-top: 12rpx;
+}
+.stats-line {
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.3);
+  text-align: center;
+  width: 100%;
+  display: block;
+  margin-top: 4rpx;
 }
 
 /* 文字输入 */
