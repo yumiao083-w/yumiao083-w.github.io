@@ -117,7 +117,8 @@ export function generateMemory(data) {
 }
 
 export function deleteMemory(token, memoryId) {
-  return request('/api/memory/summaries', 'DELETE', { token, id: memoryId });
+  // 当前后端无独立 memory 删除接口，占位返回错误，由页面提示用户从通话记录侧删除/重生成
+  return Promise.reject({ statusCode: 404, data: { error: 'memory api not available' } });
 }
 
 export function updateMemory(token, memoryId, text) {

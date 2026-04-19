@@ -1227,28 +1227,22 @@ export default {
       this.memErrorMsg = '';
       try {
         const data = await getMemorySummaries(this.token);
-        console.log('[index] getMemorySummaries response:', JSON.stringify(data).slice(0, 200));
-        this.memorySummaries = data.summaries || data || [];
+        const calls = data.calls || data || [];
+        const memCalls = calls.filter(c => c.memory);
+        this.memorySummaries = memCalls.map(c => ({
+          id: c.call_id || c.id,
+          text: c.memory,
+          created_at: c.start_time || c.created_at,
+          call_id: c.call_id || c.id,
+        }));
+        if (!this.memorySummaries.length) {
+          this.memErrorMsg = '';
+        }
       } catch (e) {
         const errDetail = e && e.data && e.data.error ? e.data.error : (e && e.statusCode ? 'HTTP ' + e.statusCode : (e && e.message ? e.message : JSON.stringify(e).slice(0, 100)));
-        console.warn('[index] getMemorySummaries failed:', errDetail);
+        console.warn('[index] loadMemories failed:', errDetail);
         this.memErrorMsg = '加载失败: ' + errDetail;
-        // 回退：从通话记录里过滤有 memory 的记录
-        try {
-          const histData = await getCallHistory(this.token);
-          const calls = histData.calls || histData || [];
-          const memCalls = calls.filter(c => c.memory);
-          if (memCalls.length > 0) {
-            this.memorySummaries = memCalls.map(c => ({
-              id: c.call_id || c.id,
-              text: c.memory,
-              created_at: c.start_time || c.created_at,
-            }));
-            this.memErrorMsg = '(已从通话记录中恢复记忆)';
-          }
-        } catch (e2) {
-          console.error('[index] loadMemories fallback error:', e2);
-        }
+        this.memorySummaries = [];
       } finally {
         this.memLoading = false;
       }
@@ -1292,13 +1286,7 @@ export default {
     },
 
     async doDeleteMem(mem) {
-      try {
-        await deleteMemory(this.token, mem.id);
-        this.memorySummaries = this.memorySummaries.filter(m => m.id !== mem.id);
-        uni.showToast({ title: '已删除', icon: 'success' });
-      } catch (e) {
-        uni.showToast({ title: '删除失败', icon: 'none' });
-      }
+      uni.showToast({ title: '当前后端不支持独立删除记忆，请删除对应通话记录', icon: 'none' });
     },
 
     async loadBalance() {
@@ -2363,5 +2351,8 @@ export default {
 
 .logout-btn:active {
   opacity: 0.6;
+}
+</style>
+6;
 }
 </style>
