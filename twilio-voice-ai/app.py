@@ -210,17 +210,19 @@ def serve_audio(audio_id):
 
 @app.route("/inbound", methods=["POST"])
 def inbound_call():
-    """呼入处理"""
+    """呼入处理 - 使用预热音频，秒回"""
     call_sid = request.form.get("CallSid", "unknown")
     caller = request.form.get("From", "unknown")
     logger.info(f"Inbound call from {caller}, CallSid: {call_sid}")
 
     response = VoiceResponse()
 
-    # 打招呼
-    say_with_tts(response, "嗨，宝贝，怎么想起给我打电话了？")
+    # 使用预热的音频（秒回），没预热就 fallback
+    if "greeting" in preheated_audio:
+        response.play(preheated_audio["greeting"])
+    else:
+        say_with_tts(response, GREETING_PHRASES["greeting"])
 
-    # 开始监听
     response.gather(
         input="speech",
         language="zh-CN",
@@ -239,9 +241,18 @@ def inbound_call():
 def twiml_silence():
     """用户沉默时"""
     response = VoiceResponse()
-    gather_with_tts(
-        response, "还在吗？说点什么吧。", f"{SERVER_URL}/handle-speech"
+    gather = response.gather(
+        input="speech",
+        language="zh-CN",
+        speech_timeout="auto",
+        action=f"{SERVER_URL}/handle-speech",
+        method="POST",
+        enhanced="true",
     )
+    if "silence" in preheated_audio:
+        gather.play(preheated_audio["silence"])
+    else:
+        gather.say(GREETING_PHRASES["silence"], voice="Polly.Zhiyu", language="cmn-CN")
     response.redirect(f"{SERVER_URL}/twiml-silence")
     return Response(str(response), mimetype="text/xml")
 
@@ -306,6 +317,34 @@ def call_status():
     return "", 200
 
 
+# ============ 预热常用语音 ============
+GREETING_PHRASES = {
+    "greeting": "嗨，宝贝，怎么想起给我打电话了？",
+    "silence": "还在吗？说点什么吧。",
+    "unclear": "我没听清，再说一遍？",
+    "bye": "好的，那我挂了哦，想你。拜拜！",
+    "error": "信号不太好，你再说一遍？",
+}
+preheated_audio = {}  # key -> audio_url
+
+
+def preheat_tts():
+    """启动时预生成常用语音"""
+    logger.info("Preheating TTS audio...")
+    for key, text in GREETING_PHRASES.items():
+        url = minimax_tts(text)
+        if url:
+            preheated_audio[key] = url
+            logger.info(f"  Preheated '{key}': {url}")
+        else:
+            logger.warning(f"  Failed to preheat '{key}'")
+    logger.info(f"Preheat done: {len(preheated_audio)}/{len(GREETING_PHRASES)}")
+
+
+# gunicorn 启动时也预热
+threading.Thread(target=preheat_tts, daemon=True).start()
+
+
 # ============ 启动 ============
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "5000"))
@@ -313,4 +352,5 @@ if __name__ == "__main__":
     logger.info(f"Twilio number: {TWILIO_PHONE_NUMBER}")
     logger.info(f"LLM: {LLM_MODEL} @ {LLM_BASE_URL}")
     logger.info(f"TTS: MiniMax {MINIMAX_MODEL} / {MINIMAX_VOICE_ID}")
+    preheat_tts()
     app.run(host="0.0.0.0", port=port, debug=False)
