@@ -106,7 +106,7 @@ def inbound_call():
     response = VoiceResponse()
 
     # 接起来打招呼
-    response.say("嗨，宝贝，怎么想起给我打电话了？", voice="Polly.Zhiyu", language="cmn-CN")
+    response.say("嗨，宝贝，怎么想起给我打电话了？", voice="Google.cmn-CN-Standard-A", language="cmn-CN")
 
     # 开始监听
     gather = response.gather(
@@ -153,7 +153,7 @@ def twiml_handler():
     response = VoiceResponse()
 
     # 先打招呼
-    response.say("你好呀，想你了就给你打个电话。", voice="Polly.Zhiyu", language="cmn-CN")
+    response.say("你好呀，想你了就给你打个电话。", voice="Google.cmn-CN-Standard-A", language="cmn-CN")
 
     # 开始监听用户说话
     gather = response.gather(
@@ -164,7 +164,7 @@ def twiml_handler():
         method="POST",
         enhanced="true",
     )
-    gather.say("你在干嘛呢？", voice="Polly.Zhiyu", language="cmn-CN")
+    gather.say("你在干嘛呢？", voice="Google.cmn-CN-Standard-A", language="cmn-CN")
 
     # 如果用户没说话，重新提示
     response.redirect(f"{SERVER_URL}/twiml-silence")
@@ -184,7 +184,7 @@ def twiml_silence():
         method="POST",
         enhanced="true",
     )
-    gather.say("还在吗？说点什么吧。", voice="Polly.Zhiyu", language="cmn-CN")
+    gather.say("还在吗？说点什么吧。", voice="Google.cmn-CN-Standard-A", language="cmn-CN")
     response.redirect(f"{SERVER_URL}/twiml-silence")
     return Response(str(response), mimetype="text/xml")
 
@@ -209,13 +209,13 @@ def handle_speech():
             method="POST",
             enhanced="true",
         )
-        gather.say("我没听清，再说一遍？", voice="Polly.Zhiyu", language="cmn-CN")
+        gather.say("我没听清，再说一遍？", voice="Google.cmn-CN-Standard-A", language="cmn-CN")
         return Response(str(response), mimetype="text/xml")
 
     # 检查挂断意图
     bye_words = ["再见", "拜拜", "挂了", "不聊了", "bye", "挂断"]
     if any(w in speech_result for w in bye_words):
-        response.say("好的，那我挂了哦，想你。拜拜！", voice="Polly.Zhiyu", language="cmn-CN")
+        response.say("好的，那我挂了哦，想你。拜拜！", voice="Google.cmn-CN-Standard-A", language="cmn-CN")
         response.hangup()
         if call_sid in conversations:
             del conversations[call_sid]
@@ -225,7 +225,7 @@ def handle_speech():
     reply = get_llm_response(call_sid, speech_result)
 
     # 播放回复
-    response.say(reply, voice="Polly.Zhiyu", language="cmn-CN")
+    response.say(reply, voice="Google.cmn-CN-Standard-A", language="cmn-CN")
 
     # 继续听下一句
     gather = response.gather(
