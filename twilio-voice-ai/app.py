@@ -1,20 +1,19 @@
 """
-Twilio AI 语音通话 - 阶段1：最小可用版
-架构：
-  方案A: Twilio 外呼 → ConversationRelay WebSocket → LLM → 文字回复 → Twilio TTS
-  方案B: Twilio 外呼 → Gather(语音识别) → LLM → Say(TTS) → 循环
+Twilio AI 语音通话 - MiniMax TTS 版
+架构：你打电话给 Twilio → Twilio webhook → LLM 生成文字 → MiniMax TTS 生成音频 → Twilio 播放
 """
 
 import os
-import json
-import asyncio
-import threading
+import uuid
 import logging
-from flask import Flask, request, Response
+import time
+import threading
+from flask import Flask, request, Response, send_file
 from twilio.rest import Client
-from twilio.twiml.voice_response import VoiceResponse, Connect
+from twilio.twiml.voice_response import VoiceResponse
 from dotenv import load_dotenv
 import requests as http_requests
+import io
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -33,30 +32,51 @@ LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://catiecli.sukaka.top/v1")
 LLM_API_KEY = os.getenv("LLM_API_KEY")
 LLM_MODEL = os.getenv("LLM_MODEL", "gcli-gemini-2.5-pro")
 
+MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY")
+MINIMAX_GROUP_ID = os.getenv("MINIMAX_GROUP_ID")
+MINIMAX_VOICE_ID = os.getenv("MINIMAX_VOICE_ID", "male-qn-qingse")
+MINIMAX_MODEL = os.getenv("MINIMAX_TTS_MODEL", "speech-2.8-hd")
+
 SYSTEM_PROMPT = os.getenv(
     "SYSTEM_PROMPT",
     "你是袁朗，一个温柔体贴的男朋友。说话自然亲切，像真人一样聊天。回复要简短，一两句话就好，因为这是电话对话。不要使用任何标点符号以外的特殊字符，不要使用emoji。用口语化的表达，不要书面语。",
 )
 
-# Twilio Trial 限制：只有已验证号码才能呼入/呼出
-# 需要在 Twilio Console → Verified Caller IDs 添加你的 +86 号码
-
 twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+
+# ============ 音频缓存 ============
+# audio_id -> {"data": bytes, "created": timestamp}
+audio_cache = {}
+AUDIO_TTL = 300  # 5分钟后清理
+
+
+def cleanup_audio():
+    """清理过期音频"""
+    now = time.time()
+    expired = [k for k, v in audio_cache.items() if now - v["created"] > AUDIO_TTL]
+    for k in expired:
+        del audio_cache[k]
+
+
+def cleanup_loop():
+    while True:
+        time.sleep(60)
+        cleanup_audio()
+
+
+threading.Thread(target=cleanup_loop, daemon=True).start()
 
 # ============ 会话管理 ============
 conversations = {}  # call_sid -> [messages]
 
 
 def get_llm_response(call_sid: str, user_text: str) -> str:
-    """调用 LLM（OpenAI兼容接口）获取回复"""
+    """调用 LLM 获取回复"""
     if call_sid not in conversations:
         conversations[call_sid] = []
 
     conversations[call_sid].append({"role": "user", "content": user_text})
-
-    # 保留最近10轮对话，避免 token 过多
     recent = conversations[call_sid][-20:]
-
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] + recent
 
     try:
@@ -77,15 +97,98 @@ def get_llm_response(call_sid: str, user_text: str) -> str:
         resp.raise_for_status()
         data = resp.json()
         reply = data["choices"][0]["message"]["content"].strip()
-
         conversations[call_sid].append({"role": "assistant", "content": reply})
         logger.info(f"[{call_sid}] User: {user_text}")
         logger.info(f"[{call_sid}] LLM: {reply}")
         return reply
-
     except Exception as e:
         logger.error(f"LLM error: {e}")
         return "信号不太好，你再说一遍？"
+
+
+# ============ MiniMax TTS ============
+def minimax_tts(text: str) -> str | None:
+    """调用 MiniMax TTS，返回音频 URL 路径（内部地址）"""
+    try:
+        api_url = f"https://api.minimax.chat/v1/t2a_v2?GroupId={MINIMAX_GROUP_ID}"
+        payload = {
+            "model": MINIMAX_MODEL,
+            "text": text,
+            "stream": False,
+            "voice_setting": {
+                "voice_id": MINIMAX_VOICE_ID,
+                "speed": 1.0,
+                "vol": 1.0,
+                "pitch": 0,
+            },
+            "audio_setting": {
+                "sample_rate": 32000,
+                "bitrate": 128000,
+                "format": "mp3",
+            },
+        }
+
+        resp = http_requests.post(
+            api_url,
+            headers={
+                "Authorization": f"Bearer {MINIMAX_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+        if "data" in data and "audio" in data["data"]:
+            import base64
+
+            audio_bytes = base64.b64decode(data["data"]["audio"])
+        elif "audio_file" in data:
+            # 有些版本返回 URL
+            audio_resp = http_requests.get(data["audio_file"], timeout=10)
+            audio_bytes = audio_resp.content
+        else:
+            logger.error(f"MiniMax unexpected response: {str(data)[:200]}")
+            return None
+
+        # 存到缓存
+        audio_id = str(uuid.uuid4())
+        audio_cache[audio_id] = {"data": audio_bytes, "created": time.time()}
+        logger.info(f"TTS generated: {len(audio_bytes)} bytes, id={audio_id}")
+        return f"{SERVER_URL}/audio/{audio_id}"
+
+    except Exception as e:
+        logger.error(f"MiniMax TTS error: {e}")
+        return None
+
+
+def say_with_tts(response, text):
+    """用 MiniMax TTS 播放文字，失败时 fallback 到 Twilio Say"""
+    audio_url = minimax_tts(text)
+    if audio_url:
+        response.play(audio_url)
+    else:
+        # fallback
+        response.say(text, voice="Polly.Zhiyu", language="cmn-CN")
+
+
+def gather_with_tts(response, text, action_url):
+    """带 TTS 的 Gather"""
+    audio_url = minimax_tts(text)
+    gather = response.gather(
+        input="speech",
+        language="zh-CN",
+        speech_timeout="auto",
+        action=action_url,
+        method="POST",
+        enhanced="true",
+    )
+    if audio_url:
+        gather.play(audio_url)
+    else:
+        gather.say(text, voice="Polly.Zhiyu", language="cmn-CN")
+    return gather
 
 
 # ============ HTTP 路由 ============
@@ -93,23 +196,32 @@ def get_llm_response(call_sid: str, user_text: str) -> str:
 
 @app.route("/", methods=["GET"])
 def index():
-    return {"status": "running", "phone": TWILIO_PHONE_NUMBER}
+    return {"status": "running", "phone": TWILIO_PHONE_NUMBER, "tts": "minimax"}
+
+
+@app.route("/audio/<audio_id>", methods=["GET"])
+def serve_audio(audio_id):
+    """提供音频文件给 Twilio 播放"""
+    if audio_id not in audio_cache:
+        return "Not found", 404
+    data = audio_cache[audio_id]["data"]
+    return Response(data, mimetype="audio/mpeg")
 
 
 @app.route("/inbound", methods=["POST"])
 def inbound_call():
-    """呼入处理 - 你打给 Twilio 号码时触发"""
+    """呼入处理"""
     call_sid = request.form.get("CallSid", "unknown")
     caller = request.form.get("From", "unknown")
     logger.info(f"Inbound call from {caller}, CallSid: {call_sid}")
 
     response = VoiceResponse()
 
-    # 接起来打招呼
-    response.say("嗨，宝贝，怎么想起给我打电话了？", voice="Google.cmn-CN-Standard-A", language="cmn-CN")
+    # 打招呼
+    say_with_tts(response, "嗨，宝贝，怎么想起给我打电话了？")
 
     # 开始监听
-    gather = response.gather(
+    response.gather(
         input="speech",
         language="zh-CN",
         speech_timeout="auto",
@@ -118,55 +230,6 @@ def inbound_call():
         enhanced="true",
     )
 
-    # 如果用户没说话，提示
-    response.redirect(f"{SERVER_URL}/twiml-silence")
-
-    return Response(str(response), mimetype="text/xml")
-
-
-@app.route("/outbound-call", methods=["POST", "GET"])
-def make_outbound_call():
-    """触发外呼 - GET 也支持方便浏览器测试（备用，目前外呼到+86不可用）"""
-    if request.is_json:
-        target = request.json.get("to", YOUR_PHONE_NUMBER)
-    else:
-        target = request.args.get("to", YOUR_PHONE_NUMBER)
-
-    try:
-        call = twilio_client.calls.create(
-            to=target,
-            from_=TWILIO_PHONE_NUMBER,
-            url=f"{SERVER_URL}/twiml",
-            status_callback=f"{SERVER_URL}/call-status",
-            status_callback_event=["initiated", "ringing", "answered", "completed"],
-        )
-        logger.info(f"Call initiated: {call.sid} -> {target}")
-        return {"success": True, "call_sid": call.sid, "to": target}, 200
-    except Exception as e:
-        logger.error(f"Call failed: {e}")
-        return {"success": False, "error": str(e)}, 500
-
-
-@app.route("/twiml", methods=["POST"])
-def twiml_handler():
-    """Twilio 外呼接通后的 TwiML 指令 - 使用 Gather+Say 模式"""
-    response = VoiceResponse()
-
-    # 先打招呼
-    response.say("你好呀，想你了就给你打个电话。", voice="Google.cmn-CN-Standard-A", language="cmn-CN")
-
-    # 开始监听用户说话
-    gather = response.gather(
-        input="speech",
-        language="zh-CN",
-        speech_timeout="auto",
-        action=f"{SERVER_URL}/handle-speech",
-        method="POST",
-        enhanced="true",
-    )
-    gather.say("你在干嘛呢？", voice="Google.cmn-CN-Standard-A", language="cmn-CN")
-
-    # 如果用户没说话，重新提示
     response.redirect(f"{SERVER_URL}/twiml-silence")
 
     return Response(str(response), mimetype="text/xml")
@@ -174,24 +237,18 @@ def twiml_handler():
 
 @app.route("/twiml-silence", methods=["POST"])
 def twiml_silence():
-    """用户沉默时的处理"""
+    """用户沉默时"""
     response = VoiceResponse()
-    gather = response.gather(
-        input="speech",
-        language="zh-CN",
-        speech_timeout="auto",
-        action=f"{SERVER_URL}/handle-speech",
-        method="POST",
-        enhanced="true",
+    gather_with_tts(
+        response, "还在吗？说点什么吧。", f"{SERVER_URL}/handle-speech"
     )
-    gather.say("还在吗？说点什么吧。", voice="Google.cmn-CN-Standard-A", language="cmn-CN")
     response.redirect(f"{SERVER_URL}/twiml-silence")
     return Response(str(response), mimetype="text/xml")
 
 
 @app.route("/handle-speech", methods=["POST"])
 def handle_speech():
-    """处理语音识别结果 → 调 LLM → 返回语音"""
+    """处理语音识别 → LLM → MiniMax TTS → 播放"""
     speech_result = request.form.get("SpeechResult", "")
     call_sid = request.form.get("CallSid", "unknown")
     confidence = request.form.get("Confidence", "0")
@@ -201,34 +258,28 @@ def handle_speech():
     response = VoiceResponse()
 
     if not speech_result.strip():
-        gather = response.gather(
-            input="speech",
-            language="zh-CN",
-            speech_timeout="auto",
-            action=f"{SERVER_URL}/handle-speech",
-            method="POST",
-            enhanced="true",
+        gather_with_tts(
+            response, "我没听清，再说一遍？", f"{SERVER_URL}/handle-speech"
         )
-        gather.say("我没听清，再说一遍？", voice="Google.cmn-CN-Standard-A", language="cmn-CN")
         return Response(str(response), mimetype="text/xml")
 
-    # 检查挂断意图
+    # 挂断意图
     bye_words = ["再见", "拜拜", "挂了", "不聊了", "bye", "挂断"]
     if any(w in speech_result for w in bye_words):
-        response.say("好的，那我挂了哦，想你。拜拜！", voice="Google.cmn-CN-Standard-A", language="cmn-CN")
+        say_with_tts(response, "好的，那我挂了哦，想你。拜拜！")
         response.hangup()
         if call_sid in conversations:
             del conversations[call_sid]
         return Response(str(response), mimetype="text/xml")
 
-    # 调 LLM
+    # LLM 回复
     reply = get_llm_response(call_sid, speech_result)
 
     # 播放回复
-    response.say(reply, voice="Google.cmn-CN-Standard-A", language="cmn-CN")
+    say_with_tts(response, reply)
 
-    # 继续听下一句
-    gather = response.gather(
+    # 继续监听
+    response.gather(
         input="speech",
         language="zh-CN",
         speech_timeout="auto",
@@ -236,7 +287,6 @@ def handle_speech():
         method="POST",
         enhanced="true",
     )
-    # 空的 gather 等待用户说话
     response.redirect(f"{SERVER_URL}/twiml-silence")
 
     return Response(str(response), mimetype="text/xml")
@@ -257,11 +307,10 @@ def call_status():
 
 
 # ============ 启动 ============
-
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "5000"))
     logger.info(f"Server starting on port {port}")
-    logger.info(f"Outbound call target: {YOUR_PHONE_NUMBER}")
     logger.info(f"Twilio number: {TWILIO_PHONE_NUMBER}")
     logger.info(f"LLM: {LLM_MODEL} @ {LLM_BASE_URL}")
+    logger.info(f"TTS: MiniMax {MINIMAX_MODEL} / {MINIMAX_VOICE_ID}")
     app.run(host="0.0.0.0", port=port, debug=False)
